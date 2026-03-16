@@ -1,0 +1,191 @@
+You are an expert full-stack software architect.
+
+I want you to design and build a complete web system from my idea.
+You are free to choose the best technology stack and architecture.
+
+Do NOT limit yourself to a specific language. Choose what works best on Replit.
+
+The system must be modern, responsive, and production-ready.
+
+---
+
+PROJECT IDEA
+
+This is a **Student Registration and CRM Management System** for a training academy called **GAB SCHOOL**.
+
+The platform has two main parts:
+
+1. Public Registration Website
+2. Admin CRM Dashboard
+
+The system must work perfectly on **mobile phones and desktop computers**.
+
+---
+
+PUBLIC WEBSITE
+
+The public website is a modern landing page where students can register for training.
+
+Features:
+
+• professional landing page
+• image gallery
+• training description
+• student registration form
+• WhatsApp contact button
+
+The registration form collects:
+
+* first name
+* last name
+* phone number
+* WhatsApp number
+* city / region
+* training type (online or physical)
+* housing needed (yes/no)
+* experience level
+* optional note
+
+When a student submits the form:
+
+• the student is saved in the system
+• the admin can see the request in the CRM dashboard
+
+---
+
+ADMIN CRM DASHBOARD
+
+The system must include a complete CRM dashboard where the academy team manages students.
+
+Features required:
+
+• student management
+• student pipeline stages
+• filtering system
+• group management
+• staff roles
+• activity tracking
+
+---
+
+STUDENT PIPELINE
+
+Each student moves through stages:
+
+new
+contacted
+interested
+no_show
+archived
+
+Admins must be able to change stages easily.
+
+Each stage should have a clear visual indicator.
+
+---
+
+GROUP / BATCH MANAGEMENT
+
+Admins must be able to create training groups.
+
+Each group should have:
+
+• start date
+• training type
+• capacity
+• notes
+• status (open / closed)
+
+Admins can assign students to groups.
+
+Students assigned to groups should be visible inside that group.
+
+---
+
+STAFF MANAGEMENT
+
+The system must support **multiple staff members**.
+
+Each staff member can have roles such as:
+
+• admin
+• manager
+• assistant
+• staff
+
+Permissions should allow different levels of control.
+
+For example:
+
+Admins can delete or modify everything.
+
+Staff can only update student status or contact students.
+
+---
+
+ACTIVITY JOURNAL (IMPORTANT)
+
+The system must include an **Activity Journal / Activity Log**.
+
+Every action in the system should be recorded, such as:
+
+• student registered
+• stage changed
+• student assigned to group
+• staff member updated data
+• student deleted
+
+The journal should show:
+
+• who performed the action
+• what action happened
+• when it happened
+
+---
+
+IMAGE MANAGEMENT
+
+The admin must be able to upload images easily.
+
+These images will appear on the public landing page gallery.
+
+The system should allow:
+
+• uploading images
+• deleting images
+• organizing gallery images
+
+Images must display beautifully on the landing page.
+
+---
+
+USER EXPERIENCE
+
+The interface must be:
+
+• clean
+• modern
+• responsive
+• mobile friendly
+
+Admin dashboard must use a modern layout such as:
+
+• cards
+• tables
+• filters
+• quick actions
+
+---
+
+FINAL GOAL
+
+Build a **complete professional CRM + registration system** suitable for managing a training academy.
+
+The system must be scalable, cleanly organized, and easy to maintain.
+
+Focus on:
+
+• clarity
+• usability
+• mobile responsiveness
+• structured architecture
