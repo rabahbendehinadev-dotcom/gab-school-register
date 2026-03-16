@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { useAuth } from "@/hooks/use-auth";
 import { 
   useListStudents, useDeleteStudent, useUpdateStudent, useUpdateStudentStage, 
   useAssignStudentToGroup, useListGroups, getListStudentsQueryKey,
@@ -34,6 +35,8 @@ export default function Students() {
   const [groupDialogStudent, setGroupDialogStudent] = useState<Student | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+  const canManage = user?.role === "admin" || user?.role === "manager";
   
   const queryClient = useQueryClient();
   const { data: students, isLoading } = useListStudents({ 
@@ -166,32 +169,36 @@ export default function Students() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Button 
+                        <Button
                           variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
                           title="View/Edit" onClick={() => setDetailStudent(student)}
                         >
                           <Eye className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>
-                        <Button 
+                        <Button
                           variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
                           title="Change Stage" onClick={() => setStageDialogStudent(student)}
                         >
                           <ArrowRightLeft className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>
-                        <Button 
-                          variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
-                          title="Assign Group" onClick={() => setGroupDialogStudent(student)}
-                        >
-                          <Users className="w-4 h-4 text-muted-foreground hover:text-foreground" />
-                        </Button>
-                        <Button 
-                          variant="ghost" size="icon" 
-                          className="w-8 h-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
-                          title="Delete"
-                          onClick={() => { if(confirm("Delete this student?")) deleteMutation.mutate({ id: student.id }) }}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {canManage && (
+                          <Button
+                            variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
+                            title="Assign Group" onClick={() => setGroupDialogStudent(student)}
+                          >
+                            <Users className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                          </Button>
+                        )}
+                        {canManage && (
+                          <Button
+                            variant="ghost" size="icon"
+                            className="w-8 h-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
+                            title="Delete"
+                            onClick={() => { if (confirm("Delete this student?")) deleteMutation.mutate({ id: student.id }); }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>

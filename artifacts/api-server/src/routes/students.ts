@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
-import { db, studentsTable } from "@workspace/db";
+import { db, studentsTable, groupsTable } from "@workspace/db";
 import {
   CreateStudentBody,
   ListStudentsQueryParams,
@@ -213,6 +213,14 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
+  }
+
+  if (parsed.data.groupId !== null && parsed.data.groupId !== undefined) {
+    const [group] = await db.select({ id: groupsTable.id }).from(groupsTable).where(eq(groupsTable.id, parsed.data.groupId));
+    if (!group) {
+      res.status(404).json({ error: "Group not found" });
+      return;
+    }
   }
 
   const [student] = await db
