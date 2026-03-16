@@ -7,6 +7,8 @@ import crypto from "crypto";
 
 const app: Express = express();
 
+app.set("trust proxy", 1);
+
 app.use(cors({
   origin: true,
   credentials: true,
@@ -24,7 +26,7 @@ app.use(
     cookie: {
       secure: isProduction,
       httpOnly: true,
-      sameSite: isProduction ? "strict" : "lax",
+      sameSite: "lax",
       maxAge: 24 * 60 * 60 * 1000,
     },
   })

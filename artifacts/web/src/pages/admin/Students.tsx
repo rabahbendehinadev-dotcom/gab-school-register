@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Trash2, ArrowRightLeft, Users, Eye, X } from "lucide-react";
+import { Search, Trash2, ArrowRightLeft, Users, Eye, X, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -175,6 +175,16 @@ export default function Students() {
                         >
                           <Eye className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>
+                        <a
+                          href={`https://wa.me/${(student.whatsapp || student.phone).replace(/\D/g, "")}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="واتساب"
+                        >
+                          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg hover:bg-green-50 hover:text-green-600">
+                            <MessageCircle className="w-4 h-4 text-green-500" />
+                          </Button>
+                        </a>
                         <Button
                           variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
                           title="Change Stage" onClick={() => setStageDialogStudent(student)}

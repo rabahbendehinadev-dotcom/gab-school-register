@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
+import { sendTelegramNotification } from "../lib/telegram";
 import "../types/session";
 
 const router: IRouter = Router();
@@ -78,6 +79,22 @@ router.post("/students", async (req, res): Promise<void> => {
     `New student registered: ${student.firstName} ${student.lastName}`,
     "Public Registration"
   );
+
+  const trainingLabel = student.trainingType === "physical" ? "حضوري" : "أونلاين";
+  const telegramMsg = [
+    `🎓 <b>طالب جديد سجّل في GAB SCHOOL!</b>`,
+    ``,
+    `👤 <b>الاسم:</b> ${student.firstName} ${student.lastName}`,
+    `📞 <b>الهاتف:</b> ${student.phone}`,
+    `💬 <b>الواتساب:</b> ${student.whatsapp}`,
+    `📍 <b>الولاية:</b> ${student.city}`,
+    `📚 <b>نوع الدورة:</b> ${trainingLabel}`,
+    `🏠 <b>يحتاج إقامة:</b> ${student.housingNeeded ? "نعم" : "لا"}`,
+    `📊 <b>مستوى الخبرة:</b> ${student.experienceLevel}`,
+    student.note ? `📝 <b>ملاحظة:</b> ${student.note}` : "",
+  ].filter(Boolean).join("\n");
+
+  sendTelegramNotification(telegramMsg).catch(() => {});
 
   res.status(201).json(GetStudentResponse.parse(student));
 });

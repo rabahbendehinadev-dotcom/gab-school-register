@@ -5,11 +5,19 @@ import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 
 export default function Dashboard() {
-  const { data: stats, isLoading } = useGetDashboardStats();
+  const { data: stats, isLoading, error, refetch } = useGetDashboardStats();
   const { data: activity } = useListActivity({ limit: 5 });
 
-  if (isLoading) return <AdminLayout><div className="animate-pulse flex space-x-4">Loading stats...</div></AdminLayout>;
-  if (!stats) return <AdminLayout>Failed to load dashboard.</AdminLayout>;
+  if (isLoading) return <AdminLayout><div className="p-8 text-center text-muted-foreground animate-pulse">Loading dashboard...</div></AdminLayout>;
+  if (!stats) return (
+    <AdminLayout>
+      <div className="p-8 text-center space-y-4">
+        <p className="text-muted-foreground">Failed to load dashboard.</p>
+        {error && <p className="text-xs text-red-500">{String(error)}</p>}
+        <button onClick={() => refetch()} className="text-sm underline text-primary">Retry</button>
+      </div>
+    </AdminLayout>
+  );
 
   const statCards = [
     { label: "Total Students", value: stats.totalStudents, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
