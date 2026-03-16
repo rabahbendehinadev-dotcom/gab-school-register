@@ -27,7 +27,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     mutation: {
       onSuccess: () => {
         queryClient.setQueryData(getGetMeQueryKey(), null);
-        setLocation("/admin/login");
+        setLocation("/gab-c7x2p/login");
       }
     }
   });

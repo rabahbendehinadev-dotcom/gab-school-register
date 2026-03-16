@@ -10,36 +10,76 @@ import {
 } from "@workspace/api-zod";
 import { requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
+import { objectStorageClient } from "../lib/objectStorage";
 import "../types/session";
 import multer from "multer";
-import path from "path";
-import fs from "fs";
-
-const uploadDir = path.join(process.cwd(), "uploads");
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, uploadDir),
-  filename: (_req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
-    cb(null, uniqueName);
-  },
-});
+import { randomUUID } from "crypto";
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed = /jpeg|jpg|png|gif|webp|svg/;
-    const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
-    const mimeOk = allowed.test(file.mimetype.split("/")[1]);
-    cb(null, extOk || mimeOk);
+    const allowed = /jpeg|jpg|png|gif|webp/;
+    const ok = allowed.test(file.mimetype.split("/")[1]);
+    cb(null, ok);
   },
 });
 
+function getBucketId(): string {
+  const id = process.env.DEFAULT_OBJECT_STORAGE_BUCKET_ID;
+  if (!id) throw new Error("DEFAULT_OBJECT_STORAGE_BUCKET_ID not set");
+  return id;
+}
+
+async function uploadToGCS(buffer: Buffer, mimetype: string, originalname: string): Promise<string> {
+  const bucketId = getBucketId();
+  const bucket = objectStorageClient.bucket(bucketId);
+  const ext = originalname.split(".").pop() || "jpg";
+  const objectName = `gallery/${randomUUID()}.${ext}`;
+  const file = bucket.file(objectName);
+
+  await file.save(buffer, {
+    metadata: { contentType: mimetype },
+  });
+
+  return `/api/gallery/image/${objectName}`;
+}
+
+async function deleteFromGCS(url: string): Promise<void> {
+  try {
+    const prefix = "/api/gallery/image/";
+    if (!url.startsWith(prefix)) return;
+    const objectName = url.slice(prefix.length);
+    const bucketId = getBucketId();
+    const bucket = objectStorageClient.bucket(bucketId);
+    const file = bucket.file(objectName);
+    const [exists] = await file.exists();
+    if (exists) await file.delete();
+  } catch {
+  }
+}
+
 const router: IRouter = Router();
+
+router.get(/^\/gallery\/image\/(.+)$/, async (req, res): Promise<void> => {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const objectName: string = (req.params as any)[0] as string;
+    if (!objectName) { res.status(400).end(); return; }
+    const bucketId = getBucketId();
+    const bucket = objectStorageClient.bucket(bucketId);
+    const file = bucket.file(objectName);
+    const [exists] = await file.exists();
+    if (!exists) { res.status(404).end(); return; }
+    const [meta] = await file.getMetadata();
+    res.setHeader("Content-Type", (meta.contentType as string) || "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=31536000");
+    const nodeStream = file.createReadStream();
+    nodeStream.pipe(res);
+  } catch {
+    res.status(500).end();
+  }
+});
 
 router.get("/gallery", async (_req, res): Promise<void> => {
   const images = await db
@@ -56,7 +96,15 @@ router.post("/gallery", requireRole("admin", "manager"), upload.single("image"),
     return;
   }
 
-  const url = `/api/uploads/${req.file.filename}`;
+  let url: string;
+  try {
+    url = await uploadToGCS(req.file.buffer, req.file.mimetype, req.file.originalname);
+  } catch (err) {
+    console.error("GCS upload error:", err);
+    res.status(500).json({ error: "Failed to upload image to storage" });
+    return;
+  }
+
   const caption = req.body?.caption || null;
   const sortOrder = parseInt(req.body?.sortOrder || "0", 10);
 
@@ -88,13 +136,7 @@ router.delete("/gallery/:id", requireRole("admin", "manager"), async (req, res):
     return;
   }
 
-  const filename = image.url.split("/").pop();
-  if (filename) {
-    const filePath = path.join(uploadDir, filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
-  }
+  deleteFromGCS(image.url).catch(() => {});
 
   const performer = req.session.fullName ?? "Unknown";
   await logActivity("image_deleted", `Gallery image deleted`, performer);

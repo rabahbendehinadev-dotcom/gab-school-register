@@ -17,13 +17,13 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
-  { href: "/admin/pipeline", label: "Pipeline", icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
-  { href: "/admin/students", label: "Students", icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
-  { href: "/admin/groups", label: "Groups", icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
-  { href: "/admin/gallery", label: "Gallery", icon: ImageIcon, roles: ["admin", "manager"] },
-  { href: "/admin/staff", label: "Staff", icon: ShieldCheck, roles: ["admin"] },
-  { href: "/admin/activity", label: "Activity Log", icon: Activity, roles: ["admin", "manager"] },
+  { href: "/gab-c7x2p", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
+  { href: "/gab-c7x2p/pipeline", label: "Pipeline", icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
+  { href: "/gab-c7x2p/students", label: "Students", icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
+  { href: "/gab-c7x2p/groups", label: "Groups", icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
+  { href: "/gab-c7x2p/gallery", label: "Gallery", icon: ImageIcon, roles: ["admin", "manager"] },
+  { href: "/gab-c7x2p/staff", label: "Staff", icon: ShieldCheck, roles: ["admin"] },
+  { href: "/gab-c7x2p/activity", label: "Activity Log", icon: Activity, roles: ["admin", "manager"] },
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {
@@ -36,7 +36,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   if (!user) {
-    window.location.href = "/admin/login";
+    window.location.href = "/gab-c7x2p/login";
     return null;
   }
 
@@ -61,7 +61,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         flex flex-col
       `}>
         <div className="h-16 flex items-center px-6 border-b border-border/50">
-          <Link href="/admin" className="flex items-center gap-3">
+          <Link href="/gab-c7x2p" className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-display font-bold text-xl">
               G
             </div>

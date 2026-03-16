@@ -32,16 +32,16 @@ function Router() {
       <Route path="/" component={Home} />
       
       {/* Admin Auth */}
-      <Route path="/admin/login" component={Login} />
+      <Route path="/gab-c7x2p/login" component={Login} />
       
       {/* Admin Protected Routes wrapped in AuthProvider logic inside AdminLayout */}
-      <Route path="/admin" component={Dashboard} />
-      <Route path="/admin/pipeline" component={Pipeline} />
-      <Route path="/admin/students" component={Students} />
-      <Route path="/admin/groups" component={Groups} />
-      <Route path="/admin/staff" component={Staff} />
-      <Route path="/admin/activity" component={Activity} />
-      <Route path="/admin/gallery" component={Gallery} />
+      <Route path="/gab-c7x2p" component={Dashboard} />
+      <Route path="/gab-c7x2p/pipeline" component={Pipeline} />
+      <Route path="/gab-c7x2p/students" component={Students} />
+      <Route path="/gab-c7x2p/groups" component={Groups} />
+      <Route path="/gab-c7x2p/staff" component={Staff} />
+      <Route path="/gab-c7x2p/activity" component={Activity} />
+      <Route path="/gab-c7x2p/gallery" component={Gallery} />
       
       {/* 404 */}
       <Route component={NotFound} />

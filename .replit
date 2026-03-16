@@ -1,4 +1,4 @@
-modules = ["nodejs-24"]
+modules = ["nodejs-24", "postgresql-16"]
 
 [[artifacts]]
 id = "artifacts/api-server"
@@ -31,3 +31,6 @@ timeoutMs = 20000
 TELEGRAM_BOT_TOKEN = "7776830596:AAEfR4EXKB1FFSzNEZMAvu7jBWWApwd2Hvw"
 TELEGRAM_CHAT_ID = "6725073871"
 WHATSAPP_ADMIN_NUMBER = "213772339494"
+
+[nix]
+channel = "stable-25_05"

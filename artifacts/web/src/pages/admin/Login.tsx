@@ -29,7 +29,7 @@ export default function Login() {
       const user = await loginMutation.mutateAsync({ data });
       queryClient.setQueryData(getGetMeQueryKey(), user);
       toast({ title: "Welcome back", description: `Logged in as ${user.fullName}` });
-      setLocation("/admin");
+      setLocation("/gab-c7x2p");
     } catch (error) {
       toast({ 
         variant: "destructive", 

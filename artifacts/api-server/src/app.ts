@@ -1,7 +1,6 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import session from "express-session";
-import path from "path";
 import router from "./routes";
 import crypto from "crypto";
 
@@ -31,8 +30,6 @@ app.use(
     },
   })
 );
-
-app.use("/api/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.use("/api", router);
 
