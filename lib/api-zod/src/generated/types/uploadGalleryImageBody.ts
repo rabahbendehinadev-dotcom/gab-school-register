@@ -7,7 +7,7 @@
  */
 
 export type UploadGalleryImageBody = {
-  image: Blob;
+  image: unknown;
   caption?: string;
   sortOrder?: number;
 };
