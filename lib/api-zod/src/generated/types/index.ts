@@ -43,3 +43,4 @@ export * from "./updateStageBodyStage";
 export * from "./updateStudentBody";
 export * from "./updateStudentBodyStage";
 export * from "./updateStudentBodyTrainingType";
+export * from "./uploadGalleryImageBody";

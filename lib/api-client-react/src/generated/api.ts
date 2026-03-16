@@ -37,6 +37,7 @@ import type {
   UpdateStaffBody,
   UpdateStageBody,
   UpdateStudentBody,
+  UploadGalleryImageBody,
 } from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
@@ -1879,11 +1880,22 @@ export const getUploadGalleryImageUrl = () => {
 };
 
 export const uploadGalleryImage = async (
+  uploadGalleryImageBody: UploadGalleryImageBody,
   options?: RequestInit,
 ): Promise<GalleryImage> => {
+  const formData = new FormData();
+  formData.append(`image`, uploadGalleryImageBody.image);
+  if (uploadGalleryImageBody.caption !== undefined) {
+    formData.append(`caption`, uploadGalleryImageBody.caption);
+  }
+  if (uploadGalleryImageBody.sortOrder !== undefined) {
+    formData.append(`sortOrder`, uploadGalleryImageBody.sortOrder.toString());
+  }
+
   return customFetch<GalleryImage>(getUploadGalleryImageUrl(), {
     ...options,
     method: "POST",
+    body: formData,
   });
 };
 
@@ -1894,14 +1906,14 @@ export const getUploadGalleryImageMutationOptions = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof uploadGalleryImage>>,
     TError,
-    void,
+    { data: BodyType<UploadGalleryImageBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationOptions<
   Awaited<ReturnType<typeof uploadGalleryImage>>,
   TError,
-  void,
+  { data: BodyType<UploadGalleryImageBody> },
   TContext
 > => {
   const mutationKey = ["uploadGalleryImage"];
@@ -1915,9 +1927,11 @@ export const getUploadGalleryImageMutationOptions = <
 
   const mutationFn: MutationFunction<
     Awaited<ReturnType<typeof uploadGalleryImage>>,
-    void
-  > = () => {
-    return uploadGalleryImage(requestOptions);
+    { data: BodyType<UploadGalleryImageBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return uploadGalleryImage(data, requestOptions);
   };
 
   return { mutationFn, ...mutationOptions };
@@ -1926,7 +1940,7 @@ export const getUploadGalleryImageMutationOptions = <
 export type UploadGalleryImageMutationResult = NonNullable<
   Awaited<ReturnType<typeof uploadGalleryImage>>
 >;
-
+export type UploadGalleryImageMutationBody = BodyType<UploadGalleryImageBody>;
 export type UploadGalleryImageMutationError = ErrorType<unknown>;
 
 /**
@@ -1939,14 +1953,14 @@ export const useUploadGalleryImage = <
   mutation?: UseMutationOptions<
     Awaited<ReturnType<typeof uploadGalleryImage>>,
     TError,
-    void,
+    { data: BodyType<UploadGalleryImageBody> },
     TContext
   >;
   request?: SecondParameter<typeof customFetch>;
 }): UseMutationResult<
   Awaited<ReturnType<typeof uploadGalleryImage>>,
   TError,
-  void,
+  { data: BodyType<UploadGalleryImageBody> },
   TContext
 > => {
   return useMutation(getUploadGalleryImageMutationOptions(options));

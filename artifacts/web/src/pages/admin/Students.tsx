@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { 
   useListStudents, useDeleteStudent, useUpdateStudent, useUpdateStudentStage, 
@@ -307,24 +307,23 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
 }) {
   const form = useForm<UpdateStudentBody>();
 
-  const handleOpen = (s: Student) => {
-    form.reset({
-      firstName: s.firstName,
-      lastName: s.lastName,
-      phone: s.phone,
-      whatsapp: s.whatsapp,
-      city: s.city,
-      experienceLevel: s.experienceLevel,
-      note: s.note ?? "",
-      housingNeeded: s.housingNeeded,
-    });
-  };
+  useEffect(() => {
+    if (student) {
+      form.reset({
+        firstName: student.firstName,
+        lastName: student.lastName,
+        phone: student.phone,
+        whatsapp: student.whatsapp,
+        city: student.city,
+        experienceLevel: student.experienceLevel,
+        note: student.note ?? "",
+        housingNeeded: student.housingNeeded,
+      });
+    }
+  }, [student]);
 
   return (
-    <Dialog open={!!student} onOpenChange={(o) => {
-      if (!o) onClose();
-      else if (student) handleOpen(student);
-    }}>
+    <Dialog open={!!student} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-[500px] rounded-3xl p-6">
         <DialogHeader><DialogTitle className="text-xl font-bold">Student Details</DialogTitle></DialogHeader>
         {student && (

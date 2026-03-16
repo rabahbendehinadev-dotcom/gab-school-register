@@ -398,6 +398,15 @@ export const ListGalleryImagesResponse = zod.array(
 );
 
 /**
+ * @summary Upload a gallery image (multipart form data with image file, caption, sortOrder)
+ */
+export const UploadGalleryImageBody = zod.object({
+  image: zod.instanceof(File),
+  caption: zod.string().optional(),
+  sortOrder: zod.number().optional(),
+});
+
+/**
  * @summary Delete a gallery image
  */
 export const DeleteGalleryImageParams = zod.object({

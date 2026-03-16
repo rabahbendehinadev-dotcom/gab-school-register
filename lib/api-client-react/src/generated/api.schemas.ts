@@ -329,3 +329,9 @@ export type ListActivityParams = {
   limit?: number;
   offset?: number;
 };
+
+export type UploadGalleryImageBody = {
+  image: Blob;
+  caption?: string;
+  sortOrder?: number;
+};

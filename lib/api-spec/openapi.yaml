@@ -454,6 +454,22 @@ paths:
       operationId: uploadGalleryImage
       tags: [gallery]
       summary: Upload a gallery image (multipart form data with image file, caption, sortOrder)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                caption:
+                  type: string
+                sortOrder:
+                  type: integer
       responses:
         "201":
           description: Image uploaded
