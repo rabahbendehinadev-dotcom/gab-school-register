@@ -59,7 +59,6 @@ export default function Home() {
   const createStudentMutation = useCreateStudent();
   const featuresAnim = useScrollVisible();
   const whyAnim = useScrollVisible();
-  const galleryAnim = useScrollVisible();
 
   const form = useForm<RegistrationForm>({
     resolver: zodResolver(registrationSchema),
@@ -300,18 +299,20 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-5">
           <SectionHeader tag="🖼️ معرض الأعمال" title={<>أعمالنا <Accent>وتجهيزاتنا</Accent></>} desc="صور من معامل الأكاديمية وأعمال الخريجين والتجهيزات الحديثة" />
           {gallery && gallery.length > 0 ? (
-            <div ref={galleryAnim.ref} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {gallery.map((img, i) => (
                 <div
                   key={img.id}
                   className="aspect-square rounded-2xl overflow-hidden bg-[#e5e5e5] shadow-md hover:-translate-y-2 hover:shadow-2xl transition-all duration-500 group relative"
                   style={{
-                    opacity: galleryAnim.visible ? 1 : 0,
-                    transform: galleryAnim.visible ? "translateY(0) scale(1)" : "translateY(32px) scale(0.96)",
-                    transition: `opacity .55s ${(i % 8) * 0.07}s ease, transform .55s ${(i % 8) * 0.07}s ease`,
+                    animationName: "fadeUp",
+                    animationDuration: "0.6s",
+                    animationTimingFunction: "ease",
+                    animationFillMode: "both",
+                    animationDelay: `${i * 0.08}s`,
                   }}
                 >
-                  <img src={img.url} alt={img.caption || `صورة ${i + 1}`} loading="lazy" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                  <img src={img.url} alt={img.caption || `صورة ${i + 1}`} loading="eager" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                   {img.caption && (
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-3 py-1.5 truncate translate-y-full group-hover:translate-y-0 transition-transform duration-300">
                       {img.caption}
