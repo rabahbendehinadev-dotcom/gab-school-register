@@ -722,7 +722,6 @@ components:
           type: string
         startDate:
           type: string
-          format: date-time
         trainingType:
           type: string
           enum: [online, physical]
@@ -755,7 +754,6 @@ components:
           type: string
         startDate:
           type: string
-          format: date-time
         trainingType:
           type: string
           enum: [online, physical]
@@ -779,7 +777,6 @@ components:
           type: string
         startDate:
           type: string
-          format: date-time
         trainingType:
           type: string
           enum: [online, physical]
@@ -800,7 +797,6 @@ components:
           type: string
         startDate:
           type: string
-          format: date-time
         trainingType:
           type: string
           enum: [online, physical]

@@ -17,7 +17,7 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/groups", requireRole("admin", "manager", "staff"), async (_req, res): Promise<void> => {
+router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
   const groups = await db.select().from(groupsTable).orderBy(groupsTable.startDate);
 
   const groupsWithCounts = await Promise.all(
@@ -42,7 +42,7 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
 
   const [group] = await db
     .insert(groupsTable)
-    .values(parsed.data)
+    .values({ ...parsed.data, startDate: new Date(parsed.data.startDate) })
     .returning();
 
   const performer = req.session.fullName ?? "Unknown";
@@ -51,7 +51,7 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
   res.status(201).json({ ...group, studentCount: 0 });
 });
 
-router.get("/groups/:id", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
+router.get("/groups/:id", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
   const params = GetGroupParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -95,9 +95,15 @@ router.patch("/groups/:id", requireRole("admin", "manager"), async (req, res): P
     return;
   }
 
+  const { startDate: startDateStr, ...restData } = parsed.data;
+  const updateValues = {
+    ...restData,
+    ...(startDateStr ? { startDate: new Date(startDateStr) } : {}),
+  };
+
   const [group] = await db
     .update(groupsTable)
-    .set(parsed.data)
+    .set(updateValues)
     .where(eq(groupsTable.id, params.data.id))
     .returning();
 

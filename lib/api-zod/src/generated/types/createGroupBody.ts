@@ -10,7 +10,7 @@ import type { CreateGroupBodyTrainingType } from "./createGroupBodyTrainingType"
 
 export interface CreateGroupBody {
   name: string;
-  startDate: Date;
+  startDate: string;
   trainingType: CreateGroupBodyTrainingType;
   capacity: number;
   notes?: string;

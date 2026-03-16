@@ -17,13 +17,13 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
-  { href: "/admin/pipeline", label: "Pipeline", icon: KanbanSquare },
-  { href: "/admin/students", label: "Students", icon: Users },
-  { href: "/admin/groups", label: "Groups", icon: Layers },
-  { href: "/admin/gallery", label: "Gallery", icon: ImageIcon },
-  { href: "/admin/staff", label: "Staff", icon: ShieldCheck, roles: ["admin", "manager"] },
-  { href: "/admin/activity", label: "Activity Log", icon: Activity, roles: ["admin"] },
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
+  { href: "/admin/pipeline", label: "Pipeline", icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
+  { href: "/admin/students", label: "Students", icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
+  { href: "/admin/groups", label: "Groups", icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
+  { href: "/admin/gallery", label: "Gallery", icon: ImageIcon, roles: ["admin", "manager"] },
+  { href: "/admin/staff", label: "Staff", icon: ShieldCheck, roles: ["admin"] },
+  { href: "/admin/activity", label: "Activity Log", icon: Activity, roles: ["admin", "manager"] },
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {

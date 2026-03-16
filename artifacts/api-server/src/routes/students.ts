@@ -25,7 +25,7 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/students", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
+router.get("/students", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
   const query = ListStudentsQueryParams.safeParse(req.query);
   const conditions = [];
 
@@ -82,7 +82,7 @@ router.post("/students", async (req, res): Promise<void> => {
   res.status(201).json(GetStudentResponse.parse(student));
 });
 
-router.get("/students/:id", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
+router.get("/students/:id", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
   const params = GetStudentParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -163,7 +163,7 @@ router.delete("/students/:id", requireRole("admin", "manager"), async (req, res)
   res.sendStatus(204);
 });
 
-router.patch("/students/:id/stage", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
+router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
   const params = UpdateStudentStageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

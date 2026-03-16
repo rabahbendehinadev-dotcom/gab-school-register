@@ -216,7 +216,7 @@ export const AssignStudentToGroupResponse = zod.object({
 export const ListGroupsResponseItem = zod.object({
   id: zod.number(),
   name: zod.string(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   trainingType: zod.enum(["online", "physical"]),
   capacity: zod.number(),
   notes: zod.string().nullish(),
@@ -231,7 +231,7 @@ export const ListGroupsResponse = zod.array(ListGroupsResponseItem);
  */
 export const CreateGroupBody = zod.object({
   name: zod.string(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   trainingType: zod.enum(["online", "physical"]),
   capacity: zod.number(),
   notes: zod.string().optional(),
@@ -248,7 +248,7 @@ export const GetGroupParams = zod.object({
 export const GetGroupResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   trainingType: zod.enum(["online", "physical"]),
   capacity: zod.number(),
   notes: zod.string().nullish(),
@@ -290,7 +290,7 @@ export const UpdateGroupParams = zod.object({
 
 export const UpdateGroupBody = zod.object({
   name: zod.string().optional(),
-  startDate: zod.date().optional(),
+  startDate: zod.string().optional(),
   trainingType: zod.enum(["online", "physical"]).optional(),
   capacity: zod.number().optional(),
   notes: zod.string().nullish(),
@@ -300,7 +300,7 @@ export const UpdateGroupBody = zod.object({
 export const UpdateGroupResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
-  startDate: zod.date(),
+  startDate: zod.string(),
   trainingType: zod.enum(["online", "physical"]),
   capacity: zod.number(),
   notes: zod.string().nullish(),

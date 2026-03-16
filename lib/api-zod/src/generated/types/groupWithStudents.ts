@@ -12,7 +12,7 @@ import type { Student } from "./student";
 export interface GroupWithStudents {
   id: number;
   name: string;
-  startDate: Date;
+  startDate: string;
   trainingType: GroupWithStudentsTrainingType;
   capacity: number;
   /** @nullable */

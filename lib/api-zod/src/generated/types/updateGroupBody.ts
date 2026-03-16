@@ -10,7 +10,7 @@ import type { UpdateGroupBodyTrainingType } from "./updateGroupBodyTrainingType"
 
 export interface UpdateGroupBody {
   name?: string;
-  startDate?: Date;
+  startDate?: string;
   trainingType?: UpdateGroupBodyTrainingType;
   capacity?: number;
   /** @nullable */

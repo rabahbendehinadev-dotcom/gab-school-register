@@ -11,7 +11,7 @@ import type { GroupTrainingType } from "./groupTrainingType";
 export interface Group {
   id: number;
   name: string;
-  startDate: Date;
+  startDate: string;
   trainingType: GroupTrainingType;
   capacity: number;
   /** @nullable */
