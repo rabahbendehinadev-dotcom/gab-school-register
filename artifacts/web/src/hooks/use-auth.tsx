@@ -1,7 +1,8 @@
-import { createContext, useContext, ReactNode, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useGetMe, useLogin, useLogout, StaffMember, getGetMeQueryKey } from "@workspace/api-client-react";
+import { createContext, useContext, ReactNode } from "react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { useLogin, useLogout, getGetMeQueryKey, getMe } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
+import type { StaffMember } from "@workspace/api-client-react";
 
 type AuthContextType = {
   user: StaffMember | null;
@@ -15,11 +16,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading, error } = useGetMe({
-    query: {
-      retry: false,
-      staleTime: Infinity,
-    }
+  const { data: user, isLoading } = useQuery({
+    queryKey: getGetMeQueryKey(),
+    queryFn: () => getMe(),
+    retry: false,
+    staleTime: Infinity,
   });
 
   const logoutMutation = useLogout({

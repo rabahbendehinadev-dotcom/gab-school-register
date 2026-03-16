@@ -1,10 +1,28 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListGalleryImages, useUploadGalleryImage, useDeleteGalleryImage, getListGalleryImagesQueryKey } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useListGalleryImages, useDeleteGalleryImage, getListGalleryImagesQueryKey } from "@workspace/api-client-react";
+import { useQueryClient, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Trash2, Upload, ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+function useUploadGalleryImageManual() {
+  const baseUrl = import.meta.env.VITE_API_URL || "";
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append("image", file);
+      formData.append("sortOrder", "0");
+      const res = await fetch(`${baseUrl}/api/gallery`, {
+        method: "POST",
+        body: formData,
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      return res.json();
+    },
+  });
+}
 
 export default function Gallery() {
   const queryClient = useQueryClient();
@@ -12,15 +30,7 @@ export default function Gallery() {
   const { data: images, isLoading } = useListGalleryImages();
   const [file, setFile] = useState<File | null>(null);
 
-  const uploadMutation = useUploadGalleryImage({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListGalleryImagesQueryKey() });
-        setFile(null);
-        toast({ title: "Image uploaded successfully" });
-      }
-    }
-  });
+  const uploadMutation = useUploadGalleryImageManual();
 
   const deleteMutation = useDeleteGalleryImage({
     mutation: {
@@ -30,7 +40,15 @@ export default function Gallery() {
 
   const handleUpload = () => {
     if (!file) return;
-    uploadMutation.mutate({ data: { image: file, sortOrder: 0 } });
+    uploadMutation.mutate(file, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListGalleryImagesQueryKey() });
+        setFile(null);
+        const input = document.getElementById("image-upload") as HTMLInputElement;
+        if (input) input.value = "";
+        toast({ title: "Image uploaded successfully" });
+      },
+    });
   };
 
   if (isLoading) return <AdminLayout><div className="animate-pulse">Loading gallery...</div></AdminLayout>;

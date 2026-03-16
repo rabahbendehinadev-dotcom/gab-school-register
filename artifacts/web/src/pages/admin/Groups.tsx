@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListGroups, useCreateGroup, useDeleteGroup, getListGroupsQueryKey, CreateGroupBody } from "@workspace/api-client-react";
+import { useListGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useGetGroup, useAssignStudentToGroup, getListGroupsQueryKey, getListStudentsQueryKey, getGetGroupQueryKey, CreateGroupBody, UpdateGroupBody } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,39 +8,89 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, Calendar, Settings, Plus, Trash2 } from "lucide-react";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Users, Calendar, Settings, Plus, Trash2, Edit, X } from "lucide-react";
 import { format } from "date-fns";
 import { useForm } from "react-hook-form";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Groups() {
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const { data: groups, isLoading } = useListGroups();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [editGroup, setEditGroup] = useState<any>(null);
+  const [membersGroupId, setMembersGroupId] = useState<number | null>(null);
 
   const createMutation = useCreateGroup({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
-        setIsOpen(false);
-        form.reset();
+        setIsCreateOpen(false);
+        createForm.reset();
+        toast({ title: "Group created" });
+      }
+    }
+  });
+
+  const updateMutation = useUpdateGroup({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        setEditGroup(null);
+        toast({ title: "Group updated" });
       }
     }
   });
 
   const deleteMutation = useDeleteGroup({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() })
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        toast({ title: "Group deleted" });
+      }
     }
   });
 
-  const form = useForm<CreateGroupBody>({
+  const unassignMutation = useAssignStudentToGroup({
+    mutation: {
+      onSuccess: () => {
+        if (membersGroupId) {
+          queryClient.invalidateQueries({ queryKey: getGetGroupQueryKey(membersGroupId) });
+        }
+        queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+        toast({ title: "Student removed from group" });
+      }
+    }
+  });
+
+  const createForm = useForm<CreateGroupBody>({
     defaultValues: { status: "open", trainingType: "physical", capacity: 20 }
   });
 
-  const onSubmit = (data: CreateGroupBody) => {
-    // API expects integer capacity
+  const editForm = useForm<UpdateGroupBody>();
+
+  const onCreateSubmit = (data: CreateGroupBody) => {
     data.capacity = Number(data.capacity);
     createMutation.mutate({ data });
+  };
+
+  const onEditSubmit = (data: UpdateGroupBody) => {
+    if (!editGroup) return;
+    if (data.capacity) data.capacity = Number(data.capacity);
+    updateMutation.mutate({ id: editGroup.id, data });
+  };
+
+  const openEdit = (group: any) => {
+    setEditGroup(group);
+    editForm.reset({
+      name: group.name,
+      startDate: group.startDate,
+      capacity: group.capacity,
+      trainingType: group.trainingType,
+      status: group.status,
+    });
   };
 
   if (isLoading) return <AdminLayout><div className="animate-pulse">Loading groups...</div></AdminLayout>;
@@ -52,7 +102,7 @@ export default function Groups() {
           <h2 className="text-2xl font-bold">Training Groups</h2>
           <p className="text-muted-foreground">Manage batches and student assignments.</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="rounded-xl shadow-lg shadow-primary/20"><Plus className="w-4 h-4 mr-2"/> Create Group</Button>
           </DialogTrigger>
@@ -60,19 +110,19 @@ export default function Groups() {
             <DialogHeader>
               <DialogTitle className="text-xl font-bold">Create New Group</DialogTitle>
             </DialogHeader>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
+            <form onSubmit={createForm.handleSubmit(onCreateSubmit)} className="space-y-4 mt-4">
               <div className="space-y-2">
                 <Label>Group Name</Label>
-                <Input {...form.register("name")} required placeholder="e.g. Batch 2026 Alpha" className="rounded-xl" />
+                <Input {...createForm.register("name")} required placeholder="e.g. Batch 2026 Alpha" className="rounded-xl" />
               </div>
               <div className="space-y-2">
                 <Label>Start Date</Label>
-                <Input type="date" {...form.register("startDate")} required className="rounded-xl" />
+                <Input type="date" {...createForm.register("startDate")} required className="rounded-xl" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Training Type</Label>
-                  <Select onValueChange={(v) => form.setValue("trainingType", v as any)} defaultValue="physical">
+                  <Select onValueChange={(v) => createForm.setValue("trainingType", v as any)} defaultValue="physical">
                     <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="physical">Physical</SelectItem>
@@ -82,7 +132,7 @@ export default function Groups() {
                 </div>
                 <div className="space-y-2">
                   <Label>Capacity</Label>
-                  <Input type="number" {...form.register("capacity")} required className="rounded-xl" />
+                  <Input type="number" {...createForm.register("capacity")} required className="rounded-xl" />
                 </div>
               </div>
               <Button type="submit" className="w-full rounded-xl" disabled={createMutation.isPending}>
@@ -96,23 +146,34 @@ export default function Groups() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {groups?.map(group => (
           <Card key={group.id} className="rounded-2xl shadow-sm border-border/50 hover:shadow-md transition-shadow overflow-hidden flex flex-col group/card">
-            <div className={`h-2 ${group.status === 'open' ? 'bg-success' : 'bg-muted-foreground'}`} />
+            <div className={`h-2 ${group.status === 'open' ? 'bg-green-500' : 'bg-muted-foreground'}`} />
             <CardHeader className="pb-4">
               <div className="flex justify-between items-start">
                 <div>
                   <CardTitle className="text-xl mb-1">{group.name}</CardTitle>
-                  <span className={`text-xs px-2 py-1 rounded-md font-medium uppercase ${group.status === 'open' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                  <span className={`text-xs px-2 py-1 rounded-md font-medium uppercase ${group.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>
                     {group.status}
                   </span>
                 </div>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover/card:opacity-100 transition-opacity"
-                  onClick={() => confirm("Delete this group?") && deleteMutation.mutate({ id: group.id })}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                <div className="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground"
+                    title="Edit Group"
+                    onClick={() => openEdit(group)}
+                  >
+                    <Edit className="w-4 h-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                    onClick={() => confirm("Delete this group?") && deleteMutation.mutate({ id: group.id })}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col justify-between">
@@ -138,13 +199,114 @@ export default function Groups() {
                 />
               </div>
               
-              <Button variant="outline" className="w-full rounded-xl hover:bg-primary/5 hover:text-primary hover:border-primary/30">
+              <Button 
+                variant="outline" 
+                className="w-full rounded-xl hover:bg-primary/5 hover:text-primary hover:border-primary/30"
+                onClick={() => setMembersGroupId(group.id)}
+              >
                 Manage Members
               </Button>
             </CardContent>
           </Card>
         ))}
       </div>
+
+      <Dialog open={!!editGroup} onOpenChange={(o) => !o && setEditGroup(null)}>
+        <DialogContent className="sm:max-w-[425px] rounded-3xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Edit Group</DialogTitle>
+          </DialogHeader>
+          {editGroup && (
+            <form onSubmit={editForm.handleSubmit(onEditSubmit)} className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Group Name</Label>
+                <Input {...editForm.register("name")} placeholder="Group name" className="rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label>Start Date</Label>
+                <Input type="date" {...editForm.register("startDate")} className="rounded-xl" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Training Type</Label>
+                  <Select onValueChange={(v) => editForm.setValue("trainingType", v as any)} defaultValue={editGroup.trainingType}>
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="physical">Physical</SelectItem>
+                      <SelectItem value="online">Online</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Capacity</Label>
+                  <Input type="number" {...editForm.register("capacity")} className="rounded-xl" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select onValueChange={(v) => editForm.setValue("status", v as any)} defaultValue={editGroup.status}>
+                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="submit" className="w-full rounded-xl" disabled={updateMutation.isPending}>
+                {updateMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <MembersDialog groupId={membersGroupId} onClose={() => setMembersGroupId(null)} onRemove={(studentId) => unassignMutation.mutate({ id: studentId, data: { groupId: null } })} />
     </AdminLayout>
+  );
+}
+
+function MembersDialog({ groupId, onClose, onRemove }: { groupId: number | null; onClose: () => void; onRemove: (studentId: number) => void }) {
+  const { data: group } = useGetGroup(groupId!, { query: { queryKey: getGetGroupQueryKey(groupId!), enabled: !!groupId } });
+
+  return (
+    <Dialog open={!!groupId} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[520px] rounded-3xl p-6">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">{group?.name ?? "Group"} — Members</DialogTitle>
+        </DialogHeader>
+        {group?.students && group.students.length > 0 ? (
+          <div className="max-h-80 overflow-auto mt-4">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Stage</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {group.students.map((s: any) => (
+                  <TableRow key={s.id}>
+                    <TableCell className="font-medium">{s.firstName} {s.lastName}</TableCell>
+                    <TableCell className="text-sm">{s.phone}</TableCell>
+                    <TableCell><span className="capitalize text-sm">{s.stage?.replace("_", " ")}</span></TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive" onClick={() => onRemove(s.id)}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="h-32 flex items-center justify-center text-muted-foreground text-sm mt-4">
+            No members in this group yet. Assign students from the Students page.
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

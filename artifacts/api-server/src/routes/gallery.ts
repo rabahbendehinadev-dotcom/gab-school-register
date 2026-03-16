@@ -8,7 +8,7 @@ import {
   UpdateGalleryImageBody,
   UpdateGalleryImageResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import multer from "multer";
 import path from "path";
@@ -49,7 +49,7 @@ router.get("/gallery", async (_req, res): Promise<void> => {
   res.json(ListGalleryImagesResponse.parse(images));
 });
 
-router.post("/gallery", requireAuth, upload.single("image"), async (req, res): Promise<void> => {
+router.post("/gallery", requireRole("admin", "manager"), upload.single("image"), async (req, res): Promise<void> => {
   if (!req.file) {
     res.status(400).json({ error: "No image file provided" });
     return;
@@ -70,7 +70,7 @@ router.post("/gallery", requireAuth, upload.single("image"), async (req, res): P
   res.status(201).json(image);
 });
 
-router.delete("/gallery/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/gallery/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = DeleteGalleryImageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -101,7 +101,7 @@ router.delete("/gallery/:id", requireAuth, async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-router.patch("/gallery/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/gallery/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = UpdateGalleryImageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -124,6 +124,9 @@ router.patch("/gallery/:id", requireAuth, async (req, res): Promise<void> => {
     res.status(404).json({ error: "Image not found" });
     return;
   }
+
+  const performer = (req.session as any)?.fullName ?? "Unknown";
+  await logActivity("image_updated", `Gallery image metadata updated (id: ${image.id})`, performer);
 
   res.json(UpdateGalleryImageResponse.parse(image));
 });

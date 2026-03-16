@@ -11,7 +11,7 @@ import {
   UpdateGroupResponse,
   DeleteGroupParams,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 
 const router: IRouter = Router();
@@ -32,7 +32,7 @@ router.get("/groups", requireAuth, async (_req, res): Promise<void> => {
   res.json(ListGroupsResponse.parse(groupsWithCounts));
 });
 
-router.post("/groups", requireAuth, async (req, res): Promise<void> => {
+router.post("/groups", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const parsed = CreateGroupBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -81,7 +81,7 @@ router.get("/groups/:id", requireAuth, async (req, res): Promise<void> => {
   );
 });
 
-router.patch("/groups/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/groups/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = UpdateGroupParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -116,7 +116,7 @@ router.patch("/groups/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(UpdateGroupResponse.parse({ ...group, studentCount: countResult?.count ?? 0 }));
 });
 
-router.delete("/groups/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/groups/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = DeleteGroupParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

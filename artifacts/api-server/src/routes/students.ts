@@ -19,7 +19,7 @@ import {
   AssignStudentToGroupResponse,
   GetDashboardStatsResponse,
 } from "@workspace/api-zod";
-import { requireAuth } from "../middlewares/auth";
+import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 
 const router: IRouter = Router();
@@ -101,7 +101,7 @@ router.get("/students/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(GetStudentResponse.parse(student));
 });
 
-router.patch("/students/:id", requireAuth, async (req, res): Promise<void> => {
+router.patch("/students/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = UpdateStudentParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -135,7 +135,7 @@ router.patch("/students/:id", requireAuth, async (req, res): Promise<void> => {
   res.json(UpdateStudentResponse.parse(student));
 });
 
-router.delete("/students/:id", requireAuth, async (req, res): Promise<void> => {
+router.delete("/students/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = DeleteStudentParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -162,7 +162,7 @@ router.delete("/students/:id", requireAuth, async (req, res): Promise<void> => {
   res.sendStatus(204);
 });
 
-router.patch("/students/:id/stage", requireAuth, async (req, res): Promise<void> => {
+router.patch("/students/:id/stage", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
   const params = UpdateStudentStageParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -201,7 +201,7 @@ router.patch("/students/:id/stage", requireAuth, async (req, res): Promise<void>
   res.json(UpdateStudentStageResponse.parse(student));
 });
 
-router.patch("/students/:id/group", requireAuth, async (req, res): Promise<void> => {
+router.patch("/students/:id/group", requireRole("admin", "manager"), async (req, res): Promise<void> => {
   const params = AssignStudentToGroupParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
