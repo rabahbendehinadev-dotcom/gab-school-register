@@ -25,7 +25,7 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/students", requireAuth, async (req, res): Promise<void> => {
+router.get("/students", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
   const query = ListStudentsQueryParams.safeParse(req.query);
   const conditions = [];
 
@@ -82,7 +82,7 @@ router.post("/students", async (req, res): Promise<void> => {
   res.status(201).json(GetStudentResponse.parse(student));
 });
 
-router.get("/students/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/students/:id", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
   const params = GetStudentParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -236,7 +236,7 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
   res.json(AssignStudentToGroupResponse.parse(student));
 });
 
-router.get("/stats", requireAuth, async (_req, res): Promise<void> => {
+router.get("/stats", requireRole("admin", "manager"), async (_req, res): Promise<void> => {
   const students = await db.select().from(studentsTable);
   const stats = {
     totalStudents: students.length,

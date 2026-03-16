@@ -17,7 +17,7 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/groups", requireAuth, async (_req, res): Promise<void> => {
+router.get("/groups", requireRole("admin", "manager", "staff"), async (_req, res): Promise<void> => {
   const groups = await db.select().from(groupsTable).orderBy(groupsTable.startDate);
 
   const groupsWithCounts = await Promise.all(
@@ -51,7 +51,7 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
   res.status(201).json({ ...group, studentCount: 0 });
 });
 
-router.get("/groups/:id", requireAuth, async (req, res): Promise<void> => {
+router.get("/groups/:id", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
   const params = GetGroupParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });

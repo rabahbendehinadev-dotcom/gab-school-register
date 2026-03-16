@@ -16,7 +16,7 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/staff", requireAuth, async (_req, res): Promise<void> => {
+router.get("/staff", requireRole("admin"), async (_req, res): Promise<void> => {
   const staff = await db.select().from(staffTable).orderBy(staffTable.createdAt);
 
   const safeStaff = staff.map((s) => ({

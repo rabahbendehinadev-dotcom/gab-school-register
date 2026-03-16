@@ -97,6 +97,7 @@ export default function Groups() {
       capacity: group.capacity,
       trainingType: group.trainingType,
       status: group.status,
+      notes: group.notes ?? "",
     });
   };
 
@@ -129,7 +130,7 @@ export default function Groups() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Training Type</Label>
-                  <Select onValueChange={(v) => createForm.setValue("trainingType", v as CreateGroupBodyTrainingType)} defaultValue="physical">
+                  <Select onValueChange={(v: CreateGroupBodyTrainingType) => createForm.setValue("trainingType", v)} defaultValue="physical">
                     <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="physical">Physical</SelectItem>
@@ -141,6 +142,22 @@ export default function Groups() {
                   <Label>Capacity</Label>
                   <Input type="number" {...createForm.register("capacity")} required className="rounded-xl" />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Status</Label>
+                  <Select onValueChange={(v: CreateGroupBodyStatus) => createForm.setValue("status", v)} defaultValue="open">
+                    <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="open">Open</SelectItem>
+                      <SelectItem value="closed">Closed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Input {...createForm.register("notes")} placeholder="Optional notes" className="rounded-xl" />
               </div>
               <Button type="submit" className="w-full rounded-xl" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create Group"}
@@ -233,7 +250,7 @@ export default function Groups() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Training Type</Label>
-                  <Select onValueChange={(v) => editForm.setValue("trainingType", v as UpdateGroupBodyTrainingType)} defaultValue={editGroup.trainingType}>
+                  <Select onValueChange={(v: UpdateGroupBodyTrainingType) => editForm.setValue("trainingType", v)} defaultValue={editGroup.trainingType}>
                     <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="physical">Physical</SelectItem>
@@ -248,13 +265,17 @@ export default function Groups() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select onValueChange={(v) => editForm.setValue("status", v as UpdateGroupBodyStatus)} defaultValue={editGroup.status}>
+                <Select onValueChange={(v: UpdateGroupBodyStatus) => editForm.setValue("status", v)} defaultValue={editGroup.status}>
                   <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="open">Open</SelectItem>
                     <SelectItem value="closed">Closed</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Notes</Label>
+                <Input {...editForm.register("notes")} placeholder="Optional notes" className="rounded-xl" />
               </div>
               <Button type="submit" className="w-full rounded-xl" disabled={updateMutation.isPending}>
                 {updateMutation.isPending ? "Saving..." : "Save Changes"}

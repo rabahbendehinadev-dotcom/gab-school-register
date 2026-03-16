@@ -258,7 +258,7 @@ export default function Home() {
                     </div>
                     <div className="space-y-2">
                       <Label>Training Type</Label>
-                      <Select onValueChange={(val) => form.setValue("trainingType", val as any)}>
+                      <Select onValueChange={(val: "online" | "physical") => form.setValue("trainingType", val)}>
                         <SelectTrigger className="h-12 rounded-xl bg-muted/50 border-transparent focus:bg-background">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
