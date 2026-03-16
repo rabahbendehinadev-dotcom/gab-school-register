@@ -1,0 +1,22 @@
+packages:
+  "framer-motion": "For page transitions and interactive element animations"
+  "recharts": "For the admin dashboard statistics charts"
+  "@hookform/resolvers": "For integrating Zod validation with react-hook-form"
+  "react-hook-form": "For robust form state management"
+  "zod": "For client-side form validation matching the API schema"
+  "date-fns": "For formatting activity log and student registration dates"
+  "clsx": "For conditional class names"
+  "tailwind-merge": "For merging tailwind classes"
+  "@hello-pangea/dnd": "For drag and drop functionality in the student pipeline"
+
+images:
+  - path: "artifacts/web/public/images/hero-bg.png"
+    description: "Modern clean abstract gradient background in deep professional indigo and warm orange accents, soft blurred shapes, suitable for an education academy hero section."
+    aspect_ratio: "16:9"
+  - path: "artifacts/web/public/images/logo.png"
+    description: "Minimal geometric logo for GAB SCHOOL, modern education academy, featuring a stylized open book or graduation cap in deep blue and warm orange, transparent background."
+    aspect_ratio: "1:1"
+
+notes:
+  - Uses @workspace/api-client-react for all API interactions
+  - Auth is session-cookie based handled via /api/auth/login and /api/auth/me

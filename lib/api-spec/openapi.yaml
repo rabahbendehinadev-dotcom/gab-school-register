@@ -3,20 +3,31 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: GAB SCHOOL CRM API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: students
+    description: Student management
+  - name: groups
+    description: Group/batch management
+  - name: staff
+    description: Staff management
+  - name: activity
+    description: Activity journal
+  - name: gallery
+    description: Image gallery
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,502 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Staff login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginBody"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "401":
+          description: Not authenticated
+
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List all students
+      parameters:
+        - name: stage
+          in: query
+          schema:
+            type: string
+        - name: trainingType
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: groupId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Student"
+    post:
+      operationId: createStudent
+      tags: [students]
+      summary: Register a new student (public)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStudentBody"
+      responses:
+        "201":
+          description: Student created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /students/{id}:
+    get:
+      operationId: getStudent
+      tags: [students]
+      summary: Get a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Student details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateStudent
+      tags: [students]
+      summary: Update a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStudentBody"
+      responses:
+        "200":
+          description: Updated student
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteStudent
+      tags: [students]
+      summary: Delete a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /students/{id}/stage:
+    patch:
+      operationId: updateStudentStage
+      tags: [students]
+      summary: Change student pipeline stage
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStageBody"
+      responses:
+        "200":
+          description: Stage updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+
+  /students/{id}/group:
+    patch:
+      operationId: assignStudentToGroup
+      tags: [students]
+      summary: Assign student to a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignGroupBody"
+      responses:
+        "200":
+          description: Group assigned
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+
+  /groups:
+    get:
+      operationId: listGroups
+      tags: [groups]
+      summary: List all groups
+      responses:
+        "200":
+          description: Group list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+    post:
+      operationId: createGroup
+      tags: [groups]
+      summary: Create a new group
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGroupBody"
+      responses:
+        "201":
+          description: Group created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+
+  /groups/{id}:
+    get:
+      operationId: getGroup
+      tags: [groups]
+      summary: Get a group with its students
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupWithStudents"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateGroup
+      tags: [groups]
+      summary: Update a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGroupBody"
+      responses:
+        "200":
+          description: Updated group
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteGroup
+      tags: [groups]
+      summary: Delete a group
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /staff:
+    get:
+      operationId: listStaff
+      tags: [staff]
+      summary: List staff members
+      responses:
+        "200":
+          description: Staff list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StaffMember"
+    post:
+      operationId: createStaff
+      tags: [staff]
+      summary: Create a staff member
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStaffBody"
+      responses:
+        "201":
+          description: Staff created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+
+  /staff/{id}:
+    patch:
+      operationId: updateStaff
+      tags: [staff]
+      summary: Update a staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateStaffBody"
+      responses:
+        "200":
+          description: Updated staff
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StaffMember"
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteStaff
+      tags: [staff]
+      summary: Delete a staff member
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+
+  /activity:
+    get:
+      operationId: listActivity
+      tags: [activity]
+      summary: List activity logs
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Activity logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityLog"
+
+  /gallery:
+    get:
+      operationId: listGalleryImages
+      tags: [gallery]
+      summary: List gallery images (public)
+      responses:
+        "200":
+          description: Gallery images
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GalleryImage"
+    post:
+      operationId: uploadGalleryImage
+      tags: [gallery]
+      summary: Upload a gallery image
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                image:
+                  type: string
+                  format: binary
+                caption:
+                  type: string
+                sortOrder:
+                  type: integer
+      responses:
+        "201":
+          description: Image uploaded
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalleryImage"
+
+  /gallery/{id}:
+    delete:
+      operationId: deleteGalleryImage
+      tags: [gallery]
+      summary: Delete a gallery image
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+    patch:
+      operationId: updateGalleryImage
+      tags: [gallery]
+      summary: Update gallery image details
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateGalleryImageBody"
+      responses:
+        "200":
+          description: Updated image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GalleryImage"
+        "404":
+          description: Not found
+
+  /stats:
+    get:
+      operationId: getDashboardStats
+      tags: [students]
+      summary: Dashboard statistics
+      responses:
+        "200":
+          description: Stats
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +541,383 @@ components:
       required:
         - status
 
+    LoginBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+      required:
+        - username
+        - password
+
+    StaffMember:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, assistant, staff]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - username
+        - fullName
+        - role
+        - createdAt
+
+    CreateStaffBody:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, assistant, staff]
+      required:
+        - username
+        - password
+        - fullName
+        - role
+
+    UpdateStaffBody:
+      type: object
+      properties:
+        fullName:
+          type: string
+        role:
+          type: string
+          enum: [admin, manager, assistant, staff]
+        password:
+          type: string
+
+    Student:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        whatsapp:
+          type: string
+        city:
+          type: string
+        trainingType:
+          type: string
+          enum: [online, physical]
+        housingNeeded:
+          type: boolean
+        experienceLevel:
+          type: string
+        note:
+          type: ["string", "null"]
+        stage:
+          type: string
+          enum: [new, contacted, interested, no_show, archived]
+        groupId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - firstName
+        - lastName
+        - phone
+        - whatsapp
+        - city
+        - trainingType
+        - housingNeeded
+        - experienceLevel
+        - stage
+        - createdAt
+        - updatedAt
+
+    CreateStudentBody:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        whatsapp:
+          type: string
+        city:
+          type: string
+        trainingType:
+          type: string
+          enum: [online, physical]
+        housingNeeded:
+          type: boolean
+        experienceLevel:
+          type: string
+        note:
+          type: string
+      required:
+        - firstName
+        - lastName
+        - phone
+        - whatsapp
+        - city
+        - trainingType
+        - housingNeeded
+        - experienceLevel
+
+    UpdateStudentBody:
+      type: object
+      properties:
+        firstName:
+          type: string
+        lastName:
+          type: string
+        phone:
+          type: string
+        whatsapp:
+          type: string
+        city:
+          type: string
+        trainingType:
+          type: string
+          enum: [online, physical]
+        housingNeeded:
+          type: boolean
+        experienceLevel:
+          type: string
+        note:
+          type: ["string", "null"]
+        stage:
+          type: string
+          enum: [new, contacted, interested, no_show, archived]
+
+    UpdateStageBody:
+      type: object
+      properties:
+        stage:
+          type: string
+          enum: [new, contacted, interested, no_show, archived]
+      required:
+        - stage
+
+    AssignGroupBody:
+      type: object
+      properties:
+        groupId:
+          type: ["integer", "null"]
+      required:
+        - groupId
+
+    Group:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        trainingType:
+          type: string
+          enum: [online, physical]
+        capacity:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [open, closed]
+        studentCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - startDate
+        - trainingType
+        - capacity
+        - status
+        - studentCount
+        - createdAt
+
+    CreateGroupBody:
+      type: object
+      properties:
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        trainingType:
+          type: string
+          enum: [online, physical]
+        capacity:
+          type: integer
+        notes:
+          type: string
+        status:
+          type: string
+          enum: [open, closed]
+      required:
+        - name
+        - startDate
+        - trainingType
+        - capacity
+
+    UpdateGroupBody:
+      type: object
+      properties:
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        trainingType:
+          type: string
+          enum: [online, physical]
+        capacity:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [open, closed]
+
+    GroupWithStudents:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        startDate:
+          type: string
+          format: date-time
+        trainingType:
+          type: string
+          enum: [online, physical]
+        capacity:
+          type: integer
+        notes:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [open, closed]
+        studentCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        students:
+          type: array
+          items:
+            $ref: "#/components/schemas/Student"
+      required:
+        - id
+        - name
+        - startDate
+        - trainingType
+        - capacity
+        - status
+        - studentCount
+        - createdAt
+        - students
+
+    ActivityLog:
+      type: object
+      properties:
+        id:
+          type: integer
+        action:
+          type: string
+        details:
+          type: string
+        performedBy:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - action
+        - details
+        - createdAt
+
+    GalleryImage:
+      type: object
+      properties:
+        id:
+          type: integer
+        url:
+          type: string
+        caption:
+          type: ["string", "null"]
+        sortOrder:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - url
+        - sortOrder
+        - createdAt
+
+    UpdateGalleryImageBody:
+      type: object
+      properties:
+        caption:
+          type: string
+        sortOrder:
+          type: integer
+
+    DashboardStats:
+      type: object
+      properties:
+        totalStudents:
+          type: integer
+        newStudents:
+          type: integer
+        contactedStudents:
+          type: integer
+        interestedStudents:
+          type: integer
+        noShowStudents:
+          type: integer
+        archivedStudents:
+          type: integer
+        totalGroups:
+          type: integer
+        openGroups:
+          type: integer
+      required:
+        - totalStudents
+        - newStudents
+        - contactedStudents
+        - interestedStudents
+        - noShowStudents
+        - archivedStudents
+        - totalGroups
+        - openGroups
