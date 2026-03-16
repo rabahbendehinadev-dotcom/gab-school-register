@@ -1,0 +1,498 @@
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+$success = false;
+$error_message = '';
+
+const TELEGRAM_BOT_TOKEN = '7776830596:AAEfR4EXKB1FFSzNEZMAvu7jBWWApwd2Hvw';
+const TELEGRAM_CHAT_ID   = 6725073871;
+const MAKE_WEBHOOK_URL = 'https://hook.eu2.make.com/bg4thr6yxbqur80w5h24ds9nbdin9y5s';
+
+$gabapp_images = [];
+$gabapp_path = __DIR__ . '/logo/gabapp/';
+if (is_dir($gabapp_path)) {
+    $images = glob($gabapp_path . '*.{jpg,JPG,jpeg,JPEG,png,PNG,webp,WEBP}', GLOB_BRACE);
+    foreach ($images as $image) {
+        $gabapp_images[] = basename($image);
+    }
+}
+
+function sendTelegramMessage(string $text): void {
+    if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID) return;
+    $url = 'https://api.telegram.org/bot' . TELEGRAM_BOT_TOKEN . '/sendMessage';
+    $data = ['chat_id' => TELEGRAM_CHAT_ID, 'text' => $text];
+    $options = ['http' => ['header' => "Content-type: application/x-www-form-urlencoded\r\n", 'method' => 'POST', 'content' => http_build_query($data), 'timeout' => 5]];
+    $result = @file_get_contents($url, false, stream_context_create($options));
+    file_put_contents(__DIR__ . '/telegram_log.txt', date('Y-m-d H:i:s') . ' | ' . ($result ?: 'ERROR') . "\n", FILE_APPEND);
+}
+
+function sendMakeWebhook(array $data): void {
+    if (!MAKE_WEBHOOK_URL) return;
+    $ch = curl_init(MAKE_WEBHOOK_URL);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+    curl_exec($ch);
+    curl_close($ch);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    require_once __DIR__ . '/config.php';
+    $first_name  = trim($_POST['first_name'] ?? '');
+    $last_name   = trim($_POST['last_name'] ?? '');
+    $phone       = trim($_POST['phone'] ?? '');
+    $wilaya      = trim($_POST['wilaya'] ?? '');
+    $whatsapp    = trim($_POST['whatsapp'] ?? '');
+    $need_housing = $_POST['need_housing'] ?? 'no';
+    $course_type = $_POST['course_type'] ?? 'offline';
+    if (!in_array($course_type, ['online', 'offline'])) $course_type = 'offline';
+    $experience  = $_POST['experience_level'] ?? 'none';
+    $note        = trim($_POST['note'] ?? '');
+
+    if (empty($first_name) || empty($last_name) || empty($phone) || empty($wilaya)) {
+        $error_message = 'الرجاء ملء جميع الحقول الأساسية (الاسم، اللقب، الهاتف، الولاية).';
+    } else {
+        try {
+            $stmt = $pdo->prepare("INSERT INTO students (first_name, last_name, phone, wilaya, whatsapp, need_housing, course_type, experience, note, is_active, created_at, updated_at) VALUES (:first_name, :last_name, :phone, :wilaya, :whatsapp, :need_housing, :course_type, :experience, :note, 1, NOW(), NOW())");
+            $stmt->execute([':first_name' => $first_name, ':last_name' => $last_name, ':phone' => $phone, ':wilaya' => $wilaya, ':whatsapp' => $whatsapp ?: null, ':need_housing' => $need_housing === 'yes' ? 'yes' : 'no', ':course_type' => $course_type, ':experience' => $experience, ':note' => $note ?: null]);
+            $success = true;
+            $msg  = "🚀 طلب VIP في GAB SCHOOL\n";
+            $msg .= "الاسم: {$first_name} {$last_name}\nالهاتف: {$phone}\n";
+            if ($whatsapp) $msg .= "واتساب: {$whatsapp}\n";
+            $msg .= "الولاية: {$wilaya}\n";
+            $msg .= "نوع الدورة: " . ($course_type === 'online' ? 'أونلاين' : 'حضورية') . "\n";
+            $msg .= "الخبرة: " . ($experience === 'none' ? 'لا توجد' : ($experience === 'basic' ? 'أساسيات' : 'متقدمة')) . "\n";
+            $msg .= "إقامة: " . ($need_housing === 'yes' ? 'نعم' : 'لا') . "\n";
+            $msg .= "التاريخ: " . date('Y-m-d H:i');
+            sendTelegramMessage($msg);
+            sendMakeWebhook(['first_name' => $first_name, 'last_name' => $last_name, 'phone' => $phone, 'wilaya' => $wilaya, 'whatsapp' => $whatsapp, 'need_housing' => $need_housing, 'course_type' => $course_type, 'experience_level' => $experience, 'note' => $note, 'created_at' => date('Y-m-d H:i:s'), 'source' => 'gab_school_landing']);
+        } catch (PDOException $e) {
+            $error_message = 'حدث خطأ أثناء حفظ البيانات.';
+        }
+    }
+}
+?>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GAB SCHOOL — أكبر أكاديمية لتفليش الهواتف في الجزائر</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --orange: #f97316; --orange-dark: #ea580c; --orange-deep: #c2410c;
+            --orange-light: #ffedd5; --orange-mid: #fed7aa;
+            --white: #ffffff; --off-white: #fafafa;
+            --gray-100: #f5f5f5; --gray-200: #e5e5e5; --gray-400: #a3a3a3;
+            --gray-600: #525252; --black: #111111;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.08);
+            --shadow-md: 0 8px 24px rgba(0,0,0,0.10);
+            --shadow-lg: 0 20px 48px rgba(0,0,0,0.12);
+            --shadow-xl: 0 32px 72px rgba(0,0,0,0.15);
+            --shadow-orange: 0 12px 36px rgba(249,115,22,0.30);
+            --radius-sm: 12px; --radius-md: 20px; --radius-lg: 28px; --radius-xl: 36px;
+            --transition: 0.35s cubic-bezier(0.25,0.46,0.45,0.94);
+        }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Cairo', sans-serif; font-size: 15px; background: var(--off-white); color: var(--black); overflow-x: hidden; line-height: 1.7; }
+        .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--gray-100); }
+        ::-webkit-scrollbar-thumb { background: var(--orange); border-radius: 99px; }
+
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(249,115,22,0.45); } 70% { box-shadow: 0 0 0 14px rgba(249,115,22,0); } 100% { box-shadow: 0 0 0 0 rgba(249,115,22,0); } }
+        @keyframes shimmer-bar { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+        @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+        .topbar { background: var(--black); color: var(--orange-mid); text-align: center; padding: 9px 24px; font-size: 0.82rem; font-weight: 600; }
+        .topbar i { color: var(--orange); margin-inline: 4px; }
+
+        .header { position: sticky; top: 0; z-index: 900; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--gray-200); box-shadow: var(--shadow-sm); }
+        .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; }
+        .logo-wrap { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+        .logo-img { height: 56px; width: auto; object-fit: contain; display: none; }
+        .logo-svg { width: 180px; height: 60px; filter: drop-shadow(0 4px 12px rgba(249,115,22,0.35)); transition: transform var(--transition); }
+        .logo-svg:hover { transform: scale(1.06) rotate(1deg); }
+        .header-cta { display: inline-flex; align-items: center; gap: 8px; background: var(--orange); color: var(--white); padding: 11px 26px; border-radius: 50px; font-weight: 700; font-size: 0.9rem; text-decoration: none; box-shadow: var(--shadow-orange); transition: all var(--transition); }
+        .header-cta:hover { background: var(--orange-dark); transform: translateY(-2px); }
+
+        .hero-section { padding: 80px 0 100px; position: relative; overflow: hidden; }
+        .hero-section::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 70% at 80% 50%, rgba(249,115,22,0.09) 0%, transparent 60%), radial-gradient(ellipse 40% 50% at 10% 80%, rgba(249,115,22,0.06) 0%, transparent 50%); pointer-events: none; }
+        .hero-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 60px; align-items: center; }
+        .hero-content { animation: fadeUp 0.7s ease both; }
+        .hero-badge { display: inline-flex; align-items: center; gap: 8px; background: var(--orange-light); color: var(--orange-dark); border: 1.5px solid var(--orange-mid); padding: 8px 20px; border-radius: 50px; font-size: 0.85rem; font-weight: 700; margin-bottom: 24px; animation: pulse-ring 2.5s infinite; }
+        .hero-title { font-size: clamp(2rem, 4.5vw, 3.2rem); font-weight: 900; line-height: 1.2; margin-bottom: 20px; color: var(--black); }
+        .hero-title .accent { background: linear-gradient(90deg, var(--orange), var(--orange-dark)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .hero-desc { font-size: 1rem; color: var(--gray-600); line-height: 1.9; margin-bottom: 32px; }
+        .hero-desc strong { color: var(--orange-dark); }
+        .hero-stats { display: flex; gap: 24px; flex-wrap: wrap; }
+        .stat-item { display: flex; flex-direction: column; align-items: center; background: var(--white); border: 1.5px solid var(--gray-200); border-radius: var(--radius-md); padding: 16px 22px; box-shadow: var(--shadow-sm); min-width: 110px; transition: all var(--transition); }
+        .stat-item:hover { border-color: var(--orange); box-shadow: var(--shadow-orange); transform: translateY(-4px); }
+        .stat-num { font-size: 1.6rem; font-weight: 900; color: var(--orange); line-height: 1; }
+        .stat-label { font-size: 0.75rem; color: var(--gray-600); font-weight: 600; margin-top: 4px; white-space: nowrap; }
+
+        .form-card { background: var(--white); border-radius: var(--radius-xl); padding: 48px 44px; box-shadow: var(--shadow-xl); border: 1.5px solid var(--gray-200); position: relative; overflow: hidden; animation: fadeUp 0.7s 0.15s ease both; }
+        .form-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 5px; background: linear-gradient(90deg, var(--orange), var(--orange-dark), var(--orange)); background-size: 400px 100%; animation: shimmer-bar 2.5s linear infinite; }
+        .form-title { font-size: 1.3rem; font-weight: 800; color: var(--black); text-align: center; margin-bottom: 28px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .form-title i { color: var(--orange); }
+
+        .alert { display: flex; align-items: flex-start; gap: 12px; padding: 18px 22px; border-radius: var(--radius-md); margin-bottom: 24px; font-size: 0.92rem; font-weight: 600; border: 1.5px solid; animation: fadeUp 0.4s ease both; }
+        .alert i { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+        .alert-success { background: #fff7ed; color: var(--orange-dark); border-color: var(--orange-mid); }
+        .alert-error { background: #fef2f2; color: #b91c1c; border-color: #fca5a5; }
+
+        .field { margin-bottom: 20px; }
+        .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        label { display: flex; align-items: center; gap: 7px; font-size: 0.88rem; font-weight: 700; color: var(--gray-600); margin-bottom: 8px; }
+        label i { color: var(--orange); font-size: 0.85rem; }
+        input[type="text"], input[type="tel"], select, textarea { width: 100%; padding: 13px 18px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-sm); background: var(--gray-100); color: var(--black); font-size: 0.93rem; font-family: 'Cairo', sans-serif; transition: all var(--transition); -webkit-appearance: none; appearance: none; }
+        input::placeholder, textarea::placeholder { color: var(--gray-400); }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--orange); background: var(--white); box-shadow: 0 0 0 4px rgba(249,115,22,0.12); }
+        select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23f97316' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: left 14px center; padding-left: 36px; }
+        textarea { resize: vertical; min-height: 88px; }
+        .btn-submit { width: 100%; padding: 16px; background: linear-gradient(135deg, var(--orange) 0%, var(--orange-dark) 100%); color: var(--white); border: none; border-radius: var(--radius-sm); font-size: 1rem; font-weight: 800; cursor: pointer; font-family: 'Cairo', sans-serif; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all var(--transition); box-shadow: var(--shadow-orange); margin-top: 8px; }
+        .btn-submit:hover { transform: translateY(-3px); box-shadow: 0 20px 48px rgba(249,115,22,0.45); }
+        .btn-submit:active { transform: translateY(0); }
+        .form-note { text-align: center; margin-top: 14px; font-size: 0.8rem; color: var(--gray-400); }
+        .form-note i { color: var(--orange); }
+
+        .section-header { text-align: center; margin-bottom: 56px; }
+        .section-tag { display: inline-flex; align-items: center; gap: 7px; background: var(--orange-light); color: var(--orange-dark); padding: 6px 16px; border-radius: 50px; font-size: 0.8rem; font-weight: 700; margin-bottom: 14px; border: 1px solid var(--orange-mid); }
+        .section-title { font-size: clamp(1.6rem, 3.5vw, 2.4rem); font-weight: 900; color: var(--black); line-height: 1.25; }
+        .section-title .accent { background: linear-gradient(90deg, var(--orange), var(--orange-dark)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .section-desc { margin-top: 12px; font-size: 0.95rem; color: var(--gray-600); max-width: 600px; margin-left: auto; margin-right: auto; }
+        .divider { width: 60px; height: 4px; background: linear-gradient(90deg, var(--orange), var(--orange-dark)); border-radius: 99px; margin: 16px auto 0; }
+
+        .features-section { padding: 90px 0; background: var(--white); }
+        .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
+        .feature-card { background: var(--off-white); border: 1.5px solid var(--gray-200); border-radius: var(--radius-lg); padding: 40px 32px; text-align: center; transition: all var(--transition); position: relative; overflow: hidden; }
+        .feature-card::before { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--orange), var(--orange-dark)); transform: scaleX(0); transition: transform var(--transition); }
+        .feature-card:hover { transform: translateY(-10px); box-shadow: var(--shadow-xl); border-color: var(--orange-mid); }
+        .feature-card:hover::before { transform: scaleX(1); }
+        .feature-icon { width: 80px; height: 80px; background: var(--orange-light); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; font-size: 2rem; color: var(--orange); transition: all var(--transition); }
+        .feature-card:hover .feature-icon { background: var(--orange); color: var(--white); transform: scale(1.1) rotate(5deg); box-shadow: var(--shadow-orange); }
+        .feature-card h3 { font-size: 1.15rem; font-weight: 800; margin-bottom: 12px; color: var(--black); }
+        .feature-card p { font-size: 0.9rem; color: var(--gray-600); line-height: 1.8; }
+
+        .why-section { padding: 90px 0; background: var(--orange); position: relative; overflow: hidden; }
+        .why-section::before { content: ''; position: absolute; top: -80px; right: -80px; width: 320px; height: 320px; background: rgba(255,255,255,0.06); border-radius: 50%; pointer-events: none; }
+        .why-section::after { content: ''; position: absolute; bottom: -60px; left: -60px; width: 240px; height: 240px; background: rgba(255,255,255,0.06); border-radius: 50%; pointer-events: none; }
+        .why-section .section-title, .why-section .section-desc { color: var(--white); }
+        .why-section .section-tag { background: rgba(255,255,255,0.2); color: var(--white); border-color: rgba(255,255,255,0.3); }
+        .why-section .divider { background: rgba(255,255,255,0.5); }
+        .why-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; margin-top: 56px; }
+        .why-card { background: rgba(255,255,255,0.15); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1.5px solid rgba(255,255,255,0.3); border-radius: var(--radius-lg); padding: 32px 28px; color: var(--white); transition: all var(--transition); }
+        .why-card:hover { background: rgba(255,255,255,0.25); transform: translateY(-8px); box-shadow: 0 20px 48px rgba(0,0,0,0.15); }
+        .why-emoji { font-size: 2.2rem; margin-bottom: 14px; display: block; animation: float 3s ease-in-out infinite; }
+        .why-card h4 { font-size: 1.05rem; font-weight: 800; margin-bottom: 8px; }
+        .why-card p { font-size: 0.88rem; opacity: 0.88; line-height: 1.8; }
+
+        /* ═══ GALLERY — الصور تظهر دائماً حتى لو فشل JavaScript ═══ */
+        .gallery-section { padding: 90px 0; background: var(--gray-100); }
+        .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; }
+
+        .photo-card {
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            aspect-ratio: 1;
+            background: var(--gray-200);
+            box-shadow: var(--shadow-md);
+            /* لا opacity:0 هنا — الإخفاء يتم فقط عبر JavaScript */
+            transition: transform var(--transition), box-shadow var(--transition), opacity 0.55s ease;
+        }
+        /* هذه الكلاس يُضاف فقط عبر JS */
+        .photo-card.will-animate {
+            opacity: 0;
+            transform: translateY(36px) scale(0.96);
+        }
+        .photo-card.will-animate.visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .photo-card img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.6s ease; display: block; }
+        .photo-card:hover { transform: translateY(-10px) scale(1.02); box-shadow: var(--shadow-xl); }
+        .photo-card:hover img { transform: scale(1.1); }
+
+        .footer { background: var(--black); color: var(--gray-400); padding: 48px 24px 32px; }
+        .footer-inner { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+        .footer-logo { filter: brightness(0) invert(1); width: 140px; height: auto; opacity: 0.75; }
+        .footer-text { font-size: 0.85rem; text-align: center; line-height: 2; }
+        .footer-text a { color: var(--orange); text-decoration: none; }
+        .footer-orange { color: var(--orange); font-weight: 700; }
+        .footer-divider { width: 100%; max-width: 600px; height: 1px; background: rgba(255,255,255,0.1); }
+
+        .float-group { position: fixed; bottom: 36px; z-index: 999; display: flex; flex-direction: column; gap: 12px; }
+        .float-group.float-left { left: 32px; }
+        .float-group.float-right { right: 32px; }
+        .btn-whatsapp { width: 62px; height: 62px; background: #25D366; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--white); font-size: 1.7rem; text-decoration: none; box-shadow: 0 8px 28px rgba(37,211,102,0.50); transition: all var(--transition); animation: pulse-ring 2.5s infinite; }
+        .btn-whatsapp:hover { transform: scale(1.15); }
+        .btn-scroll-cta { display: inline-flex; align-items: center; gap: 8px; background: var(--orange); color: var(--white); border: none; padding: 14px 24px; border-radius: 50px; font-size: 0.88rem; font-weight: 800; font-family: 'Cairo', sans-serif; cursor: pointer; box-shadow: var(--shadow-orange); transition: all var(--transition); white-space: nowrap; }
+        .btn-scroll-cta:hover { background: var(--orange-dark); transform: translateY(-3px); }
+
+        @media (max-width: 900px) {
+            .hero-grid { grid-template-columns: 1fr; gap: 44px; }
+            .hero-section { padding: 56px 0 72px; }
+            .field-row { grid-template-columns: 1fr; gap: 0; }
+            .float-group.float-right { bottom: 110px; }
+        }
+        @media (max-width: 640px) {
+            body { font-size: 14px; }
+            .form-card { padding: 32px 22px; }
+            .header-cta span { display: none; }
+            .hero-stats { gap: 14px; }
+            .float-group.float-left { left: 18px; bottom: 24px; }
+            .float-group.float-right { right: 18px; bottom: 100px; }
+            .features-section, .why-section, .gallery-section { padding: 60px 0; }
+            .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="topbar">
+    <i class="fas fa-crown"></i>
+    أكبر أكاديمية لتفليش الهواتف في الجزائر &nbsp;|&nbsp; سجّل الآن واحجز مكانك
+    <i class="fas fa-fire"></i>
+</div>
+
+<header class="header">
+    <div class="container">
+        <div class="header-inner">
+            <a href="#" class="logo-wrap">
+                <img src="/logo/gabschool.jpg" alt="GAB SCHOOL" class="logo-img" id="logoImg">
+                <svg class="logo-svg" id="logoSvg" viewBox="0 0 220 70" xmlns="http://www.w3.org/2000/svg">
+                    <defs><linearGradient id="logoG" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#f97316"/><stop offset="100%" style="stop-color:#ea580c"/></linearGradient></defs>
+                    <rect x="4" y="4" width="212" height="62" rx="16" fill="url(#logoG)"/>
+                    <text x="82" y="44" font-family="Cairo,sans-serif" font-size="21" font-weight="900" fill="#fff" letter-spacing="1">GAB</text>
+                    <text x="130" y="44" font-family="Cairo,sans-serif" font-size="16" font-weight="700" fill="#fff" opacity="0.9">SCHOOL</text>
+                </svg>
+            </a>
+            <a class="header-cta" href="#hero-form">
+                <i class="fas fa-clipboard-list"></i>
+                <span>سجّل الآن</span>
+            </a>
+        </div>
+    </div>
+</header>
+
+<section class="hero-section" id="hero-form">
+    <div class="container">
+        <div class="hero-grid">
+            <div class="hero-content">
+                <div class="hero-badge"><i class="fas fa-crown"></i> دورة حضورية + فيديوهات مسجّلة</div>
+                <h1 class="hero-title">سجّل في<br><span class="accent">دورة تفليش الهواتف</span><br>مع GAB SCHOOL</h1>
+                <p class="hero-desc">املأ الاستمارة وسنتواصل معك لتأكيد التسجيل وإعطائك كل التفاصيل<br><strong>(العرض · المدة · المواد · مكان الأكاديمية)</strong></p>
+                <div class="hero-stats">
+                    <div class="stat-item"><span class="stat-num">+5000</span><span class="stat-label">خريج محترف</span></div>
+                    <div class="stat-item"><span class="stat-num">80%</span><span class="stat-label">تدريب عملي</span></div>
+                    <div class="stat-item"><span class="stat-num">24/7</span><span class="stat-label">دعم مدى الحياة</span></div>
+                </div>
+            </div>
+            <div class="form-card">
+                <h2 class="form-title"><i class="fas fa-clipboard-list"></i> استمارة التسجيل الرسمية</h2>
+                <?php if ($success): ?>
+                    <div class="alert alert-success"><i class="fas fa-check-circle"></i><span>تم إرسال طلبك بنجاح! سيتواصل معك فريق GAB SCHOOL خلال 24 ساعة.</span></div>
+                <?php elseif ($error_message): ?>
+                    <div class="alert alert-error"><i class="fas fa-exclamation-triangle"></i><span><?= htmlspecialchars($error_message, ENT_QUOTES, 'UTF-8') ?></span></div>
+                <?php endif; ?>
+                <form method="post" action="">
+                    <div class="field-row">
+                        <div class="field"><label><i class="fas fa-user"></i> الاسم الأول</label><input type="text" name="first_name" required placeholder="أدخل اسمك الأول"></div>
+                        <div class="field"><label><i class="fas fa-user-tag"></i> اللقب</label><input type="text" name="last_name" required placeholder="أدخل لقبك"></div>
+                    </div>
+                    <div class="field-row">
+                        <div class="field"><label><i class="fas fa-phone"></i> رقم الهاتف</label><input type="tel" name="phone" required placeholder="05X XX XX XX"></div>
+                        <div class="field"><label><i class="fab fa-whatsapp"></i> رقم الواتساب</label><input type="tel" name="whatsapp" placeholder="يمكن أن يكون نفس الرقم"></div>
+                    </div>
+                    <div class="field"><label><i class="fas fa-map-marker-alt"></i> الولاية</label><input type="text" name="wilaya" required placeholder="الجزائر · وهران · عنابة..."></div>
+                    <div class="field-row">
+                        <div class="field"><label><i class="fas fa-laptop"></i> نوع الدورة</label><select name="course_type" required><option value="">اختر نوع الدورة</option><option value="offline">حضورية (في الأكاديمية)</option><option value="online">أونلاين (عن بعد)</option></select></div>
+                        <div class="field"><label><i class="fas fa-home"></i> هل تحتاج إقامة؟</label><select name="need_housing"><option value="no">لا أحتاج</option><option value="yes">نعم أحتاج إقامة</option></select></div>
+                    </div>
+                    <div class="field"><label><i class="fas fa-chart-line"></i> مستوى خبرتك</label><select name="experience_level"><option value="none">لا خبرة، أبدأ من الصفر</option><option value="basic">أساسيات بسيطة</option><option value="advanced">خبرة وأريد الاحتراف</option></select></div>
+                    <div class="field"><label><i class="fas fa-sticky-note"></i> ملاحظة (اختياري)</label><textarea name="note" placeholder="مثال: أفضل الدراسة صباحاً..."></textarea></div>
+                    <button class="btn-submit" type="submit"><i class="fas fa-paper-plane"></i> إرسال طلب التسجيل الآن</button>
+                    <p class="form-note"><i class="fas fa-shield-alt"></i> معلوماتك محفوظة وآمنة · سنتواصل معك خلال 24 ساعة</p>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="features-section">
+    <div class="container">
+        <div class="section-header">
+            <div class="section-tag"><i class="fas fa-star"></i> مميزاتنا</div>
+            <h2 class="section-title">لماذا تختار <span class="accent">GAB SCHOOL</span>؟</h2>
+            <div class="divider"></div>
+            <p class="section-desc">نقدم أفضل تجربة تعليمية في مجال تصليح الهواتف على مستوى الجزائر</p>
+        </div>
+        <div class="features-grid">
+            <div class="feature-card"><div class="feature-icon"><i class="fas fa-tools"></i></div><h3>تدريب عملي 80%</h3><p>تدريب يومي على أجهزة حقيقية + أحدث الأدوات والمعدات الاحترافية</p></div>
+            <div class="feature-card"><div class="feature-icon"><i class="fas fa-certificate"></i></div><h3>شهادة رسمية</h3><p>شهادة رسمية من الأكاديمية + ملف تدريبي كامل يؤهلك للعمل المهني فوراً</p></div>
+            <div class="feature-card"><div class="feature-icon"><i class="fas fa-users"></i></div><h3>دعم مدى الحياة</h3><p>مجموعة واتساب دائمة + متابعة مجانية بعد انتهاء الدورة بدون حد زمني</p></div>
+            <div class="feature-card"><div class="feature-icon"><i class="fas fa-server"></i></div><h3>سيرفر خاص بنا</h3><p>أدوات حصرية على سيرفرنا الخاص لا تجدها في أي مكان آخر</p></div>
+            <div class="feature-card"><div class="feature-icon"><i class="fas fa-video"></i></div><h3>فيديوهات مسجّلة</h3><p>مكتبة فيديوهات شاملة تبقى معك إلى الأبد لمراجعة كل المواد</p></div>
+            <div class="feature-card"><div class="feature-icon"><i class="fas fa-briefcase"></i></div><h3>توظيف بعد التخرج</h3><p>مساعدة في إيجاد عمل أو فتح محل خاص بك بعد نهاية الدورة</p></div>
+        </div>
+    </div>
+</section>
+
+<section class="why-section">
+    <div class="container">
+        <div class="section-header">
+            <div class="section-tag"><i class="fas fa-trophy"></i> الأفضل في الجزائر</div>
+            <h2 class="section-title" style="color:#fff;">نحن الرقم <span style="color:#ffedd5;">#1</span></h2>
+            <div class="divider"></div>
+            <p class="section-desc">منذ سنوات ونحن نبني محترفين في مجال تصليح الهواتف</p>
+        </div>
+        <div class="why-grid">
+            <div class="why-card"><span class="why-emoji">🚀</span><h4>الأوائل في صنع الأدوات</h4><p>أدوات احترافية حصرية لا توجد في أي أكاديمية أخرى</p></div>
+            <div class="why-card"><span class="why-emoji">🎁</span><h4>الأدوات مجانية 100%</h4><p>تحديثات أسبوعية + قناة تليجرام خاصة بالخريجين</p></div>
+            <div class="why-card"><span class="why-emoji">📱</span><h4>متابعة مدى الحياة</h4><p>دعم فني 24/7 من أول يوم ولغاية نهاية مسيرتك المهنية</p></div>
+            <div class="why-card"><span class="why-emoji">🥇</span><h4>أفضل أكاديمية في الجزائر</h4><p>اعتراف رسمي وسمعة مثبتة لدى المحترفين في الجزائر</p></div>
+        </div>
+    </div>
+</section>
+
+<!-- معرض الصور 1 — /logo/photo1.jpg إلى /logo/photo16.jpg -->
+<section class="gallery-section">
+    <div class="container">
+        <div class="section-header">
+            <div class="section-tag"><i class="fas fa-images"></i> معرض الأعمال</div>
+            <h2 class="section-title">أعمالنا <span class="accent">وتجهيزاتنا</span></h2>
+            <div class="divider"></div>
+            <p class="section-desc">صور من معامل الأكاديمية وأعمال الخريجين والتجهيزات الحديثة</p>
+        </div>
+        <div class="gallery-grid">
+            <?php for ($i = 1; $i <= 16; $i++): ?>
+            <div class="photo-card">
+                <img src="/logo/photo<?= $i ?>.jpg"
+                     alt="عمل <?= $i ?>"
+                     loading="lazy"
+                     onerror="this.parentElement.style.display='none'">
+            </div>
+            <?php endfor; ?>
+        </div>
+    </div>
+</section>
+
+<!-- معرض الصور 2 — /logo/gabapp/ -->
+<section class="gallery-section" style="background:var(--white);">
+    <div class="container">
+        <div class="section-header">
+            <div class="section-tag"><i class="fas fa-tools"></i> أدواتنا الحصرية</div>
+            <h2 class="section-title">أدواتنا <span class="accent">ومعاملنا</span></h2>
+            <div class="divider"></div>
+            <p class="section-desc">أحدث أدواتنا المتطورة + معاملنا الحديثة + سيرفرنا الخاص</p>
+        </div>
+        <div class="gallery-grid">
+            <?php if (!empty($gabapp_images)): ?>
+                <?php foreach ($gabapp_images as $image): ?>
+                <div class="photo-card">
+                    <img src="/logo/gabapp/<?= htmlspecialchars($image) ?>"
+                         alt="أدوات GAB"
+                         loading="lazy"
+                         onerror="this.parentElement.style.display='none'">
+                </div>
+                <?php endforeach; ?>
+            <?php else: ?>
+                <?php for ($i = 1; $i <= 10; $i++): ?>
+                <div class="photo-card">
+                    <img src="/logo/gabapp/photo<?= $i ?>.JPG"
+                         alt="GAB APP <?= $i ?>"
+                         loading="lazy"
+                         onerror="this.parentElement.style.display='none'">
+                </div>
+                <?php endfor; ?>
+            <?php endif; ?>
+        </div>
+    </div>
+</section>
+
+<footer class="footer">
+    <div class="footer-inner">
+        <img src="/logo/gabschool.jpg" alt="GAB SCHOOL" class="footer-logo" onerror="this.style.display='none'">
+        <div class="footer-divider"></div>
+        <p class="footer-text">
+            <span class="footer-orange">GAB SCHOOL</span> &mdash; أكبر أكاديمية لتفليش الهواتف في الجزائر<br>
+            © <?= date('Y') ?> جميع الحقوق محفوظة &nbsp;·&nbsp; <a href="https://wa.me/213772339494">تواصل معنا</a>
+        </p>
+    </div>
+</footer>
+
+<div class="float-group float-left">
+    <a class="btn-whatsapp" href="https://wa.me/213772339494" target="_blank" title="تواصل عبر واتساب">
+        <i class="fab fa-whatsapp"></i>
+    </a>
+</div>
+<div class="float-group float-right">
+    <button class="btn-scroll-cta" onclick="document.getElementById('hero-form').scrollIntoView({behavior:'smooth'})">
+        <i class="fas fa-clipboard-list"></i> سجّل في الدورة
+    </button>
+</div>
+
+<script>
+    // تحميل الشعار الحقيقي من السيرفر
+    (function () {
+        var img = document.getElementById('logoImg');
+        var svg = document.getElementById('logoSvg');
+        if (!img || !svg) return;
+        img.onload  = function () { svg.style.display = 'none'; img.style.display = 'block'; };
+        img.onerror = function () { img.style.display = 'none'; svg.style.display = 'block'; };
+    })();
+
+    // ═══════════════════════════════════════════════════════
+    // Gallery fade-in — آمن 100%:
+    // الصور تظهر بدون CSS opacity:0
+    // JavaScript يُضيف will-animate أولاً ثم يُشغّل المراقب
+    // إذا فشل أي شيء → safety timeout يُظهر كل الصور بعد 1.5 ثانية
+    // ═══════════════════════════════════════════════════════
+    (function () {
+        var cards = document.querySelectorAll('.photo-card');
+        if (!cards.length) return;
+
+        // أضف الكلاس عبر JS فقط — الصور ظاهرة بدون JS
+        cards.forEach(function (c) { c.classList.add('will-animate'); });
+
+        function revealCard(el, delay) {
+            setTimeout(function () { el.classList.add('visible'); }, delay || 0);
+        }
+
+        // إذا المتصفح لا يدعم IntersectionObserver → أظهر الكل فوراً
+        if (!window.IntersectionObserver) {
+            cards.forEach(function (c) { revealCard(c, 0); });
+            return;
+        }
+
+        var allCards = Array.from(cards);
+        var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting) {
+                    var idx   = allCards.indexOf(entry.target);
+                    var delay = (idx % 8) * 70;
+                    revealCard(entry.target, delay);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.04, rootMargin: '0px 0px 80px 0px' });
+
+        cards.forEach(function (c) { observer.observe(c); });
+
+        // شبكة أمان: بعد 1.5 ثانية أظهر أي بطاقة لا تزال مخفية
+        setTimeout(function () {
+            document.querySelectorAll('.photo-card.will-animate:not(.visible)').forEach(function (c) {
+                c.classList.add('visible');
+            });
+        }, 1500);
+    })();
+</script>
+</body>
+</html>
