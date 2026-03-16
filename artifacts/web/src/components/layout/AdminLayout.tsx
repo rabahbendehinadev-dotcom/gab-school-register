@@ -43,7 +43,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const filteredNav = navItems.filter(item => !item.roles || item.roles.includes(user.role));
 
   return (
-    <div className="min-h-screen bg-muted/40 flex overflow-hidden">
+    <div dir="ltr" className="min-h-screen bg-muted/40 flex overflow-hidden">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 

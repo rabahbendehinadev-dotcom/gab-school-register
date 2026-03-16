@@ -158,7 +158,7 @@ export default function Home() {
                       <Field label="📞 رقم الهاتف" error={form.formState.errors.phone?.message}>
                         <input {...form.register("phone")} type="tel" placeholder="05X XX XX XX" className={inputCls} dir="ltr" />
                       </Field>
-                      <Field label="💬 رقم الواتساب">
+                      <Field label="💬 رقم الواتساب" error={form.formState.errors.whatsapp?.message}>
                         <input {...form.register("whatsapp")} type="tel" placeholder="يمكن أن يكون نفس الرقم" className={inputCls} dir="ltr" />
                       </Field>
                     </div>
