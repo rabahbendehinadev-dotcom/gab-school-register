@@ -10,6 +10,7 @@ import {
 } from "@workspace/api-zod";
 import { requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
+import "../types/session";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
@@ -64,7 +65,7 @@ router.post("/gallery", requireRole("admin", "manager"), upload.single("image"),
     .values({ url, caption, sortOrder })
     .returning();
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("image_uploaded", `Gallery image uploaded: ${req.file.originalname}`, performer);
 
   res.status(201).json(image);
@@ -95,7 +96,7 @@ router.delete("/gallery/:id", requireRole("admin", "manager"), async (req, res):
     }
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("image_deleted", `Gallery image deleted`, performer);
 
   res.sendStatus(204);
@@ -125,7 +126,7 @@ router.patch("/gallery/:id", requireRole("admin", "manager"), async (req, res): 
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("image_updated", `Gallery image metadata updated (id: ${image.id})`, performer);
 
   res.json(UpdateGalleryImageResponse.parse(image));

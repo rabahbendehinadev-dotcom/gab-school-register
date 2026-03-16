@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListStudents, useDeleteStudent, useUpdateStudentStage, useAssignStudentToGroup, useListGroups, getListStudentsQueryKey } from "@workspace/api-client-react";
+import { 
+  useListStudents, useDeleteStudent, useUpdateStudent, useUpdateStudentStage, 
+  useAssignStudentToGroup, useListGroups, getListStudentsQueryKey,
+  type Student, type UpdateStudentBody, type UpdateStageBodyStage
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
@@ -8,9 +12,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Trash2, ArrowRightLeft, Users } from "lucide-react";
+import { Search, Trash2, ArrowRightLeft, Users, Eye, X } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useForm } from "react-hook-form";
 
 const STAGES = ["new", "contacted", "interested", "no_show", "archived"] as const;
 const STAGE_COLORS: Record<string, string> = {
@@ -24,14 +29,17 @@ const STAGE_COLORS: Record<string, string> = {
 export default function Students() {
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("all");
-  const [stageDialogStudent, setStageDialogStudent] = useState<any>(null);
-  const [groupDialogStudent, setGroupDialogStudent] = useState<any>(null);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [stageDialogStudent, setStageDialogStudent] = useState<Student | null>(null);
+  const [groupDialogStudent, setGroupDialogStudent] = useState<Student | null>(null);
+  const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const { toast } = useToast();
   
   const queryClient = useQueryClient();
   const { data: students, isLoading } = useListStudents({ 
     search: search || undefined,
-    stage: stageFilter !== "all" ? stageFilter : undefined
+    stage: stageFilter !== "all" ? stageFilter : undefined,
+    trainingType: typeFilter !== "all" ? typeFilter : undefined,
   });
   const { data: groups } = useListGroups();
 
@@ -64,6 +72,16 @@ export default function Students() {
     }
   });
 
+  const updateMutation = useUpdateStudent({
+    mutation: {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+        setDetailStudent(null);
+        toast({ title: "Student updated" });
+      }
+    }
+  });
+
   if (isLoading) return <AdminLayout><div className="animate-pulse">Loading students...</div></AdminLayout>;
 
   return (
@@ -80,9 +98,9 @@ export default function Students() {
               className="pl-9 bg-background border-border shadow-sm rounded-xl"
             />
           </div>
-          <div className="flex gap-4 w-full sm:w-auto">
+          <div className="flex gap-3 w-full sm:w-auto">
             <Select value={stageFilter} onValueChange={setStageFilter}>
-              <SelectTrigger className="w-[160px] rounded-xl bg-background">
+              <SelectTrigger className="w-[140px] rounded-xl bg-background">
                 <SelectValue placeholder="All Stages" />
               </SelectTrigger>
               <SelectContent>
@@ -92,6 +110,16 @@ export default function Students() {
                 <SelectItem value="interested">Interested</SelectItem>
                 <SelectItem value="no_show">No Show</SelectItem>
                 <SelectItem value="archived">Archived</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-[140px] rounded-xl bg-background">
+                <SelectValue placeholder="All Types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="physical">Physical</SelectItem>
+                <SelectItem value="online">Online</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -139,31 +167,28 @@ export default function Students() {
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="w-8 h-8 rounded-lg"
-                          title="Change Stage"
-                          onClick={() => setStageDialogStudent(student)}
+                          variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
+                          title="View/Edit" onClick={() => setDetailStudent(student)}
+                        >
+                          <Eye className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                        <Button 
+                          variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
+                          title="Change Stage" onClick={() => setStageDialogStudent(student)}
                         >
                           <ArrowRightLeft className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>
                         <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="w-8 h-8 rounded-lg"
-                          title="Assign Group"
-                          onClick={() => setGroupDialogStudent(student)}
+                          variant="ghost" size="icon" className="w-8 h-8 rounded-lg"
+                          title="Assign Group" onClick={() => setGroupDialogStudent(student)}
                         >
                           <Users className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>
                         <Button 
-                          variant="ghost" 
-                          size="icon" 
+                          variant="ghost" size="icon" 
                           className="w-8 h-8 rounded-lg hover:bg-destructive/10 hover:text-destructive"
                           title="Delete"
-                          onClick={() => {
-                            if(confirm("Delete this student?")) deleteMutation.mutate({ id: student.id })
-                          }}
+                          onClick={() => { if(confirm("Delete this student?")) deleteMutation.mutate({ id: student.id }) }}
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -184,68 +209,173 @@ export default function Students() {
         </div>
       </div>
 
-      <Dialog open={!!stageDialogStudent} onOpenChange={(o) => !o && setStageDialogStudent(null)}>
-        <DialogContent className="sm:max-w-[360px] rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Change Stage</DialogTitle>
-          </DialogHeader>
-          {stageDialogStudent && (
-            <div className="space-y-3 mt-2">
-              <p className="text-sm text-muted-foreground">
-                {stageDialogStudent.firstName} {stageDialogStudent.lastName} — currently <strong className="capitalize">{stageDialogStudent.stage.replace('_', ' ')}</strong>
-              </p>
-              <div className="grid grid-cols-1 gap-2">
-                {STAGES.map(stage => (
-                  <Button
-                    key={stage}
-                    variant={stage === stageDialogStudent.stage ? "default" : "outline"}
-                    className="w-full capitalize rounded-xl justify-start"
-                    disabled={stage === stageDialogStudent.stage || stageMutation.isPending}
-                    onClick={() => stageMutation.mutate({ id: stageDialogStudent.id, data: { stage } })}
-                  >
-                    {stage.replace('_', ' ')}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      <StageDialog 
+        student={stageDialogStudent} 
+        onClose={() => setStageDialogStudent(null)} 
+        onStageChange={(id, stage) => stageMutation.mutate({ id, data: { stage: stage as UpdateStageBodyStage } })}
+        isPending={stageMutation.isPending}
+      />
 
-      <Dialog open={!!groupDialogStudent} onOpenChange={(o) => !o && setGroupDialogStudent(null)}>
-        <DialogContent className="sm:max-w-[360px] rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Assign to Group</DialogTitle>
-          </DialogHeader>
-          {groupDialogStudent && (
-            <div className="space-y-3 mt-2">
-              <p className="text-sm text-muted-foreground">
-                {groupDialogStudent.firstName} {groupDialogStudent.lastName}
-              </p>
-              <div className="space-y-2">
-                <Label>Select Group</Label>
-                <Select 
-                  defaultValue={groupDialogStudent.groupId?.toString() || "none"}
-                  onValueChange={(v) => {
-                    const groupId = v === "none" ? null : parseInt(v);
-                    groupMutation.mutate({ id: groupDialogStudent.id, data: { groupId } });
-                  }}
+      <GroupAssignDialog
+        student={groupDialogStudent}
+        groups={groups ?? []}
+        onClose={() => setGroupDialogStudent(null)}
+        onAssign={(studentId, groupId) => groupMutation.mutate({ id: studentId, data: { groupId } })}
+      />
+
+      <StudentDetailDialog
+        student={detailStudent}
+        onClose={() => setDetailStudent(null)}
+        onSave={(id, data) => updateMutation.mutate({ id, data })}
+        isPending={updateMutation.isPending}
+      />
+    </AdminLayout>
+  );
+}
+
+function StageDialog({ student, onClose, onStageChange, isPending }: { 
+  student: Student | null; onClose: () => void; 
+  onStageChange: (id: number, stage: string) => void; isPending: boolean;
+}) {
+  return (
+    <Dialog open={!!student} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[360px] rounded-3xl">
+        <DialogHeader><DialogTitle>Change Stage</DialogTitle></DialogHeader>
+        {student && (
+          <div className="space-y-3 mt-2">
+            <p className="text-sm text-muted-foreground">
+              {student.firstName} {student.lastName} — currently <strong className="capitalize">{student.stage.replace('_', ' ')}</strong>
+            </p>
+            <div className="grid grid-cols-1 gap-2">
+              {STAGES.map(stage => (
+                <Button
+                  key={stage}
+                  variant={stage === student.stage ? "default" : "outline"}
+                  className="w-full capitalize rounded-xl justify-start"
+                  disabled={stage === student.stage || isPending}
+                  onClick={() => onStageChange(student.id, stage)}
                 >
-                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">No Group</SelectItem>
-                    {groups?.map(g => (
-                      <SelectItem key={g.id} value={g.id.toString()}>
-                        {g.name} ({g.studentCount}/{g.capacity})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  {stage.replace('_', ' ')}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GroupAssignDialog({ student, groups, onClose, onAssign }: {
+  student: Student | null; groups: Array<{ id: number; name: string; studentCount: number; capacity: number }>;
+  onClose: () => void; onAssign: (studentId: number, groupId: number | null) => void;
+}) {
+  return (
+    <Dialog open={!!student} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="sm:max-w-[360px] rounded-3xl">
+        <DialogHeader><DialogTitle>Assign to Group</DialogTitle></DialogHeader>
+        {student && (
+          <div className="space-y-3 mt-2">
+            <p className="text-sm text-muted-foreground">{student.firstName} {student.lastName}</p>
+            <div className="space-y-2">
+              <Label>Select Group</Label>
+              <Select 
+                defaultValue={student.groupId?.toString() || "none"}
+                onValueChange={(v) => onAssign(student.id, v === "none" ? null : parseInt(v))}
+              >
+                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">No Group</SelectItem>
+                  {groups.map(g => (
+                    <SelectItem key={g.id} value={g.id.toString()}>
+                      {g.name} ({g.studentCount}/{g.capacity})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function StudentDetailDialog({ student, onClose, onSave, isPending }: {
+  student: Student | null; onClose: () => void;
+  onSave: (id: number, data: UpdateStudentBody) => void; isPending: boolean;
+}) {
+  const form = useForm<UpdateStudentBody>();
+
+  const handleOpen = (s: Student) => {
+    form.reset({
+      firstName: s.firstName,
+      lastName: s.lastName,
+      phone: s.phone,
+      whatsapp: s.whatsapp,
+      city: s.city,
+      experienceLevel: s.experienceLevel,
+      note: s.note ?? "",
+      housingNeeded: s.housingNeeded,
+    });
+  };
+
+  return (
+    <Dialog open={!!student} onOpenChange={(o) => {
+      if (!o) onClose();
+      else if (student) handleOpen(student);
+    }}>
+      <DialogContent className="sm:max-w-[500px] rounded-3xl p-6">
+        <DialogHeader><DialogTitle className="text-xl font-bold">Student Details</DialogTitle></DialogHeader>
+        {student && (
+          <form onSubmit={form.handleSubmit((data) => onSave(student.id, data))} className="space-y-4 mt-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>First Name</Label>
+                <Input {...form.register("firstName")} className="rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label>Last Name</Label>
+                <Input {...form.register("lastName")} className="rounded-xl" />
               </div>
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-    </AdminLayout>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Phone</Label>
+                <Input {...form.register("phone")} className="rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label>WhatsApp</Label>
+                <Input {...form.register("whatsapp")} className="rounded-xl" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>City</Label>
+                <Input {...form.register("city")} className="rounded-xl" />
+              </div>
+              <div className="space-y-2">
+                <Label>Experience Level</Label>
+                <Input {...form.register("experienceLevel")} className="rounded-xl" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Note</Label>
+              <Input {...form.register("note")} className="rounded-xl" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="housing" {...form.register("housingNeeded")} className="rounded" />
+              <Label htmlFor="housing">Housing Needed</Label>
+            </div>
+            <div className="flex gap-3">
+              <Button type="submit" className="flex-1 rounded-xl" disabled={isPending}>
+                {isPending ? "Saving..." : "Save Changes"}
+              </Button>
+              <Button type="button" variant="outline" className="rounded-xl" onClick={onClose}>Cancel</Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }

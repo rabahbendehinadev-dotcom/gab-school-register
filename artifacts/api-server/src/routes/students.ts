@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
+import "../types/session";
 
 const router: IRouter = Router();
 
@@ -125,7 +126,7 @@ router.patch("/students/:id", requireRole("admin", "manager"), async (req, res):
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "student_updated",
     `Student updated: ${student.firstName} ${student.lastName}`,
@@ -152,7 +153,7 @@ router.delete("/students/:id", requireRole("admin", "manager"), async (req, res)
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "student_deleted",
     `Student deleted: ${student.firstName} ${student.lastName}`,
@@ -191,7 +192,7 @@ router.patch("/students/:id/stage", requireRole("admin", "manager", "staff"), as
     .where(eq(studentsTable.id, params.data.id))
     .returning();
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "stage_changed",
     `${student.firstName} ${student.lastName}: ${oldStudent.stage} → ${parsed.data.stage}`,
@@ -225,7 +226,7 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "group_assigned",
     `${student.firstName} ${student.lastName} assigned to group ${parsed.data.groupId ?? "none"}`,

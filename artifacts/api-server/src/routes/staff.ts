@@ -12,6 +12,7 @@ import {
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { hashPassword } from "../lib/password";
 import { logActivity } from "../lib/activityLogger";
+import "../types/session";
 
 const router: IRouter = Router();
 
@@ -56,7 +57,7 @@ router.post("/staff", requireRole("admin"), async (req, res): Promise<void> => {
     })
     .returning();
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("staff_created", `Staff member created: ${staff.fullName} (${staff.role})`, performer);
 
   res.status(201).json({
@@ -81,7 +82,7 @@ router.patch("/staff/:id", requireRole("admin"), async (req, res): Promise<void>
     return;
   }
 
-  const updateData: Record<string, any> = {};
+  const updateData: Record<string, string> = {};
   if (parsed.data.fullName) updateData.fullName = parsed.data.fullName;
   if (parsed.data.role) updateData.role = parsed.data.role;
   if (parsed.data.password) updateData.passwordHash = hashPassword(parsed.data.password);
@@ -97,7 +98,7 @@ router.patch("/staff/:id", requireRole("admin"), async (req, res): Promise<void>
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("staff_updated", `Staff member updated: ${staff.fullName}`, performer);
 
   res.json(
@@ -128,7 +129,7 @@ router.delete("/staff/:id", requireRole("admin"), async (req, res): Promise<void
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("staff_deleted", `Staff member deleted: ${staff.fullName}`, performer);
 
   res.sendStatus(204);

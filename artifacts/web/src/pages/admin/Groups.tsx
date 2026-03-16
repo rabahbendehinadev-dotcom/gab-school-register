@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useGetGroup, useAssignStudentToGroup, getListGroupsQueryKey, getListStudentsQueryKey, getGetGroupQueryKey, CreateGroupBody, UpdateGroupBody } from "@workspace/api-client-react";
+import { 
+  useListGroups, useCreateGroup, useUpdateGroup, useDeleteGroup, useGetGroup, 
+  useAssignStudentToGroup, getListGroupsQueryKey, getListStudentsQueryKey, getGetGroupQueryKey,
+  type CreateGroupBody, type UpdateGroupBody, type Group, type Student,
+  type CreateGroupBodyTrainingType, type CreateGroupBodyStatus, type UpdateGroupBodyTrainingType, type UpdateGroupBodyStatus
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,12 +19,14 @@ import { format } from "date-fns";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 
+type GroupWithCount = Group & { studentCount: number };
+
 export default function Groups() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: groups, isLoading } = useListGroups();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [editGroup, setEditGroup] = useState<any>(null);
+  const [editGroup, setEditGroup] = useState<GroupWithCount | null>(null);
   const [membersGroupId, setMembersGroupId] = useState<number | null>(null);
 
   const createMutation = useCreateGroup({
@@ -82,7 +89,7 @@ export default function Groups() {
     updateMutation.mutate({ id: editGroup.id, data });
   };
 
-  const openEdit = (group: any) => {
+  const openEdit = (group: GroupWithCount) => {
     setEditGroup(group);
     editForm.reset({
       name: group.name,
@@ -122,7 +129,7 @@ export default function Groups() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Training Type</Label>
-                  <Select onValueChange={(v) => createForm.setValue("trainingType", v as any)} defaultValue="physical">
+                  <Select onValueChange={(v) => createForm.setValue("trainingType", v as CreateGroupBodyTrainingType)} defaultValue="physical">
                     <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="physical">Physical</SelectItem>
@@ -157,17 +164,14 @@ export default function Groups() {
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
                   <Button 
-                    variant="ghost" 
-                    size="icon" 
+                    variant="ghost" size="icon" 
                     className="w-8 h-8 rounded-lg text-muted-foreground hover:text-foreground"
-                    title="Edit Group"
-                    onClick={() => openEdit(group)}
+                    title="Edit Group" onClick={() => openEdit(group)}
                   >
                     <Edit className="w-4 h-4" />
                   </Button>
                   <Button 
-                    variant="ghost" 
-                    size="icon" 
+                    variant="ghost" size="icon" 
                     className="w-8 h-8 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     onClick={() => confirm("Delete this group?") && deleteMutation.mutate({ id: group.id })}
                   >
@@ -229,7 +233,7 @@ export default function Groups() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Training Type</Label>
-                  <Select onValueChange={(v) => editForm.setValue("trainingType", v as any)} defaultValue={editGroup.trainingType}>
+                  <Select onValueChange={(v) => editForm.setValue("trainingType", v as UpdateGroupBodyTrainingType)} defaultValue={editGroup.trainingType}>
                     <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="physical">Physical</SelectItem>
@@ -244,7 +248,7 @@ export default function Groups() {
               </div>
               <div className="space-y-2">
                 <Label>Status</Label>
-                <Select onValueChange={(v) => editForm.setValue("status", v as any)} defaultValue={editGroup.status}>
+                <Select onValueChange={(v) => editForm.setValue("status", v as UpdateGroupBodyStatus)} defaultValue={editGroup.status}>
                   <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="open">Open</SelectItem>
@@ -286,7 +290,7 @@ function MembersDialog({ groupId, onClose, onRemove }: { groupId: number | null;
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {group.students.map((s: any) => (
+                {group.students.map((s: Student) => (
                   <TableRow key={s.id}>
                     <TableCell className="font-medium">{s.firstName} {s.lastName}</TableCell>
                     <TableCell className="text-sm">{s.phone}</TableCell>

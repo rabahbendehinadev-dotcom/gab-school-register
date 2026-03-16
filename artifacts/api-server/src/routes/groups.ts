@@ -13,6 +13,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
+import "../types/session";
 
 const router: IRouter = Router();
 
@@ -44,7 +45,7 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
     .values(parsed.data)
     .returning();
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("group_created", `Group created: ${group.name}`, performer);
 
   res.status(201).json({ ...group, studentCount: 0 });
@@ -110,7 +111,7 @@ router.patch("/groups/:id", requireRole("admin", "manager"), async (req, res): P
     .from(studentsTable)
     .where(eq(studentsTable.groupId, group.id));
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("group_updated", `Group updated: ${group.name}`, performer);
 
   res.json(UpdateGroupResponse.parse({ ...group, studentCount: countResult?.count ?? 0 }));
@@ -133,7 +134,7 @@ router.delete("/groups/:id", requireRole("admin", "manager"), async (req, res): 
     return;
   }
 
-  const performer = (req.session as any)?.fullName ?? "Unknown";
+  const performer = req.session.fullName ?? "Unknown";
   await logActivity("group_deleted", `Group deleted: ${group.name}`, performer);
 
   res.sendStatus(204);

@@ -4,6 +4,7 @@ import { db, staffTable } from "@workspace/db";
 import { LoginBody, LoginResponse, GetMeResponse } from "@workspace/api-zod";
 import { verifyPassword } from "../lib/password";
 import { logActivity } from "../lib/activityLogger";
+import "../types/session";
 
 const router: IRouter = Router();
 
@@ -24,9 +25,9 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     return;
   }
 
-  (req.session as any).staffId = staff.id;
-  (req.session as any).role = staff.role;
-  (req.session as any).fullName = staff.fullName;
+  req.session.staffId = staff.id;
+  req.session.role = staff.role;
+  req.session.fullName = staff.fullName;
 
   await logActivity("login", `${staff.fullName} logged in`, staff.fullName);
 
@@ -42,7 +43,7 @@ router.post("/auth/login", async (req, res): Promise<void> => {
 });
 
 router.post("/auth/logout", async (req, res): Promise<void> => {
-  const name = (req.session as any)?.fullName;
+  const name = req.session.fullName;
   req.session.destroy(() => {});
   if (name) {
     await logActivity("logout", `${name} logged out`, name);
@@ -51,7 +52,7 @@ router.post("/auth/logout", async (req, res): Promise<void> => {
 });
 
 router.get("/auth/me", async (req, res): Promise<void> => {
-  const staffId = (req.session as any)?.staffId;
+  const staffId = req.session.staffId;
   if (!staffId) {
     res.status(401).json({ error: "Not authenticated" });
     return;
