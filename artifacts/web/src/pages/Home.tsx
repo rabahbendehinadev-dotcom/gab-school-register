@@ -222,23 +222,64 @@ export default function Home() {
                     </div>
 
                     {trainingType === "online" && (
-                      <a
-                        href="https://online.gab-school.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-right transition-all hover:bg-orange-100 hover:border-orange-300 group"
-                      >
-                        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center text-white text-base shadow-sm group-hover:scale-105 transition-transform">
-                          🎓
+                      <div className="online-card-enter online-border-glow rounded-2xl overflow-hidden border border-orange-400/30" style={{ background: "linear-gradient(135deg,#0f0f0f 0%,#1a1200 60%,#1c0a00 100%)" }}>
+                        {/* Top shimmer bar */}
+                        <div className="h-0.5 w-full" style={{ background: "linear-gradient(90deg,transparent,#f97316,#fb923c,transparent)", backgroundSize:"400px 100%", animation:"shimmer 2s linear infinite" }} />
+
+                        <div className="px-4 pt-4 pb-2">
+                          {/* Live badge */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="inline-flex items-center gap-1.5 bg-orange-500/15 border border-orange-500/30 rounded-full px-2.5 py-0.5">
+                              <span className="live-dot w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />
+                              <span className="text-[10px] font-bold text-orange-300 tracking-wider uppercase">متاح الآن</span>
+                            </div>
+                            <span className="text-[10px] text-gray-500">online.gab-school.com</span>
+                          </div>
+
+                          {/* Icon + title row */}
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="relative flex-shrink-0">
+                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl online-icon-float" style={{ background:"linear-gradient(135deg,#f97316,#ea580c)", boxShadow:"0 4px 16px rgba(249,115,22,0.5)" }}>
+                                🎓
+                              </div>
+                              {/* Orbit dot */}
+                              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                <span className="online-orbit-dot w-2 h-2 rounded-full bg-orange-300/80 block" style={{ boxShadow:"0 0 6px rgba(249,115,22,0.9)" }} />
+                              </div>
+                            </div>
+                            <div className="text-right flex-1">
+                              <p className="text-sm font-black text-white leading-tight">منصة GAB SCHOOL</p>
+                              <p className="text-[11px] text-orange-300 font-semibold">الدروس الأونلاين · فيديوهات مسجّلة</p>
+                            </div>
+                          </div>
+
+                          {/* Features */}
+                          <div className="grid grid-cols-3 gap-2 mb-3">
+                            {[["📹","دروس مرئية"],["🕐","في أي وقت"],["📱","من هاتفك"]].map(([icon,label])=>(
+                              <div key={label} className="flex flex-col items-center gap-0.5 bg-white/5 rounded-xl py-2 border border-white/8">
+                                <span className="text-base">{icon}</span>
+                                <span className="text-[9px] text-gray-400 font-medium">{label}</span>
+                              </div>
+                            ))}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-black text-[#111] mb-0.5">منصة GAB SCHOOL الأونلاين</p>
-                          <p className="text-[10px] text-gray-500 truncate">online.gab-school.com</p>
+
+                        {/* CTA button */}
+                        <div className="px-4 pb-4">
+                          <a
+                            href="https://online.gab-school.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="online-btn-shimmer w-full flex items-center justify-center gap-2 py-3 rounded-xl font-black text-white text-sm shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                            style={{ boxShadow:"0 6px 24px rgba(249,115,22,0.45)" }}
+                          >
+                            <span>انطلق للدروس الآن</span>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                            </svg>
+                          </a>
                         </div>
-                        <svg className="w-4 h-4 text-orange-400 flex-shrink-0 rotate-180" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                        </svg>
-                      </a>
+                      </div>
                     )}
 
                     <Field label="📈 مستوى خبرتك">
