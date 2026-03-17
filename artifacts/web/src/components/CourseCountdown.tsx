@@ -23,17 +23,20 @@ function calcTimeLeft(target: Date): TimeLeft {
 function Digit({ value, label }: { value: number; label: string }) {
   const display = String(value).padStart(2, "0");
   return (
-    <div className="flex flex-col items-center">
-      <div className="relative w-20 h-20 sm:w-24 sm:h-24 bg-black rounded-2xl flex items-center justify-center shadow-[0_8px_32px_rgba(249,115,22,0.35)] border border-orange-500/30 overflow-hidden">
-        {/* glow line */}
-        <div className="absolute inset-x-0 top-1/2 -translate-y-px h-px bg-orange-500/20" />
-        {/* top half */}
-        <div className="absolute inset-x-0 top-0 h-1/2 bg-white/[0.04]" />
-        <span className="relative text-3xl sm:text-4xl font-black text-white tracking-tight font-mono">
-          {display}
-        </span>
+    <div className="flex flex-col items-center gap-1">
+      <div className="w-12 h-12 bg-black/70 rounded-xl flex items-center justify-center border border-orange-500/20 shadow-sm">
+        <span className="text-xl font-black text-white font-mono tracking-tight">{display}</span>
       </div>
-      <span className="mt-2 text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-widest">{label}</span>
+      <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">{label}</span>
+    </div>
+  );
+}
+
+function Sep() {
+  return (
+    <div className="flex flex-col gap-1 pb-4">
+      <span className="w-1 h-1 rounded-full bg-orange-400/60" />
+      <span className="w-1 h-1 rounded-full bg-orange-400/60" />
     </div>
   );
 }
@@ -47,9 +50,7 @@ export default function CourseCountdown() {
     fetch("/api/settings/next-course")
       .then(r => r.json())
       .then((data: { value: string | null }) => {
-        if (data.value) {
-          setCourseDate(new Date(data.value));
-        }
+        if (data.value) setCourseDate(new Date(data.value));
         setLoaded(true);
       })
       .catch(() => setLoaded(true));
@@ -66,61 +67,43 @@ export default function CourseCountdown() {
 
   const dateLabel = courseDate.toLocaleDateString("ar-DZ", {
     weekday: "long",
-    year: "numeric",
     month: "long",
     day: "numeric",
+    year: "numeric",
   });
 
   return (
     <div
       dir="rtl"
-      className="relative w-full overflow-hidden rounded-3xl bg-gradient-to-br from-gray-950 via-gray-900 to-black border border-orange-500/20 shadow-[0_20px_60px_rgba(0,0,0,0.5)] px-6 py-8 mb-6"
+      className="w-full rounded-2xl bg-gradient-to-br from-gray-900 to-gray-950 border border-orange-500/20 shadow-lg px-4 py-4 mb-4"
     >
-      {/* Ambient glow */}
-      <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-16 right-8 w-48 h-48 bg-orange-600/10 rounded-full blur-2xl" />
-
-      {/* Badge */}
-      <div className="flex justify-center mb-4">
-        <span className="inline-flex items-center gap-2 bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-bold px-4 py-1.5 rounded-full tracking-wider uppercase">
+      {/* Top row: badge + date */}
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <span className="inline-flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/25 text-orange-400 text-[10px] font-bold px-3 py-1 rounded-full tracking-wider uppercase">
           <span className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
           الدورة القادمة
         </span>
+        <span className="text-gray-400 text-xs">{dateLabel}</span>
       </div>
 
-      {/* Title */}
-      <h3 className="text-center text-white font-black text-xl sm:text-2xl mb-1">
-        انطلاق الدورة الجديدة
-      </h3>
-      <p className="text-center text-gray-400 text-sm mb-6">{dateLabel}</p>
-
+      {/* Countdown digits */}
       {timeLeft && !timeLeft.expired ? (
-        <div className="flex items-center justify-center gap-3 sm:gap-5">
+        <div className="flex items-center justify-center gap-2">
           <Digit value={timeLeft.days} label="يوم" />
-          <Separator />
+          <Sep />
           <Digit value={timeLeft.hours} label="ساعة" />
-          <Separator />
+          <Sep />
           <Digit value={timeLeft.minutes} label="دقيقة" />
-          <Separator />
+          <Sep />
           <Digit value={timeLeft.seconds} label="ثانية" />
         </div>
       ) : (
-        <p className="text-center text-orange-400 font-bold text-lg">🚀 الدورة انطلقت!</p>
+        <p className="text-center text-orange-400 font-bold text-sm py-1">🚀 الدورة انطلقت!</p>
       )}
 
-      {/* CTA */}
-      <p className="text-center text-gray-500 text-xs mt-6">
+      <p className="text-center text-gray-500 text-[10px] mt-3">
         سارع بالتسجيل قبل امتلاء المقاعد
       </p>
-    </div>
-  );
-}
-
-function Separator() {
-  return (
-    <div className="flex flex-col gap-1.5 pb-6">
-      <span className="w-1.5 h-1.5 rounded-full bg-orange-500/60" />
-      <span className="w-1.5 h-1.5 rounded-full bg-orange-500/60" />
     </div>
   );
 }
