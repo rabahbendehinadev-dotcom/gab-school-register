@@ -184,11 +184,27 @@ export default function OpenDaySection() {
             </a>
           </div>
         ) : !status.enabled && !registrationNotYetOpen ? (
-          <div className="text-center py-4 text-sm text-gray-400">
-            التسجيل مغلق حالياً — تابعونا للإعلان عن الموعد
+          <div className="flex flex-col items-center gap-2 py-5">
+            <div className="w-12 h-12 rounded-2xl bg-red-50 border-2 border-red-200 flex items-center justify-center shadow-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-red-500">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <p className="font-black text-red-500 text-sm">التسجيل مغلق حالياً</p>
+            <p className="text-[11px] text-gray-400 text-center">تابعونا للإعلان عن الموعد القادم</p>
           </div>
         ) : !status.enabled && registrationNotYetOpen ? null : (
           <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 mb-1">
+              <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                  <path d="M7 11V7a5 5 0 0 1 9.9-1M17 11v4M7 11h10v8a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-8z"/>
+                </svg>
+              </div>
+              <span className="text-[11px] font-black text-green-700">التسجيل مفتوح الآن · سجّل مقعدك قبل الامتلاء</span>
+              <span className="mr-auto w-2 h-2 rounded-full bg-green-500 animate-ping inline-block" />
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] font-bold text-gray-500 block mb-1">الاسم الأول *</label>
