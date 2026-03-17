@@ -7,6 +7,7 @@ import staffRouter from "./staff";
 import activityRouter from "./activity";
 import galleryRouter from "./gallery";
 import settingsRouter from "./settings";
+import openDayRouter from "./open-day";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(staffRouter);
 router.use(activityRouter);
 router.use(galleryRouter);
 router.use(settingsRouter);
+router.use(openDayRouter);
 
 export default router;
