@@ -6,6 +6,7 @@ import groupsRouter from "./groups";
 import staffRouter from "./staff";
 import activityRouter from "./activity";
 import galleryRouter from "./gallery";
+import settingsRouter from "./settings";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use(groupsRouter);
 router.use(staffRouter);
 router.use(activityRouter);
 router.use(galleryRouter);
+router.use(settingsRouter);
 
 export default router;
