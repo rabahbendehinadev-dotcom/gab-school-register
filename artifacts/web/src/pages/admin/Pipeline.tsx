@@ -184,7 +184,7 @@ function StudentCard({
       <div className="flex justify-between items-start mb-2">
         <h4 className="font-bold text-sm text-gray-800">{fullName}</h4>
         <DropdownMenu>
-          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-black/10 transition-opacity">
+          <DropdownMenuTrigger className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded-md hover:bg-black/10 active:bg-black/20 transition-opacity touch-manipulation">
             <MoreHorizontal className="w-4 h-4 text-gray-600" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
