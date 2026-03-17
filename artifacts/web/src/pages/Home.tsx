@@ -56,6 +56,7 @@ function useScrollVisible() {
 export default function Home() {
   const { toast } = useToast();
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [registeredAsOnline, setRegisteredAsOnline] = useState(false);
   const { data: gallery } = useListGalleryImages();
   const createStudentMutation = useCreateStudent();
   const featuresAnim = useScrollVisible();
@@ -66,9 +67,12 @@ export default function Home() {
     defaultValues: { housingNeeded: false, trainingType: "physical", experienceLevel: "none" },
   });
 
+  const trainingType = form.watch("trainingType");
+
   const onSubmit = async (data: RegistrationForm) => {
     try {
       await createStudentMutation.mutateAsync({ data });
+      setRegisteredAsOnline(data.trainingType === "online");
       setIsSubmitted(true);
       toast({ title: "تم إرسال طلبك بنجاح!", description: "سيتواصل معك فريق GAB SCHOOL خلال 24 ساعة." });
       form.reset();
@@ -139,12 +143,30 @@ export default function Home() {
                 </h2>
 
                 {isSubmitted ? (
-                  <div className="text-center py-4 space-y-5">
+                  <div className="text-center py-4 space-y-4">
                     <div className="text-5xl">🎉</div>
                     <div>
                       <p className="text-xl font-black text-[#111] mb-1">تم إرسال طلبك بنجاح!</p>
                       <p className="text-sm text-gray-500">سيتواصل معك فريق GAB SCHOOL خلال 24 ساعة.</p>
                     </div>
+
+                    {registeredAsOnline && (
+                      <a
+                        href="https://online.gab-school.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-2xl border-2 border-orange-400 bg-gradient-to-r from-orange-50 to-amber-50 px-4 py-3.5 text-right transition-all hover:from-orange-100 hover:to-amber-100 hover:shadow-md group mx-auto"
+                      >
+                        <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white text-lg shadow group-hover:scale-105 transition-transform">
+                          🎓
+                        </div>
+                        <div className="flex-1 min-w-0 text-right">
+                          <p className="text-sm font-black text-[#111] mb-0.5">ابدأ دورتك الأونلاين الآن</p>
+                          <p className="text-[11px] text-orange-600 font-semibold">online.gab-school.com ←</p>
+                        </div>
+                      </a>
+                    )}
+
                     <a
                       href="https://wa.me/213772339494?text=%D8%A7%D9%84%D8%B3%D9%84%D8%A7%D9%85%20%D8%B9%D9%84%D9%8A%D9%83%D9%85%20%D8%8C%20%D9%84%D9%82%D8%AF%20%D9%82%D9%85%D8%AA%20%D8%A8%D8%A7%D9%84%D8%AA%D8%B3%D8%AC%D9%8A%D9%84%20%D9%81%D9%8A%20GAB%20SCHOOL%20%D9%88%D8%A3%D8%B1%D9%8A%D8%AF%20%D9%85%D8%B9%D8%B1%D9%81%D8%A9%20%D8%A7%D9%84%D9%85%D8%B2%D9%8A%D8%AF"
                       target="_blank"
@@ -198,6 +220,26 @@ export default function Home() {
                         </select>
                       </Field>
                     </div>
+
+                    {trainingType === "online" && (
+                      <a
+                        href="https://online.gab-school.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-2xl border border-orange-200 bg-orange-50 px-4 py-3 text-right transition-all hover:bg-orange-100 hover:border-orange-300 group"
+                      >
+                        <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-orange-500 flex items-center justify-center text-white text-base shadow-sm group-hover:scale-105 transition-transform">
+                          🎓
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-black text-[#111] mb-0.5">منصة GAB SCHOOL الأونلاين</p>
+                          <p className="text-[10px] text-gray-500 truncate">online.gab-school.com</p>
+                        </div>
+                        <svg className="w-4 h-4 text-orange-400 flex-shrink-0 rotate-180" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </a>
+                    )}
 
                     <Field label="📈 مستوى خبرتك">
                       <select {...form.register("experienceLevel")} className={selectCls}>
