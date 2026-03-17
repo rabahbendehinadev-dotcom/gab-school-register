@@ -82,10 +82,17 @@ function getWhatsAppMsg(stage: StudentStage, name: string, t: ReturnType<typeof 
   }
 }
 
+function toIntlPhone(phone: string): string {
+  let clean = phone.replace(/\D/g, "");
+  if (clean.startsWith("0") && clean.length === 10) clean = "213" + clean.slice(1);
+  else if (clean.startsWith("5") && clean.length === 9) clean = "213" + clean;
+  return clean;
+}
+
 function openWhatsApp(phone: string, msg: string) {
-  const clean = phone.replace(/\D/g, "");
+  const intl = toIntlPhone(phone);
   const encoded = encodeURIComponent(msg);
-  window.open(`https://wa.me/${clean}?text=${encoded}`, "_blank");
+  window.open(`https://wa.me/${intl}?text=${encoded}`, "_blank");
 }
 
 export default function Pipeline() {

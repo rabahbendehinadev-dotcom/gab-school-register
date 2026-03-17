@@ -24,7 +24,7 @@ type GroupWithCount = Group & { studentCount: number };
 export default function Groups() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { data: groups, isLoading } = useListGroups();
+  const { data: groups, isLoading, refetch } = useListGroups();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editGroup, setEditGroup] = useState<GroupWithCount | null>(null);
   const [membersGroupId, setMembersGroupId] = useState<number | null>(null);
@@ -33,9 +33,10 @@ export default function Groups() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        refetch();
         setIsCreateOpen(false);
         createForm.reset();
-        toast({ title: "Group created" });
+        toast({ title: "✅ تم إنشاء المجموعة بنجاح!" });
       }
     }
   });
@@ -44,8 +45,9 @@ export default function Groups() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        refetch();
         setEditGroup(null);
-        toast({ title: "Group updated" });
+        toast({ title: "✅ تم تحديث المجموعة" });
       }
     }
   });
@@ -54,7 +56,8 @@ export default function Groups() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
-        toast({ title: "Group deleted" });
+        refetch();
+        toast({ title: "🗑️ تم حذف المجموعة" });
       }
     }
   });

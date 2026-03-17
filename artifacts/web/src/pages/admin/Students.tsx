@@ -187,7 +187,7 @@ export default function Students() {
                           <Eye className="w-4 h-4 text-muted-foreground hover:text-foreground" />
                         </Button>
                         <a
-                          href={`https://wa.me/${(student.whatsapp || student.phone).replace(/\D/g, "")}`}
+                          href={`https://wa.me/${(() => { let n = (student.whatsapp || student.phone).replace(/\D/g,""); if(n.startsWith("0")&&n.length===10) n="213"+n.slice(1); else if(n.startsWith("5")&&n.length===9) n="213"+n; return n; })()}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           title="واتساب"

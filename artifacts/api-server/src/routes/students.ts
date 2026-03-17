@@ -81,6 +81,18 @@ router.post("/students", async (req, res): Promise<void> => {
   );
 
   const trainingLabel = student.trainingType === "physical" ? "حضوري" : "أونلاين";
+
+  function toIntlPhone(phone: string): string {
+    let clean = phone.replace(/\D/g, "");
+    if (clean.startsWith("0") && clean.length === 10) clean = "213" + clean.slice(1);
+    else if (clean.startsWith("5") && clean.length === 9) clean = "213" + clean;
+    return clean;
+  }
+
+  const waNumber = toIntlPhone(student.whatsapp || student.phone);
+  const waText = encodeURIComponent(`مرحباً ${student.firstName}، شكراً على تسجيلك في GAB SCHOOL! سنتواصل معك قريباً بخصوص تفاصيل الدورة.`);
+  const waLink = `https://wa.me/${waNumber}?text=${waText}`;
+
   const telegramMsg = [
     `🎓 <b>طالب جديد سجّل في GAB SCHOOL!</b>`,
     ``,
@@ -92,6 +104,8 @@ router.post("/students", async (req, res): Promise<void> => {
     `🏠 <b>يحتاج إقامة:</b> ${student.housingNeeded ? "نعم" : "لا"}`,
     `📊 <b>مستوى الخبرة:</b> ${student.experienceLevel}`,
     student.note ? `📝 <b>ملاحظة:</b> ${student.note}` : "",
+    ``,
+    `📲 <a href="${waLink}">راسله مباشرة على واتساب</a>`,
   ].filter(Boolean).join("\n");
 
   sendTelegramNotification(telegramMsg).catch(() => {});
