@@ -1,8 +1,10 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 import router from "./routes";
 import crypto from "crypto";
+import { pool } from "@workspace/db";
 
 const app: Express = express();
 
@@ -23,16 +25,28 @@ app.use((_req, res, next) => {
 
 const isProduction = process.env.NODE_ENV === "production";
 
+const PgSession = connectPgSimple(session);
+
+const sessionSecret = process.env.SESSION_SECRET
+  || (process.env.DATABASE_URL
+    ? crypto.createHash("sha256").update(process.env.DATABASE_URL).digest("hex")
+    : "gab-school-fallback-secret-change-me");
+
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex"),
+    store: new PgSession({
+      pool,
+      tableName: "user_sessions",
+      createTableIfMissing: true,
+    }),
+    secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
     cookie: {
       secure: isProduction,
       httpOnly: true,
       sameSite: "lax",
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     },
   })
 );

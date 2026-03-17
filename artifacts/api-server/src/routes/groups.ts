@@ -17,6 +17,12 @@ import "../types/session";
 
 const router: IRouter = Router();
 
+function dateToStr(d: Date | string | null | undefined): string | null {
+  if (!d) return null;
+  if (d instanceof Date) return d.toISOString().split("T")[0];
+  return String(d).split("T")[0];
+}
+
 router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
   const groups = await db.select().from(groupsTable).orderBy(groupsTable.startDate);
 
@@ -26,7 +32,7 @@ router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), asy
         .select({ count: sql<number>`count(*)::int` })
         .from(studentsTable)
         .where(eq(studentsTable.groupId, g.id));
-      return { ...g, studentCount: countResult?.count ?? 0 };
+      return { ...g, startDate: dateToStr(g.startDate) as string, studentCount: countResult?.count ?? 0 };
     })
   );
 
@@ -76,8 +82,12 @@ router.get("/groups/:id", requireRole("admin", "manager", "staff", "assistant"),
   res.json(
     GetGroupResponse.parse({
       ...group,
+      startDate: dateToStr(group.startDate),
       studentCount: students.length,
-      students,
+      students: students.map(s => ({
+        ...s,
+        createdAt: s.createdAt instanceof Date ? s.createdAt.toISOString() : s.createdAt,
+      })),
     })
   );
 });
@@ -120,7 +130,7 @@ router.patch("/groups/:id", requireRole("admin", "manager"), async (req, res): P
   const performer = req.session.fullName ?? "Unknown";
   await logActivity("group_updated", `Group updated: ${group.name}`, performer);
 
-  res.json(UpdateGroupResponse.parse({ ...group, studentCount: countResult?.count ?? 0 }));
+  res.json(UpdateGroupResponse.parse({ ...group, startDate: dateToStr(group.startDate), studentCount: countResult?.count ?? 0 }));
 });
 
 router.delete("/groups/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
