@@ -5,16 +5,16 @@ import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useI18n } from "@/contexts/i18n-context";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 
 function NextCourseDateCard() {
   const { toast } = useToast();
-  const [value, setValue] = useState("");
-  const [saved, setSaved] = useState("");
+  const [dateVal, setDateVal] = useState("");
+  const [timeVal, setTimeVal] = useState("09:00");
+  const [savedLabel, setSavedLabel] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/settings/next-course")
@@ -22,11 +22,17 @@ function NextCourseDateCard() {
       .then((data: { value: string | null }) => {
         if (data.value) {
           const d = new Date(data.value);
-          const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000)
-            .toISOString()
-            .slice(0, 16);
-          setValue(local);
-          setSaved(local);
+          const yyyy = d.getFullYear();
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const dd = String(d.getDate()).padStart(2, "0");
+          const hh = String(d.getHours()).padStart(2, "0");
+          const min = String(d.getMinutes()).padStart(2, "0");
+          setDateVal(`${yyyy}-${mm}-${dd}`);
+          setTimeVal(`${hh}:${min}`);
+          setSavedLabel(d.toLocaleDateString("ar-DZ", {
+            weekday: "long", year: "numeric", month: "long", day: "numeric",
+            hour: "2-digit", minute: "2-digit",
+          }));
         }
         setLoading(false);
       })
@@ -34,17 +40,25 @@ function NextCourseDateCard() {
   }, []);
 
   const handleSave = async () => {
-    if (!value) return;
+    if (!dateVal) {
+      toast({ title: "يرجى اختيار تاريخ الدورة", variant: "destructive" });
+      return;
+    }
     setSaving(true);
     try {
+      const iso = new Date(`${dateVal}T${timeVal}:00`).toISOString();
       const r = await fetch("/api/settings/next-course", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ value: new Date(value).toISOString() }),
+        body: JSON.stringify({ value: iso }),
       });
       if (r.ok) {
-        setSaved(value);
+        const d = new Date(iso);
+        setSavedLabel(d.toLocaleDateString("ar-DZ", {
+          weekday: "long", year: "numeric", month: "long", day: "numeric",
+          hour: "2-digit", minute: "2-digit",
+        }));
         toast({ title: "✅ تم حفظ تاريخ الدورة بنجاح" });
       } else {
         toast({ title: "فشل الحفظ", variant: "destructive" });
@@ -67,34 +81,42 @@ function NextCourseDateCard() {
       </div>
 
       {loading ? (
-        <div className="h-12 bg-gray-800 animate-pulse rounded-xl" />
+        <div className="h-28 bg-gray-800 animate-pulse rounded-xl" />
       ) : (
         <div className="space-y-3">
-          <input
-            ref={inputRef}
-            type="datetime-local"
-            value={value}
-            onChange={e => setValue(e.target.value)}
-            className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"
-          />
+          {/* Date + Time inputs in a row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">📅 التاريخ</label>
+              <input
+                type="date"
+                value={dateVal}
+                onChange={e => setDateVal(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"
+              />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-400 mb-1.5">⏰ الوقت</label>
+              <input
+                type="time"
+                value={timeVal}
+                onChange={e => setTimeVal(e.target.value)}
+                className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-colors"
+              />
+            </div>
+          </div>
 
-          {saved && (
+          {savedLabel && (
             <div className="bg-gray-800/60 rounded-lg px-3 py-2">
               <p className="text-[11px] text-gray-400">
-                التاريخ الحالي:{" "}
-                <span className="text-orange-400 font-semibold">
-                  {new Date(saved).toLocaleDateString("ar-DZ", {
-                    weekday: "long", year: "numeric", month: "long", day: "numeric",
-                    hour: "2-digit", minute: "2-digit",
-                  })}
-                </span>
+                الحالي: <span className="text-orange-400 font-semibold">{savedLabel}</span>
               </p>
             </div>
           )}
 
           <button
             onClick={handleSave}
-            disabled={saving || !value || value === saved}
+            disabled={saving || !dateVal}
             className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl transition-colors text-sm"
           >
             <Save className="w-4 h-4" />
