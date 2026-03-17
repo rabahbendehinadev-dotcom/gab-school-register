@@ -15,21 +15,23 @@ import {
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-
-const navItems = [
-  { href: "/gab-c7x2p", label: "Dashboard", icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
-  { href: "/gab-c7x2p/pipeline", label: "Pipeline", icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
-  { href: "/gab-c7x2p/students", label: "Students", icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
-  { href: "/gab-c7x2p/groups", label: "Groups", icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
-  { href: "/gab-c7x2p/gallery", label: "Gallery", icon: ImageIcon, roles: ["admin", "manager"] },
-  { href: "/gab-c7x2p/staff", label: "Staff", icon: ShieldCheck, roles: ["admin"] },
-  { href: "/gab-c7x2p/activity", label: "Activity Log", icon: Activity, roles: ["admin", "manager"] },
-];
+import { useI18n } from "@/contexts/i18n-context";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
   const { user, logout, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { lang, setLang, t } = useI18n();
+
+  const navItems = [
+    { href: "/gab-c7x2p", label: t.dashboard, icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
+    { href: "/gab-c7x2p/pipeline", label: t.pipeline, icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
+    { href: "/gab-c7x2p/students", label: t.students, icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
+    { href: "/gab-c7x2p/groups", label: t.groups, icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
+    { href: "/gab-c7x2p/gallery", label: t.gallery, icon: ImageIcon, roles: ["admin", "manager"] },
+    { href: "/gab-c7x2p/staff", label: t.staff, icon: ShieldCheck, roles: ["admin"] },
+    { href: "/gab-c7x2p/activity", label: t.activityLog, icon: Activity, roles: ["admin", "manager"] },
+  ];
 
   if (isLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-background text-primary">Loading...</div>;
@@ -74,7 +76,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
           <div className="mb-4 px-2">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Navigation</p>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t.navigation}</p>
           </div>
           {filteredNav.map((item) => {
             const isActive = item.exact ? location === item.href : location.startsWith(item.href);
@@ -97,6 +99,32 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           })}
         </div>
 
+        {/* Language Switcher */}
+        <div className="px-4 pb-3">
+          <div className="bg-muted rounded-xl p-1 flex gap-1">
+            <button
+              onClick={() => setLang("ar")}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                lang === "ar"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              العربية
+            </button>
+            <button
+              onClick={() => setLang("fr")}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                lang === "fr"
+                  ? "bg-primary text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Français
+            </button>
+          </div>
+        </div>
+
         <div className="p-4 border-t border-border/50">
           <div className="bg-muted rounded-2xl p-4 mb-4">
             <p className="text-sm font-semibold text-foreground truncate">{user.fullName}</p>
@@ -108,7 +136,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             onClick={() => logout()}
           >
             <LogOut className="w-4 h-4 mr-2" />
-            Logout
+            {t.logout}
           </Button>
         </div>
       </aside>
@@ -125,11 +153,11 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           
           <div className="flex-1 flex items-center justify-between">
             <h1 className="text-xl font-display font-semibold text-foreground tracking-tight">
-              {filteredNav.find(n => n.exact ? location === n.href : location.startsWith(n.href))?.label || "Dashboard"}
+              {filteredNav.find(n => n.exact ? location === n.href : location.startsWith(n.href))?.label || t.dashboard}
             </h1>
             <div className="flex items-center gap-4">
               <Button variant="outline" size="sm" asChild className="hidden sm:flex rounded-full">
-                <Link href="/">View Site</Link>
+                <Link href="/">{t.viewSite}</Link>
               </Button>
             </div>
           </div>

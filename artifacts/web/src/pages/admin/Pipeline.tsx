@@ -2,20 +2,95 @@ import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useListStudents, useUpdateStudentStage, getListStudentsQueryKey, Student, StudentStage } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Phone, MapPin, MoreHorizontal } from "lucide-react";
+import { Phone, MapPin, MoreHorizontal, MessageCircle } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
+import { useI18n } from "@/contexts/i18n-context";
 
-const STAGES: { id: StudentStage; label: string; color: string; border: string }[] = [
-  { id: "new", label: "New Leads", color: "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300", border: "border-blue-200 dark:border-blue-800" },
-  { id: "contacted", label: "Contacted", color: "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300", border: "border-purple-200 dark:border-purple-800" },
-  { id: "interested", label: "Interested", color: "bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300", border: "border-green-200 dark:border-green-800" },
-  { id: "no_show", label: "No Show", color: "bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300", border: "border-red-200 dark:border-red-800" },
-  { id: "archived", label: "Archived", color: "bg-gray-50 dark:bg-gray-800/50 text-gray-700 dark:text-gray-300", border: "border-gray-200 dark:border-gray-700" },
+type StageConfig = {
+  id: StudentStage;
+  cardBg: string;
+  cardBorder: string;
+  headerBg: string;
+  headerText: string;
+  badgeBg: string;
+  dotColor: string;
+  waBtnClass: string;
+};
+
+const STAGE_CONFIGS: StageConfig[] = [
+  {
+    id: "new",
+    cardBg: "bg-blue-50",
+    cardBorder: "border-blue-200",
+    headerBg: "bg-blue-600",
+    headerText: "text-white",
+    badgeBg: "bg-blue-100 text-blue-700",
+    dotColor: "bg-blue-400",
+    waBtnClass: "bg-blue-500 hover:bg-blue-600",
+  },
+  {
+    id: "contacted",
+    cardBg: "bg-orange-50",
+    cardBorder: "border-orange-200",
+    headerBg: "bg-orange-500",
+    headerText: "text-white",
+    badgeBg: "bg-orange-100 text-orange-700",
+    dotColor: "bg-orange-400",
+    waBtnClass: "bg-orange-500 hover:bg-orange-600",
+  },
+  {
+    id: "interested",
+    cardBg: "bg-green-50",
+    cardBorder: "border-green-200",
+    headerBg: "bg-green-600",
+    headerText: "text-white",
+    badgeBg: "bg-green-100 text-green-700",
+    dotColor: "bg-green-400",
+    waBtnClass: "bg-green-500 hover:bg-green-600",
+  },
+  {
+    id: "no_show",
+    cardBg: "bg-red-50",
+    cardBorder: "border-red-200",
+    headerBg: "bg-red-500",
+    headerText: "text-white",
+    badgeBg: "bg-red-100 text-red-700",
+    dotColor: "bg-red-400",
+    waBtnClass: "bg-red-500 hover:bg-red-600",
+  },
+  {
+    id: "archived",
+    cardBg: "bg-gray-50",
+    cardBorder: "border-gray-200",
+    headerBg: "bg-gray-500",
+    headerText: "text-white",
+    badgeBg: "bg-gray-100 text-gray-600",
+    dotColor: "bg-gray-400",
+    waBtnClass: "bg-gray-500 hover:bg-gray-600",
+  },
 ];
+
+function getWhatsAppMsg(stage: StudentStage, name: string, t: ReturnType<typeof useI18n>["t"]): string {
+  switch (stage) {
+    case "new": return t.newLeadMsg(name);
+    case "contacted": return t.contactedMsg(name);
+    case "interested": return t.interestedMsg(name);
+    case "no_show": return t.noShowMsg(name);
+    case "archived": return t.archivedMsg(name);
+    default: return `مرحباً ${name}!`;
+  }
+}
+
+function openWhatsApp(phone: string, msg: string) {
+  const clean = phone.replace(/\D/g, "");
+  const encoded = encodeURIComponent(msg);
+  window.open(`https://wa.me/${clean}?text=${encoded}`, "_blank");
+}
 
 export default function Pipeline() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const { data: students, isLoading } = useListStudents();
   const updateStageMutation = useUpdateStudentStage({
     mutation: {
@@ -25,9 +100,8 @@ export default function Pipeline() {
 
   if (isLoading) return <AdminLayout><div className="animate-pulse">Loading pipeline...</div></AdminLayout>;
 
-  // Group students by stage
-  const grouped = STAGES.reduce((acc, stage) => {
-    acc[stage.id] = students?.filter(s => s.stage === stage.id) || [];
+  const grouped = STAGE_CONFIGS.reduce((acc, cfg) => {
+    acc[cfg.id] = students?.filter(s => s.stage === cfg.id) || [];
     return acc;
   }, {} as Record<StudentStage, Student[]>);
 
@@ -37,76 +111,115 @@ export default function Pipeline() {
 
   return (
     <AdminLayout>
-      <div className="flex h-[calc(100vh-8rem)] gap-4 sm:gap-6 overflow-x-auto pb-4 scrollbar-hide">
-        {STAGES.map((stage) => (
-          <div key={stage.id} className="flex-shrink-0 w-80 flex flex-col bg-muted/30 rounded-2xl border border-border/50 overflow-hidden">
-            {/* Column Header */}
-            <div className={`p-4 border-b ${stage.border} bg-card`}>
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold text-foreground flex items-center gap-2">
-                  <span className={`w-2 h-2 rounded-full ${stage.color.split(' ')[0]}`} />
-                  {stage.label}
+      <div className="flex h-[calc(100vh-8rem)] gap-4 sm:gap-5 overflow-x-auto pb-4 scrollbar-hide">
+        {STAGE_CONFIGS.map((cfg) => {
+          const label = t.stageLabels[cfg.id];
+          return (
+            <div key={cfg.id} className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden shadow-sm border border-gray-200">
+              {/* Colored column header */}
+              <div className={`${cfg.headerBg} px-4 py-3 flex items-center justify-between`}>
+                <h3 className={`font-bold text-sm flex items-center gap-2 ${cfg.headerText}`}>
+                  <span className="w-2 h-2 rounded-full bg-white/70" />
+                  {label}
                 </h3>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${stage.color}`}>
-                  {grouped[stage.id].length}
+                <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">
+                  {grouped[cfg.id].length}
                 </span>
               </div>
-            </div>
 
-            {/* Column Content */}
-            <div className="flex-1 overflow-y-auto p-3 space-y-3">
-              {grouped[stage.id].map(student => (
-                <div 
-                  key={student.id} 
-                  className={`bg-card rounded-xl p-4 shadow-sm border ${stage.border} hover:shadow-md transition-all group`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h4 className="font-bold text-sm">{student.firstName} {student.lastName}</h4>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-muted transition-opacity">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Move to...</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        {STAGES.filter(s => s.id !== student.stage).map(s => (
-                          <DropdownMenuItem key={s.id} onClick={() => handleStageChange(student.id, s.id)}>
-                            {s.label}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+              {/* Column Content */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50/60">
+                {grouped[cfg.id].map(student => (
+                  <StudentCard
+                    key={student.id}
+                    student={student}
+                    cfg={cfg}
+                    t={t}
+                    stages={STAGE_CONFIGS}
+                    onStageChange={handleStageChange}
+                  />
+                ))}
+
+                {grouped[cfg.id].length === 0 && (
+                  <div className="h-32 flex items-center justify-center text-sm text-gray-400 border-2 border-dashed border-gray-200 rounded-xl bg-white/60">
+                    {t.empty}
                   </div>
-                  
-                  <div className="space-y-1.5 mt-3">
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <Phone className="w-3.5 h-3.5 mr-1.5" /> {student.phone}
-                    </div>
-                    <div className="flex items-center text-xs text-muted-foreground">
-                      <MapPin className="w-3.5 h-3.5 mr-1.5" /> {student.city}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 pt-3 border-t border-border/50 flex justify-between items-center">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground bg-muted px-2 py-1 rounded-md">
-                      {student.trainingType}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground">
-                      {format(new Date(student.createdAt), "MMM d")}
-                    </span>
-                  </div>
-                </div>
-              ))}
-              
-              {grouped[stage.id].length === 0 && (
-                <div className="h-full flex items-center justify-center text-sm text-muted-foreground/50 border-2 border-dashed border-border rounded-xl">
-                  Empty
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </AdminLayout>
+  );
+}
+
+function StudentCard({
+  student,
+  cfg,
+  t,
+  stages,
+  onStageChange,
+}: {
+  student: Student;
+  cfg: StageConfig;
+  t: ReturnType<typeof useI18n>["t"];
+  stages: StageConfig[];
+  onStageChange: (id: number, stage: StudentStage) => void;
+}) {
+  const [showWaMenu, setShowWaMenu] = useState(false);
+  const fullName = `${student.firstName} ${student.lastName}`;
+  const waMsg = getWhatsAppMsg(student.stage as StudentStage, fullName, t);
+
+  return (
+    <div className={`${cfg.cardBg} rounded-xl p-4 shadow-sm border ${cfg.cardBorder} hover:shadow-md transition-all group`}>
+      {/* Header */}
+      <div className="flex justify-between items-start mb-2">
+        <h4 className="font-bold text-sm text-gray-800">{fullName}</h4>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-black/10 transition-opacity">
+            <MoreHorizontal className="w-4 h-4 text-gray-600" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>{t.moveTo}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {stages.filter(s => s.id !== student.stage).map(s => (
+              <DropdownMenuItem key={s.id} onClick={() => onStageChange(student.id, s.id)}>
+                {t.stageLabels[s.id]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      {/* Info */}
+      <div className="space-y-1.5 mt-2">
+        <div className="flex items-center text-xs text-gray-600">
+          <Phone className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" /> {student.phone}
+        </div>
+        <div className="flex items-center text-xs text-gray-600">
+          <MapPin className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" /> {student.city}
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-3 pt-3 border-t border-black/10 flex justify-between items-center gap-2">
+        <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md ${cfg.badgeBg}`}>
+          {student.trainingType === "online" ? t.online : t.physical}
+        </span>
+        <span className="text-[10px] text-gray-500">
+          {format(new Date(student.createdAt), "MMM d")}
+        </span>
+      </div>
+
+      {/* WhatsApp Button */}
+      <button
+        onClick={() => openWhatsApp(student.phone, waMsg)}
+        className={`mt-3 w-full flex items-center justify-center gap-2 text-white text-xs font-semibold py-2 rounded-lg transition-colors ${cfg.waBtnClass}`}
+      >
+        <MessageCircle className="w-3.5 h-3.5" />
+        {t.sendWhatsApp}
+      </button>
+    </div>
   );
 }

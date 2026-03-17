@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { 
@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Search, Trash2, ArrowRightLeft, Users, Eye, X, MessageCircle } from "lucide-react";
+import { useSearch } from "wouter";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -28,8 +29,18 @@ const STAGE_COLORS: Record<string, string> = {
 };
 
 export default function Students() {
+  const searchParams = useSearch();
+  const urlStage = useMemo(() => {
+    const p = new URLSearchParams(searchParams);
+    return p.get("stage") || "all";
+  }, [searchParams]);
+
   const [search, setSearch] = useState("");
-  const [stageFilter, setStageFilter] = useState("all");
+  const [stageFilter, setStageFilter] = useState(urlStage);
+
+  useEffect(() => {
+    setStageFilter(urlStage);
+  }, [urlStage]);
   const [typeFilter, setTypeFilter] = useState("all");
   const [stageDialogStudent, setStageDialogStudent] = useState<Student | null>(null);
   const [groupDialogStudent, setGroupDialogStudent] = useState<Student | null>(null);
