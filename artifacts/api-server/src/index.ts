@@ -36,6 +36,10 @@ async function ensureSessionTable(): Promise<void> {
 }
 
 ensureSessionTable()
+  .catch((err) => {
+    console.error("FATAL: Could not ensure user_sessions table:", err);
+    process.exit(1);
+  })
   .then(() => seedAdmin())
   .then(() => {
     app.listen(port, () => {
@@ -44,7 +48,5 @@ ensureSessionTable()
   })
   .catch((err) => {
     console.error("Startup error:", err);
-    app.listen(port, () => {
-      console.log(`Server listening on port ${port}`);
-    });
+    process.exit(1);
   });
