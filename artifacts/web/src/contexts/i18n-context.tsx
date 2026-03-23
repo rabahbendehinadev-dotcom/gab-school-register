@@ -35,6 +35,10 @@ const translations = {
       `مرحباً ${name}! 🎉 لقد تم تسجيلك بنجاح في أكاديمية GAB SCHOOL. سنتواصل معك قريباً لتأكيد تفاصيل الدورة. مع تحياتنا 🌟`,
     contactedMsg: (name: string) =>
       `مرحباً ${name}! 😊 تواصلنا معك مسبقاً بخصوص الانضمام إلى أكاديمية GAB SCHOOL. نذكّرك بأن مقاعد الدورة محدودة. هل أنت مستعد للتسجيل النهائي؟ 🎯`,
+    phoneBusyMsg: (name: string) =>
+      `مرحباً ${name}! 📵 حاولنا الاتصال بك للتحدث بخصوص انضمامك لأكاديمية GAB SCHOOL، لكن هاتفك كان مغلقاً. نرجو أن تتواصل معنا في أقرب وقت لأن المقاعد محدودة جداً 🎯`,
+    noAnswerMsg: (name: string) =>
+      `مرحباً ${name}! 📞 اتصلنا بك للتحدث بخصوص انضمامك لأكاديمية GAB SCHOOL لكنك لم تتمكن من الرد. نرجو أن تعاود الاتصال بنا أو تتواصل معنا عبر الواتساب 🙏 المقاعد محدودة!`,
     interestedMsg: (name: string) =>
       `مرحباً ${name}! 🚀 يسعدنا اهتمامك بالانضمام إلى أكاديمية GAB SCHOOL. الدورة القادمة ستبدأ قريباً، هل تريد أن نحجز لك مقعداً الآن؟ 💪`,
     noShowMsg: (name: string) =>
@@ -81,6 +85,10 @@ const translations = {
       `Bonjour ${name}! 🎉 Votre inscription à GAB SCHOOL a bien été enregistrée. Nous vous contacterons prochainement pour confirmer les détails de votre formation. Cordialement 🌟`,
     contactedMsg: (name: string) =>
       `Bonjour ${name}! 😊 Nous vous avons contacté précédemment concernant votre inscription à GAB SCHOOL. Les places sont limitées, êtes-vous prêt(e) à confirmer votre inscription? 🎯`,
+    phoneBusyMsg: (name: string) =>
+      `Bonjour ${name}! 📵 Nous avons essayé de vous contacter concernant votre inscription à GAB SCHOOL, mais votre téléphone était éteint. Veuillez nous contacter dès que possible car les places sont très limitées 🎯`,
+    noAnswerMsg: (name: string) =>
+      `Bonjour ${name}! 📞 Nous avons essayé de vous appeler concernant votre inscription à GAB SCHOOL, mais vous n'avez pas pu répondre. Merci de nous rappeler ou de nous contacter via WhatsApp 🙏 Les places sont limitées!`,
     interestedMsg: (name: string) =>
       `Bonjour ${name}! 🚀 Nous sommes ravis de votre intérêt pour GAB SCHOOL. La prochaine session démarrera bientôt, souhaitez-vous que nous vous réservions une place? 💪`,
     noShowMsg: (name: string) =>

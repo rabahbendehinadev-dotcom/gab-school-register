@@ -1,9 +1,23 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useListStudents, useUpdateStudentStage, getListStudentsQueryKey, Student, StudentStage } from "@workspace/api-client-react";
+import {
+  useListStudents,
+  useUpdateStudentStage,
+  useUpdateStudent,
+  getListStudentsQueryKey,
+  Student,
+  StudentStage,
+} from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Phone, MapPin, MoreHorizontal, MessageCircle } from "lucide-react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Phone, MapPin, MoreHorizontal, MessageCircle, ChevronDown, DollarSign, CheckCircle2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { useI18n } from "@/contexts/i18n-context";
 
@@ -71,14 +85,31 @@ const STAGE_CONFIGS: StageConfig[] = [
   },
 ];
 
-function getWhatsAppMsg(stage: StudentStage, name: string, t: ReturnType<typeof useI18n>["t"]): string {
+type ContactReason = "spoken" | "phone_busy" | "no_answer";
+
+const CONTACT_REASONS: { value: ContactReason; labelAr: string; labelFr: string; emoji: string }[] = [
+  { value: "spoken",     labelAr: "تم التحدث",    labelFr: "Conversation établie", emoji: "✅" },
+  { value: "phone_busy", labelAr: "الهاتف مغلق",  labelFr: "Téléphone éteint",     emoji: "📵" },
+  { value: "no_answer",  labelAr: "لم يرد",        labelFr: "Pas de réponse",       emoji: "📞" },
+];
+
+function getWhatsAppMsg(
+  stage: StudentStage,
+  name: string,
+  t: ReturnType<typeof useI18n>["t"],
+  contactReason?: string | null,
+): string {
+  if (stage === "contacted") {
+    if (contactReason === "phone_busy") return t.phoneBusyMsg(name);
+    if (contactReason === "no_answer") return t.noAnswerMsg(name);
+    return t.contactedMsg(name);
+  }
   switch (stage) {
-    case "new": return t.newLeadMsg(name);
-    case "contacted": return t.contactedMsg(name);
+    case "new":      return t.newLeadMsg(name);
     case "interested": return t.interestedMsg(name);
-    case "no_show": return t.noShowMsg(name);
+    case "no_show":  return t.noShowMsg(name);
     case "archived": return t.archivedMsg(name);
-    default: return `مرحباً ${name}!`;
+    default:         return `مرحباً ${name}!`;
   }
 }
 
@@ -101,16 +132,24 @@ export default function Pipeline() {
   const { data: students, isLoading } = useListStudents();
   const updateStageMutation = useUpdateStudentStage({
     mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() })
-    }
+      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() }),
+    },
   });
 
-  if (isLoading) return <AdminLayout><div className="animate-pulse">Loading pipeline...</div></AdminLayout>;
+  if (isLoading)
+    return (
+      <AdminLayout>
+        <div className="animate-pulse">Loading pipeline...</div>
+      </AdminLayout>
+    );
 
-  const grouped = STAGE_CONFIGS.reduce((acc, cfg) => {
-    acc[cfg.id] = students?.filter(s => s.stage === cfg.id) || [];
-    return acc;
-  }, {} as Record<StudentStage, Student[]>);
+  const grouped = STAGE_CONFIGS.reduce(
+    (acc, cfg) => {
+      acc[cfg.id] = students?.filter((s) => s.stage === cfg.id) || [];
+      return acc;
+    },
+    {} as Record<StudentStage, Student[]>,
+  );
 
   const handleStageChange = (id: number, stage: StudentStage) => {
     updateStageMutation.mutate({ id, data: { stage } });
@@ -122,8 +161,10 @@ export default function Pipeline() {
         {STAGE_CONFIGS.map((cfg) => {
           const label = t.stageLabels[cfg.id];
           return (
-            <div key={cfg.id} className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden shadow-sm border border-gray-200">
-              {/* Colored column header */}
+            <div
+              key={cfg.id}
+              className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden shadow-sm border border-gray-200"
+            >
               <div className={`${cfg.headerBg} px-4 py-3 flex items-center justify-between`}>
                 <h3 className={`font-bold text-sm flex items-center gap-2 ${cfg.headerText}`}>
                   <span className="w-2 h-2 rounded-full bg-white/70" />
@@ -134,9 +175,8 @@ export default function Pipeline() {
                 </span>
               </div>
 
-              {/* Column Content */}
               <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-50/60">
-                {grouped[cfg.id].map(student => (
+                {grouped[cfg.id].map((student) => (
                   <StudentCard
                     key={student.id}
                     student={student}
@@ -144,6 +184,7 @@ export default function Pipeline() {
                     t={t}
                     stages={STAGE_CONFIGS}
                     onStageChange={handleStageChange}
+                    onUpdate={() => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() })}
                   />
                 ))}
 
@@ -167,19 +208,54 @@ function StudentCard({
   t,
   stages,
   onStageChange,
+  onUpdate,
 }: {
   student: Student;
   cfg: StageConfig;
   t: ReturnType<typeof useI18n>["t"];
   stages: StageConfig[];
   onStageChange: (id: number, stage: StudentStage) => void;
+  onUpdate: () => void;
 }) {
-  const [showWaMenu, setShowWaMenu] = useState(false);
+  const { lang } = useI18n();
+  const updateMutation = useUpdateStudent({ mutation: { onSuccess: onUpdate } });
+
+  const [localReason, setLocalReason] = useState<ContactReason>(
+    (student.contactReason as ContactReason) || "spoken",
+  );
+  const [localNote, setLocalNote] = useState(student.note ?? "");
+  const [localDeposit, setLocalDeposit] = useState(student.depositPaid ?? false);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
   const fullName = `${student.firstName} ${student.lastName}`;
-  const waMsg = getWhatsAppMsg(student.stage as StudentStage, fullName, t);
+  const waMsg = getWhatsAppMsg(student.stage as StudentStage, fullName, t, localReason);
+
+  const isContacted  = student.stage === "contacted";
+  const isInterested = student.stage === "interested";
+
+  const currentReason = CONTACT_REASONS.find((r) => r.value === localReason) ?? CONTACT_REASONS[0];
+
+  function handleReasonChange(val: ContactReason) {
+    setLocalReason(val);
+    updateMutation.mutate({ id: student.id, data: { contactReason: val } });
+  }
+
+  function handleNoteBlur() {
+    if (localNote !== (student.note ?? "")) {
+      updateMutation.mutate({ id: student.id, data: { note: localNote || null } });
+    }
+  }
+
+  function handleDepositClick() {
+    if (localDeposit) return;
+    setLocalDeposit(true);
+    updateMutation.mutate({ id: student.id, data: { depositPaid: true } });
+  }
 
   return (
-    <div className={`${cfg.cardBg} rounded-xl p-4 shadow-sm border ${cfg.cardBorder} hover:shadow-md transition-all group`}>
+    <div
+      className={`${cfg.cardBg} rounded-xl p-4 shadow-sm border ${cfg.cardBorder} hover:shadow-md transition-all group`}
+    >
       {/* Header */}
       <div className="flex justify-between items-start mb-2">
         <h4 className="font-bold text-sm text-gray-800">{fullName}</h4>
@@ -190,11 +266,13 @@ function StudentCard({
           <DropdownMenuContent align="end">
             <DropdownMenuLabel>{t.moveTo}</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            {stages.filter(s => s.id !== student.stage).map(s => (
-              <DropdownMenuItem key={s.id} onClick={() => onStageChange(student.id, s.id)}>
-                {t.stageLabels[s.id]}
-              </DropdownMenuItem>
-            ))}
+            {stages
+              .filter((s) => s.id !== student.stage)
+              .map((s) => (
+                <DropdownMenuItem key={s.id} onClick={() => onStageChange(student.id, s.id)}>
+                  {t.stageLabels[s.id]}
+                </DropdownMenuItem>
+              ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -209,14 +287,77 @@ function StudentCard({
         </div>
       </div>
 
+      {/* ── CONTACTED extras ── */}
+      {isContacted && (
+        <div className="mt-3 space-y-2">
+          {/* Contact reason dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="w-full flex items-center justify-between gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-orange-50 transition-colors">
+                <span className="flex items-center gap-1.5">
+                  <span>{currentReason.emoji}</span>
+                  <span>{lang === "fr" ? currentReason.labelFr : currentReason.labelAr}</span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-52">
+              <DropdownMenuLabel className="text-xs text-gray-500">
+                {lang === "fr" ? "Résultat du contact" : "نتيجة التواصل"}
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {CONTACT_REASONS.map((r) => (
+                <DropdownMenuItem
+                  key={r.value}
+                  onClick={() => handleReasonChange(r.value)}
+                  className={localReason === r.value ? "bg-orange-50 font-semibold" : ""}
+                >
+                  <span className="mr-2">{r.emoji}</span>
+                  {lang === "fr" ? r.labelFr : r.labelAr}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Note textarea */}
+          <textarea
+            ref={noteRef}
+            value={localNote}
+            onChange={(e) => setLocalNote(e.target.value)}
+            onBlur={handleNoteBlur}
+            placeholder={lang === "fr" ? "Ajouter une note..." : "أضف ملاحظة..."}
+            rows={2}
+            className="w-full text-xs rounded-lg border border-orange-200 bg-white px-3 py-2 resize-none placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 transition"
+          />
+        </div>
+      )}
+
+      {/* ── INTERESTED extras — deposit button ── */}
+      {isInterested && (
+        <div className="mt-3">
+          {localDeposit ? (
+            <div className="flex items-center justify-center gap-2 bg-green-100 text-green-700 font-semibold text-xs rounded-lg py-2 border border-green-200">
+              <CheckCircle2 className="w-4 h-4" />
+              {lang === "fr" ? "Dépôt confirmé ✅" : "تم الإيداع ✅"}
+            </div>
+          ) : (
+            <button
+              onClick={handleDepositClick}
+              className="w-full flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold text-xs rounded-lg py-2 transition-colors"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              {lang === "fr" ? "Dépôt payé 💰" : "تم إيداع المبلغ 💰"}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="mt-3 pt-3 border-t border-black/10 flex justify-between items-center gap-2">
         <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md ${cfg.badgeBg}`}>
           {student.trainingType === "online" ? t.online : t.physical}
         </span>
-        <span className="text-[10px] text-gray-500">
-          {format(new Date(student.createdAt), "MMM d")}
-        </span>
+        <span className="text-[10px] text-gray-500">{format(new Date(student.createdAt), "MMM d")}</span>
       </div>
 
       {/* WhatsApp Button */}

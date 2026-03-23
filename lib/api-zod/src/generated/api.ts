@@ -62,6 +62,8 @@ export const ListStudentsResponseItem = zod.object({
   housingNeeded: zod.boolean(),
   experienceLevel: zod.string(),
   note: zod.string().nullish(),
+  contactReason: zod.string().nullish(),
+  depositPaid: zod.boolean().optional(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -102,6 +104,8 @@ export const GetStudentResponse = zod.object({
   housingNeeded: zod.boolean(),
   experienceLevel: zod.string(),
   note: zod.string().nullish(),
+  contactReason: zod.string().nullish(),
+  depositPaid: zod.boolean().optional(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -125,6 +129,8 @@ export const UpdateStudentBody = zod.object({
   housingNeeded: zod.boolean().optional(),
   experienceLevel: zod.string().optional(),
   note: zod.string().nullish(),
+  contactReason: zod.string().nullish(),
+  depositPaid: zod.boolean().optional(),
   stage: zod
     .enum(["new", "contacted", "interested", "no_show", "archived"])
     .optional(),
@@ -141,6 +147,8 @@ export const UpdateStudentResponse = zod.object({
   housingNeeded: zod.boolean(),
   experienceLevel: zod.string(),
   note: zod.string().nullish(),
+  contactReason: zod.string().nullish(),
+  depositPaid: zod.boolean().optional(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -176,6 +184,8 @@ export const UpdateStudentStageResponse = zod.object({
   housingNeeded: zod.boolean(),
   experienceLevel: zod.string(),
   note: zod.string().nullish(),
+  contactReason: zod.string().nullish(),
+  depositPaid: zod.boolean().optional(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -204,6 +214,8 @@ export const AssignStudentToGroupResponse = zod.object({
   housingNeeded: zod.boolean(),
   experienceLevel: zod.string(),
   note: zod.string().nullish(),
+  contactReason: zod.string().nullish(),
+  depositPaid: zod.boolean().optional(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -267,6 +279,8 @@ export const GetGroupResponse = zod.object({
       housingNeeded: zod.boolean(),
       experienceLevel: zod.string(),
       note: zod.string().nullish(),
+      contactReason: zod.string().nullish(),
+      depositPaid: zod.boolean().optional(),
       stage: zod.enum([
         "new",
         "contacted",
@@ -401,7 +415,7 @@ export const ListGalleryImagesResponse = zod.array(
  * @summary Upload a gallery image (multipart form data with image file, caption, sortOrder)
  */
 export const UploadGalleryImageBody = zod.object({
-  image: zod.unknown(),
+  image: zod.instanceof(File),
   caption: zod.string().optional(),
   sortOrder: zod.number().optional(),
 });

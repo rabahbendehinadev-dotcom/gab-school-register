@@ -20,6 +20,9 @@ export interface Student {
   experienceLevel: string;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  contactReason?: string | null;
+  depositPaid?: boolean;
   stage: StudentStage;
   /** @nullable */
   groupId?: number | null;

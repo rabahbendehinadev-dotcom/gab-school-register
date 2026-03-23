@@ -629,6 +629,10 @@ components:
           type: string
         note:
           type: ["string", "null"]
+        contactReason:
+          type: ["string", "null"]
+        depositPaid:
+          type: boolean
         stage:
           type: string
           enum: [new, contacted, interested, no_show, archived]
@@ -708,6 +712,10 @@ components:
           type: string
         note:
           type: ["string", "null"]
+        contactReason:
+          type: ["string", "null"]
+        depositPaid:
+          type: boolean
         stage:
           type: string
           enum: [new, contacted, interested, no_show, archived]

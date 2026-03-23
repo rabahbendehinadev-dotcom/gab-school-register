@@ -19,5 +19,8 @@ export interface UpdateStudentBody {
   experienceLevel?: string;
   /** @nullable */
   note?: string | null;
+  /** @nullable */
+  contactReason?: string | null;
+  depositPaid?: boolean;
   stage?: UpdateStudentBodyStage;
 }
