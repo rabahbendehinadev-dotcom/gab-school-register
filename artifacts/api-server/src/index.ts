@@ -1,5 +1,6 @@
 import app from "./app";
 import { seedAdmin } from "./seed";
+import { pool } from "@workspace/db";
 
 const rawPort = process.env["PORT"];
 
@@ -15,13 +16,35 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
-seedAdmin().then(() => {
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
+async function ensureSessionTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "user_sessions" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE
+      ) WITH (OIDS=FALSE)
+    `);
+    await client.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "user_sessions" ("expire")
+    `);
+  } finally {
+    client.release();
+  }
+}
+
+ensureSessionTable()
+  .then(() => seedAdmin())
+  .then(() => {
+    app.listen(port, () => {
+      console.log(`Server listening on port ${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Startup error:", err);
+    app.listen(port, () => {
+      console.log(`Server listening on port ${port}`);
+    });
   });
-}).catch((err) => {
-  console.error("Failed to seed:", err);
-  app.listen(port, () => {
-    console.log(`Server listening on port ${port}`);
-  });
-});
