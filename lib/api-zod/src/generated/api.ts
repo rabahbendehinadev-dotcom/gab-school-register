@@ -49,6 +49,8 @@ export const ListStudentsQueryParams = zod.object({
   trainingType: zod.coerce.string().optional(),
   search: zod.coerce.string().optional(),
   groupId: zod.coerce.number().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]).optional(),
+  housingNeeded: zod.enum(["true", "false"]).optional(),
 });
 
 export const ListStudentsResponseItem = zod.object({
@@ -64,6 +66,8 @@ export const ListStudentsResponseItem = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -106,6 +110,8 @@ export const GetStudentResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -131,6 +137,8 @@ export const UpdateStudentBody = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]).optional(),
+  receiptUrl: zod.string().nullish(),
   stage: zod
     .enum(["new", "contacted", "interested", "no_show", "archived"])
     .optional(),
@@ -149,6 +157,8 @@ export const UpdateStudentResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -186,6 +196,8 @@ export const UpdateStudentStageResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -216,6 +228,8 @@ export const AssignStudentToGroupResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
+  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
   createdAt: zod.date(),
@@ -281,6 +295,8 @@ export const GetGroupResponse = zod.object({
       note: zod.string().nullish(),
       contactReason: zod.string().nullish(),
       depositPaid: zod.boolean().optional(),
+      paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+      receiptUrl: zod.string().nullish(),
       stage: zod.enum([
         "new",
         "contacted",
@@ -459,4 +475,33 @@ export const GetDashboardStatsResponse = zod.object({
   archivedStudents: zod.number(),
   totalGroups: zod.number(),
   openGroups: zod.number(),
+});
+
+/**
+ * @summary Request a presigned URL for file upload
+ */
+
+export const RequestUploadUrlBody = zod.object({
+  name: zod.string().min(1),
+  size: zod.number().min(1),
+  contentType: zod.string().min(1),
+});
+
+export const RequestUploadUrlResponse = zod.object({
+  uploadURL: zod.string().url(),
+  objectPath: zod.string(),
+  metadata: zod
+    .object({
+      name: zod.string().min(1),
+      size: zod.number().min(1),
+      contentType: zod.string().min(1),
+    })
+    .optional(),
+});
+
+/**
+ * @summary Serve an object entity from PRIVATE_OBJECT_DIR
+ */
+export const GetStorageObjectParams = zod.object({
+  objectPath: zod.coerce.string(),
 });

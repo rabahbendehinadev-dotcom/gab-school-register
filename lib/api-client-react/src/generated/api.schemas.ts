@@ -73,6 +73,15 @@ export const StudentTrainingType = {
   physical: "physical",
 } as const;
 
+export type StudentPaymentStatus =
+  (typeof StudentPaymentStatus)[keyof typeof StudentPaymentStatus];
+
+export const StudentPaymentStatus = {
+  unpaid: "unpaid",
+  deposited: "deposited",
+  paid: "paid",
+} as const;
+
 export type StudentStage = (typeof StudentStage)[keyof typeof StudentStage];
 
 export const StudentStage = {
@@ -98,6 +107,9 @@ export interface Student {
   /** @nullable */
   contactReason?: string | null;
   depositPaid?: boolean;
+  paymentStatus: StudentPaymentStatus;
+  /** @nullable */
+  receiptUrl?: string | null;
   stage: StudentStage;
   /** @nullable */
   groupId?: number | null;
@@ -133,6 +145,15 @@ export const UpdateStudentBodyTrainingType = {
   physical: "physical",
 } as const;
 
+export type UpdateStudentBodyPaymentStatus =
+  (typeof UpdateStudentBodyPaymentStatus)[keyof typeof UpdateStudentBodyPaymentStatus];
+
+export const UpdateStudentBodyPaymentStatus = {
+  unpaid: "unpaid",
+  deposited: "deposited",
+  paid: "paid",
+} as const;
+
 export type UpdateStudentBodyStage =
   (typeof UpdateStudentBodyStage)[keyof typeof UpdateStudentBodyStage];
 
@@ -158,6 +179,9 @@ export interface UpdateStudentBody {
   /** @nullable */
   contactReason?: string | null;
   depositPaid?: boolean;
+  paymentStatus?: UpdateStudentBodyPaymentStatus;
+  /** @nullable */
+  receiptUrl?: string | null;
   stage?: UpdateStudentBodyStage;
 }
 
@@ -324,12 +348,46 @@ export interface DashboardStats {
   openGroups: number;
 }
 
+export interface UploadUrlRequest {
+  /** @minLength 1 */
+  name: string;
+  /** @minimum 1 */
+  size: number;
+  /** @minLength 1 */
+  contentType: string;
+}
+
+export interface UploadUrlResponse {
+  uploadURL: string;
+  objectPath: string;
+  metadata?: UploadUrlRequest;
+}
+
 export type ListStudentsParams = {
   stage?: string;
   trainingType?: string;
   search?: string;
   groupId?: number;
+  paymentStatus?: ListStudentsPaymentStatus;
+  housingNeeded?: ListStudentsHousingNeeded;
 };
+
+export type ListStudentsPaymentStatus =
+  (typeof ListStudentsPaymentStatus)[keyof typeof ListStudentsPaymentStatus];
+
+export const ListStudentsPaymentStatus = {
+  unpaid: "unpaid",
+  deposited: "deposited",
+  paid: "paid",
+} as const;
+
+export type ListStudentsHousingNeeded =
+  (typeof ListStudentsHousingNeeded)[keyof typeof ListStudentsHousingNeeded];
+
+export const ListStudentsHousingNeeded = {
+  true: "true",
+  false: "false",
+} as const;
 
 export type ListActivityParams = {
   limit?: number;

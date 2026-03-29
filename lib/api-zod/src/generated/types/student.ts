@@ -5,6 +5,7 @@
  * GAB SCHOOL CRM API
  * OpenAPI spec version: 0.1.0
  */
+import type { StudentPaymentStatus } from "./studentPaymentStatus";
 import type { StudentStage } from "./studentStage";
 import type { StudentTrainingType } from "./studentTrainingType";
 
@@ -23,6 +24,9 @@ export interface Student {
   /** @nullable */
   contactReason?: string | null;
   depositPaid?: boolean;
+  paymentStatus: StudentPaymentStatus;
+  /** @nullable */
+  receiptUrl?: string | null;
   stage: StudentStage;
   /** @nullable */
   groupId?: number | null;

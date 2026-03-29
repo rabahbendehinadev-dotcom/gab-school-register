@@ -16,6 +16,8 @@ export const studentsTable = pgTable("students", {
   note: text("note"),
   contactReason: text("contact_reason"),
   depositPaid: boolean("deposit_paid").notNull().default(false),
+  paymentStatus: text("payment_status").notNull().default("unpaid"),
+  receiptUrl: text("receipt_url"),
   stage: text("stage").notNull().default("new"),
   groupId: integer("group_id").references(() => groupsTable.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

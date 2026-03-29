@@ -224,7 +224,9 @@ function StudentCard({
     (student.contactReason as ContactReason) || "spoken",
   );
   const [localNote, setLocalNote] = useState(student.note ?? "");
-  const [localDeposit, setLocalDeposit] = useState(student.depositPaid ?? false);
+  const [localPaymentStatus, setLocalPaymentStatus] = useState<"unpaid" | "deposited" | "paid">(
+    (student.paymentStatus as "unpaid" | "deposited" | "paid") ?? "unpaid",
+  );
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   const fullName = `${student.firstName} ${student.lastName}`;
@@ -246,10 +248,16 @@ function StudentCard({
     }
   }
 
-  function handleDepositClick() {
-    if (localDeposit) return;
-    setLocalDeposit(true);
-    updateMutation.mutate({ id: student.id, data: { depositPaid: true } });
+  function handlePaymentCycle() {
+    const next: Record<string, "unpaid" | "deposited" | "paid"> = {
+      unpaid: "deposited",
+      deposited: "paid",
+      paid: "paid",
+    };
+    const newStatus = next[localPaymentStatus] ?? "deposited";
+    if (newStatus === localPaymentStatus) return;
+    setLocalPaymentStatus(newStatus);
+    updateMutation.mutate({ id: student.id, data: { paymentStatus: newStatus } });
   }
 
   return (
@@ -332,17 +340,25 @@ function StudentCard({
         </div>
       )}
 
-      {/* ── INTERESTED extras — deposit button ── */}
+      {/* ── INTERESTED extras — 3-state payment button ── */}
       {isInterested && (
         <div className="mt-3">
-          {localDeposit ? (
+          {localPaymentStatus === "paid" ? (
             <div className="flex items-center justify-center gap-2 bg-green-100 text-green-700 font-semibold text-xs rounded-lg py-2 border border-green-200">
               <CheckCircle2 className="w-4 h-4" />
-              {lang === "fr" ? "Dépôt confirmé ✅" : "تم الإيداع ✅"}
+              {lang === "fr" ? "Paiement complet ✅" : "مدفوع ✅"}
             </div>
+          ) : localPaymentStatus === "deposited" ? (
+            <button
+              onClick={handlePaymentCycle}
+              className="w-full flex items-center justify-center gap-2 bg-white border-2 border-green-400 text-green-700 font-semibold text-xs rounded-lg py-2 hover:bg-green-50 transition-colors"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {lang === "fr" ? "Paiement complet ?" : "مدفوع كامل؟"}
+            </button>
           ) : (
             <button
-              onClick={handleDepositClick}
+              onClick={handlePaymentCycle}
               className="w-full flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold text-xs rounded-lg py-2 transition-colors"
             >
               <DollarSign className="w-3.5 h-3.5" />

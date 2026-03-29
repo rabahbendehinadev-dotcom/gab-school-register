@@ -5,10 +5,14 @@
  * GAB SCHOOL CRM API
  * OpenAPI spec version: 0.1.0
  */
+import type { ListStudentsHousingNeeded } from "./listStudentsHousingNeeded";
+import type { ListStudentsPaymentStatus } from "./listStudentsPaymentStatus";
 
 export type ListStudentsParams = {
   stage?: string;
   trainingType?: string;
   search?: string;
   groupId?: number;
+  paymentStatus?: ListStudentsPaymentStatus;
+  housingNeeded?: ListStudentsHousingNeeded;
 };

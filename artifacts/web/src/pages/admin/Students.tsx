@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useAuth } from "@/hooks/use-auth";
 import { 
@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Search, Trash2, ArrowRightLeft, Users, Eye, X, MessageCircle } from "lucide-react";
+import { Search, Trash2, ArrowRightLeft, Users, Eye, MessageCircle, Upload, ExternalLink } from "lucide-react";
 import { useSearch } from "wouter";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,18 @@ const STAGE_COLORS: Record<string, string> = {
   interested: "bg-green-100 text-green-700 border-green-200",
   no_show: "bg-red-100 text-red-700 border-red-200",
   archived: "bg-gray-100 text-gray-500 border-gray-200",
+};
+
+const PAYMENT_COLORS: Record<string, string> = {
+  unpaid: "bg-gray-100 text-gray-500 border-gray-200",
+  deposited: "bg-yellow-100 text-yellow-700 border-yellow-200",
+  paid: "bg-green-100 text-green-700 border-green-200",
+};
+
+const PAYMENT_LABELS: Record<string, string> = {
+  unpaid: "لم يدفع",
+  deposited: "تم الإيداع 💰",
+  paid: "مدفوع ✅",
 };
 
 export default function Students() {
@@ -42,6 +54,8 @@ export default function Students() {
     setStageFilter(urlStage);
   }, [urlStage]);
   const [typeFilter, setTypeFilter] = useState("all");
+  const [paymentFilter, setPaymentFilter] = useState("all");
+  const [housingFilter, setHousingFilter] = useState("all");
   const [stageDialogStudent, setStageDialogStudent] = useState<Student | null>(null);
   const [groupDialogStudent, setGroupDialogStudent] = useState<Student | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
@@ -54,6 +68,8 @@ export default function Students() {
     search: search || undefined,
     stage: stageFilter !== "all" ? stageFilter : undefined,
     trainingType: typeFilter !== "all" ? typeFilter : undefined,
+    paymentStatus: paymentFilter !== "all" ? (paymentFilter as "unpaid" | "deposited" | "paid") : undefined,
+    housingNeeded: housingFilter !== "all" ? (housingFilter as "true" | "false") : undefined,
   });
   const { data: groups } = useListGroups();
 
@@ -88,10 +104,10 @@ export default function Students() {
 
   const updateMutation = useUpdateStudent({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
-        setDetailStudent(null);
-        toast({ title: "Student updated" });
+        setDetailStudent(data);
+        toast({ title: "تم الحفظ" });
       }
     }
   });
@@ -102,38 +118,63 @@ export default function Students() {
     <AdminLayout>
       <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden flex flex-col h-[calc(100vh-8rem)]">
         
-        <div className="p-4 sm:p-6 border-b border-border/50 flex flex-col sm:flex-row gap-4 justify-between items-center bg-muted/20">
-          <div className="relative w-full sm:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search students..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 bg-background border-border shadow-sm rounded-xl"
-            />
+        <div className="p-4 sm:p-6 border-b border-border/50 flex flex-col gap-3 bg-muted/20">
+          <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <div className="relative w-full sm:w-96">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search students..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-9 bg-background border-border shadow-sm rounded-xl"
+              />
+            </div>
+            <div className="flex gap-3 w-full sm:w-auto flex-wrap">
+              <Select value={stageFilter} onValueChange={setStageFilter}>
+                <SelectTrigger className="w-[140px] rounded-xl bg-background">
+                  <SelectValue placeholder="All Stages" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Stages</SelectItem>
+                  <SelectItem value="new">New</SelectItem>
+                  <SelectItem value="contacted">Contacted</SelectItem>
+                  <SelectItem value="interested">Interested</SelectItem>
+                  <SelectItem value="no_show">No Show</SelectItem>
+                  <SelectItem value="archived">Archived</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[130px] rounded-xl bg-background">
+                  <SelectValue placeholder="All Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="physical">Physical</SelectItem>
+                  <SelectItem value="online">Online</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          <div className="flex gap-3 w-full sm:w-auto">
-            <Select value={stageFilter} onValueChange={setStageFilter}>
-              <SelectTrigger className="w-[140px] rounded-xl bg-background">
-                <SelectValue placeholder="All Stages" />
+          <div className="flex gap-3 flex-wrap">
+            <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+              <SelectTrigger className="w-[150px] rounded-xl bg-background">
+                <SelectValue placeholder="الدفع" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Stages</SelectItem>
-                <SelectItem value="new">New</SelectItem>
-                <SelectItem value="contacted">Contacted</SelectItem>
-                <SelectItem value="interested">Interested</SelectItem>
-                <SelectItem value="no_show">No Show</SelectItem>
-                <SelectItem value="archived">Archived</SelectItem>
+                <SelectItem value="all">كل الطلاب</SelectItem>
+                <SelectItem value="unpaid">لم يدفع</SelectItem>
+                <SelectItem value="deposited">تم الإيداع</SelectItem>
+                <SelectItem value="paid">مدفوع</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[140px] rounded-xl bg-background">
-                <SelectValue placeholder="All Types" />
+            <Select value={housingFilter} onValueChange={setHousingFilter}>
+              <SelectTrigger className="w-[160px] rounded-xl bg-background">
+                <SelectValue placeholder="الإقامة" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="physical">Physical</SelectItem>
-                <SelectItem value="online">Online</SelectItem>
+                <SelectItem value="all">الكل</SelectItem>
+                <SelectItem value="true">يحتاج إقامة 🏠</SelectItem>
+                <SelectItem value="false">لا يحتاج إقامة</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -147,6 +188,7 @@ export default function Students() {
                 <TableHead>Contact</TableHead>
                 <TableHead>City</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Labels</TableHead>
                 <TableHead>Stage</TableHead>
                 <TableHead>Group</TableHead>
                 <TableHead>Registered</TableHead>
@@ -167,6 +209,25 @@ export default function Students() {
                     </TableCell>
                     <TableCell>{student.city}</TableCell>
                     <TableCell className="capitalize">{student.trainingType}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {student.housingNeeded && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-blue-100 text-blue-700 border-blue-200">
+                            🏠 إقامة
+                          </span>
+                        )}
+                        {student.paymentStatus === "deposited" && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-yellow-100 text-yellow-700 border-yellow-200">
+                            💰 إيداع
+                          </span>
+                        )}
+                        {student.paymentStatus === "paid" && (
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium border bg-green-100 text-green-700 border-green-200">
+                            ✅ مدفوع
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium capitalize border ${STAGE_COLORS[student.stage] || STAGE_COLORS.new}`}>
                         {student.stage.replace('_', ' ')}
@@ -227,7 +288,7 @@ export default function Students() {
               })}
               {!students?.length && (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-48 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-48 text-center text-muted-foreground">
                     No students found.
                   </TableCell>
                 </TableRow>
@@ -334,6 +395,10 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
   onSave: (id: number, data: UpdateStudentBody) => void; isPending: boolean;
 }) {
   const form = useForm<UpdateStudentBody>();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (student) {
@@ -346,13 +411,46 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
         experienceLevel: student.experienceLevel,
         note: student.note ?? "",
         housingNeeded: student.housingNeeded,
+        paymentStatus: student.paymentStatus as "unpaid" | "deposited" | "paid",
       });
+      setReceiptPreview(student.receiptUrl ?? null);
     }
   }, [student]);
 
+  async function handleReceiptUpload(file: File) {
+    if (!student) return;
+    setUploading(true);
+    try {
+      const urlRes = await fetch("/api/storage/uploads/request-url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        credentials: "include",
+      });
+      if (!urlRes.ok) throw new Error("Failed to get upload URL");
+      const { uploadURL, objectPath } = await urlRes.json();
+
+      const putRes = await fetch(uploadURL, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) throw new Error("Failed to upload file");
+
+      const serveUrl = `/api/storage${objectPath}`;
+      setReceiptPreview(serveUrl);
+      onSave(student.id, { receiptUrl: serveUrl });
+      toast({ title: "تم رفع الوصل بنجاح" });
+    } catch (e) {
+      toast({ title: "خطأ في رفع الوصل", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
   return (
     <Dialog open={!!student} onOpenChange={(o) => { if (!o) onClose(); }}>
-      <DialogContent className="sm:max-w-[500px] rounded-3xl p-6">
+      <DialogContent className="sm:max-w-[500px] rounded-3xl p-6 max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle className="text-xl font-bold">Student Details</DialogTitle></DialogHeader>
         {student && (
           <form onSubmit={form.handleSubmit((data) => onSave(student.id, data))} className="space-y-4 mt-4">
@@ -392,8 +490,76 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
             </div>
             <div className="flex items-center gap-2">
               <input type="checkbox" id="housing" {...form.register("housingNeeded")} className="rounded" />
-              <Label htmlFor="housing">Housing Needed</Label>
+              <Label htmlFor="housing">يحتاج إقامة 🏠</Label>
             </div>
+
+            <div className="space-y-2">
+              <Label>حالة الدفع</Label>
+              <Select
+                value={form.watch("paymentStatus") ?? "unpaid"}
+                onValueChange={(v) => form.setValue("paymentStatus", v as "unpaid" | "deposited" | "paid")}
+              >
+                <SelectTrigger className="rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unpaid">لم يدفع</SelectItem>
+                  <SelectItem value="deposited">تم الإيداع 💰</SelectItem>
+                  <SelectItem value="paid">مدفوع كامل ✅</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>وصل الدفع</Label>
+              {receiptPreview ? (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={receiptPreview}
+                    alt="وصل الدفع"
+                    className="w-24 h-24 object-cover rounded-lg border border-border"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                  <div className="flex flex-col gap-2">
+                    <a href={receiptPreview} target="_blank" rel="noopener noreferrer">
+                      <Button type="button" variant="outline" size="sm" className="rounded-xl gap-1.5">
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        فتح
+                      </Button>
+                    </a>
+                    <Button
+                      type="button" variant="outline" size="sm" className="rounded-xl gap-1.5"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      تغيير
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-muted/30 transition-colors text-muted-foreground text-sm"
+                >
+                  <Upload className="w-5 h-5" />
+                  {uploading ? "جاري الرفع..." : "رفع وصل الدفع"}
+                </button>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,application/pdf"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleReceiptUpload(file);
+                }}
+              />
+            </div>
+
             <div className="flex gap-3">
               <Button type="submit" className="flex-1 rounded-xl" disabled={isPending}>
                 {isPending ? "Saving..." : "Save Changes"}

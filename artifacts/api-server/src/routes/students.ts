@@ -40,6 +40,12 @@ router.get("/students", requireRole("admin", "manager", "staff", "assistant"), a
     if (query.data.groupId) {
       conditions.push(eq(studentsTable.groupId, query.data.groupId));
     }
+    if (query.data.paymentStatus) {
+      conditions.push(eq(studentsTable.paymentStatus, query.data.paymentStatus));
+    }
+    if (query.data.housingNeeded !== undefined) {
+      conditions.push(eq(studentsTable.housingNeeded, query.data.housingNeeded === "true"));
+    }
     if (query.data.search) {
       const term = `%${query.data.search}%`;
       conditions.push(
