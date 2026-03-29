@@ -65,6 +65,11 @@ const translations = {
     uploading: "جاري الرفع...",
     receiptUploaded: "تم رفع الوصل بنجاح",
     receiptError: "خطأ في رفع الوصل",
+    schedules: "الجداول",
+    noSchedule: "بدون جدول",
+    addSchedule: "إضافة جدول جديد",
+    moveToSchedule: "نقل إلى...",
+    renameSchedule: "تعديل الاسم",
   },
   fr: {
     dashboard: "Tableau de Bord",
@@ -128,6 +133,11 @@ const translations = {
     uploading: "Téléchargement...",
     receiptUploaded: "Reçu téléchargé avec succès",
     receiptError: "Erreur lors du téléchargement",
+    schedules: "Plannings",
+    noSchedule: "Sans planning",
+    addSchedule: "Nouveau planning",
+    moveToSchedule: "Déplacer vers...",
+    renameSchedule: "Renommer",
   },
 };
 

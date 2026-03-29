@@ -11,7 +11,8 @@ import {
   LogOut,
   Menu,
   X,
-  Ticket
+  Ticket,
+  CalendarDays,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const navItems = [
     { href: "/gab-c7x2p", label: t.dashboard, icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
     { href: "/gab-c7x2p/pipeline", label: t.pipeline, icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
+    { href: "/gab-c7x2p/schedules", label: t.schedules, icon: CalendarDays, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/students", label: t.students, icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/groups", label: t.groups, icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/open-day", label: t.openDay, icon: Ticket, roles: ["admin", "manager"] },
