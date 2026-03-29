@@ -9,6 +9,7 @@ import {
   useUpdateGroup,
   useDeleteGroup,
   useAssignStudentToGroup,
+  useUploadStudentReceipt,
   getListStudentsQueryKey,
   getListGroupsQueryKey,
   type Student,
@@ -16,7 +17,11 @@ import {
   type Group,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Phone, MapPin, MoreHorizontal, MessageCircle, ChevronDown, DollarSign, CheckCircle2, Pencil, Trash2, Plus, Check, X } from "lucide-react";
+import {
+  Phone, MapPin, MoreHorizontal, MessageCircle, ChevronDown,
+  DollarSign, CheckCircle2, Pencil, Trash2, Plus, Check, X,
+  Upload, ImageIcon, Loader2, CalendarDays,
+} from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,29 +35,23 @@ import { useI18n } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 
-// ─── Stage Kanban config ────────────────────────────────────────────────────
+// ─── Stage configs ──────────────────────────────────────────────────────────
 
 type StageConfig = {
   id: StudentStage;
-  cardBg: string;
-  cardBorder: string;
-  headerBg: string;
-  headerText: string;
-  badgeBg: string;
-  dotColor: string;
-  waBtnClass: string;
+  cardBg: string; cardBorder: string; headerBg: string;
+  headerText: string; badgeBg: string; dotColor: string; waBtnClass: string;
 };
 
 const STAGE_CONFIGS: StageConfig[] = [
-  { id: "new",       cardBg: "bg-blue-50",   cardBorder: "border-blue-200",   headerBg: "bg-blue-600",   headerText: "text-white", badgeBg: "bg-blue-100 text-blue-700",   dotColor: "bg-blue-400",   waBtnClass: "bg-blue-500 hover:bg-blue-600" },
-  { id: "contacted", cardBg: "bg-orange-50", cardBorder: "border-orange-200", headerBg: "bg-orange-500", headerText: "text-white", badgeBg: "bg-orange-100 text-orange-700", dotColor: "bg-orange-400", waBtnClass: "bg-orange-500 hover:bg-orange-600" },
-  { id: "interested",cardBg: "bg-green-50",  cardBorder: "border-green-200",  headerBg: "bg-green-600",  headerText: "text-white", badgeBg: "bg-green-100 text-green-700",  dotColor: "bg-green-400",  waBtnClass: "bg-green-500 hover:bg-green-600" },
-  { id: "no_show",   cardBg: "bg-red-50",    cardBorder: "border-red-200",    headerBg: "bg-red-500",    headerText: "text-white", badgeBg: "bg-red-100 text-red-700",     dotColor: "bg-red-400",    waBtnClass: "bg-red-500 hover:bg-red-600" },
-  { id: "archived",  cardBg: "bg-gray-50",   cardBorder: "border-gray-200",   headerBg: "bg-gray-500",   headerText: "text-white", badgeBg: "bg-gray-100 text-gray-600",   dotColor: "bg-gray-400",   waBtnClass: "bg-gray-500 hover:bg-gray-600" },
+  { id: "new",        cardBg: "bg-blue-50",   cardBorder: "border-blue-200",   headerBg: "bg-blue-600",   headerText: "text-white", badgeBg: "bg-blue-100 text-blue-700",    dotColor: "bg-blue-400",   waBtnClass: "bg-blue-500 hover:bg-blue-600" },
+  { id: "contacted",  cardBg: "bg-orange-50", cardBorder: "border-orange-200", headerBg: "bg-orange-500", headerText: "text-white", badgeBg: "bg-orange-100 text-orange-700", dotColor: "bg-orange-400", waBtnClass: "bg-orange-500 hover:bg-orange-600" },
+  { id: "interested", cardBg: "bg-green-50",  cardBorder: "border-green-200",  headerBg: "bg-green-600",  headerText: "text-white", badgeBg: "bg-green-100 text-green-700",   dotColor: "bg-green-400",  waBtnClass: "bg-green-500 hover:bg-green-600" },
+  { id: "no_show",    cardBg: "bg-red-50",    cardBorder: "border-red-200",    headerBg: "bg-red-500",    headerText: "text-white", badgeBg: "bg-red-100 text-red-700",      dotColor: "bg-red-400",    waBtnClass: "bg-red-500 hover:bg-red-600" },
+  { id: "archived",   cardBg: "bg-gray-50",   cardBorder: "border-gray-200",   headerBg: "bg-gray-500",   headerText: "text-white", badgeBg: "bg-gray-100 text-gray-600",    dotColor: "bg-gray-400",   waBtnClass: "bg-gray-500 hover:bg-gray-600" },
 ];
 
 type ContactReason = "spoken" | "phone_busy" | "no_answer";
-
 const CONTACT_REASONS: { value: ContactReason; labelAr: string; labelFr: string; emoji: string }[] = [
   { value: "spoken",     labelAr: "تم التحدث",   labelFr: "Conversation établie", emoji: "✅" },
   { value: "phone_busy", labelAr: "الهاتف مغلق", labelFr: "Téléphone éteint",     emoji: "📵" },
@@ -62,7 +61,7 @@ const CONTACT_REASONS: { value: ContactReason; labelAr: string; labelFr: string;
 function getWhatsAppMsg(stage: StudentStage, name: string, t: ReturnType<typeof useI18n>["t"], contactReason?: string | null): string {
   if (stage === "contacted") {
     if (contactReason === "phone_busy") return t.phoneBusyMsg(name);
-    if (contactReason === "no_answer") return t.noAnswerMsg(name);
+    if (contactReason === "no_answer")  return t.noAnswerMsg(name);
     return t.contactedMsg(name);
   }
   switch (stage) {
@@ -74,40 +73,73 @@ function getWhatsAppMsg(stage: StudentStage, name: string, t: ReturnType<typeof 
   }
 }
 
-function toIntlPhone(phone: string): string {
-  let clean = phone.replace(/\D/g, "");
-  if (clean.startsWith("0") && clean.length === 10) clean = "213" + clean.slice(1);
-  else if (clean.startsWith("5") && clean.length === 9) clean = "213" + clean;
-  return clean;
+function toIntlPhone(p: string): string {
+  let c = p.replace(/\D/g, "");
+  if (c.startsWith("0") && c.length === 10) c = "213" + c.slice(1);
+  else if (c.startsWith("5") && c.length === 9) c = "213" + c;
+  return c;
 }
 
-function openWhatsApp(phone: string, msg: string) {
-  window.open(`https://wa.me/${toIntlPhone(phone)}?text=${encodeURIComponent(msg)}`, "_blank");
-}
+// ─── Stage student card ──────────────────────────────────────────────────────
 
-// ─── Stage card ─────────────────────────────────────────────────────────────
-
-function StageStudentCard({ student, cfg, t, stages, onStageChange, onUpdate }: {
+function StageStudentCard({ student, cfg, t, stages, groups, onStageChange, onUpdate }: {
   student: Student;
   cfg: StageConfig;
   t: ReturnType<typeof useI18n>["t"];
   stages: StageConfig[];
+  groups: Group[];
   onStageChange: (id: number, stage: StudentStage) => void;
   onUpdate: () => void;
 }) {
   const { lang } = useI18n();
-  const updateMutation = useUpdateStudent({ mutation: { onSuccess: onUpdate } });
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
-  const [localReason, setLocalReason] = useState<ContactReason>((student.contactReason as ContactReason) || "spoken");
-  const [localNote, setLocalNote] = useState(student.note ?? "");
-  const [localPaymentStatus, setLocalPaymentStatus] = useState<"unpaid" | "deposited" | "paid">((student.paymentStatus as "unpaid" | "deposited" | "paid") ?? "unpaid");
-  const noteRef = useRef<HTMLTextAreaElement>(null);
+  const updateMutation    = useUpdateStudent({ mutation: { onSuccess: onUpdate } });
+  const assignMutation    = useAssignStudentToGroup({
+    mutation: {
+      onSuccess: () => { onUpdate(); qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }); },
+      onError: () => toast({ title: t.errorMoving, variant: "destructive" }),
+    },
+  });
+  const createGroupMutation = useCreateGroup({
+    mutation: {
+      onSuccess: (newGroup) => {
+        qc.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        assignMutation.mutate({ id: student.id, data: { groupId: newGroup.id } });
+        setShowNewGroup(false);
+        setNewGroupName("");
+      },
+      onError: () => toast({ title: t.errorCreating, variant: "destructive" }),
+    },
+  });
+  const uploadReceiptMutation = useUploadStudentReceipt({
+    mutation: {
+      onSuccess: () => {
+        onUpdate();
+        toast({ title: t.receiptUploaded });
+      },
+      onError: () => toast({ title: t.receiptError, variant: "destructive" }),
+    },
+  });
 
-  const fullName = `${student.firstName} ${student.lastName}`;
-  const waMsg = getWhatsAppMsg(student.stage as StudentStage, fullName, t, localReason);
-  const isContacted  = student.stage === "contacted";
-  const isInterested = student.stage === "interested";
+  const [localReason, setLocalReason]             = useState<ContactReason>((student.contactReason as ContactReason) || "spoken");
+  const [localNote, setLocalNote]                 = useState(student.note ?? "");
+  const [localPaymentStatus, setLocalPaymentStatus] = useState<"unpaid"|"deposited"|"paid">((student.paymentStatus as "unpaid"|"deposited"|"paid") ?? "unpaid");
+  const [showNewGroup, setShowNewGroup]           = useState(false);
+  const [newGroupName, setNewGroupName]           = useState("");
+  const noteRef        = useRef<HTMLTextAreaElement>(null);
+  const newGroupRef    = useRef<HTMLInputElement>(null);
+  const fileInputRef   = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { if (showNewGroup) newGroupRef.current?.focus(); }, [showNewGroup]);
+
+  const fullName      = `${student.firstName} ${student.lastName}`;
+  const waMsg         = getWhatsAppMsg(student.stage as StudentStage, fullName, t, localReason);
+  const isContacted   = student.stage === "contacted";
+  const isInterested  = student.stage === "interested";
   const currentReason = CONTACT_REASONS.find((r) => r.value === localReason) ?? CONTACT_REASONS[0];
+  const currentGroup  = groups.find((g) => g.id === student.groupId);
 
   function handleReasonChange(val: ContactReason) {
     setLocalReason(val);
@@ -119,38 +151,124 @@ function StageStudentCard({ student, cfg, t, stages, onStageChange, onUpdate }: 
   }
 
   function handlePaymentCycle() {
-    const next: Record<string, "unpaid" | "deposited" | "paid"> = { unpaid: "deposited", deposited: "paid", paid: "paid" };
+    const next: Record<string, "unpaid"|"deposited"|"paid"> = { unpaid: "deposited", deposited: "paid", paid: "paid" };
     const newStatus = next[localPaymentStatus] ?? "deposited";
     if (newStatus === localPaymentStatus) return;
     setLocalPaymentStatus(newStatus);
     updateMutation.mutate({ id: student.id, data: { paymentStatus: newStatus } });
   }
 
+  function handleAssignGroup(groupId: number | null) {
+    assignMutation.mutate({ id: student.id, data: { groupId } });
+  }
+
+  function handleCreateAndAssign() {
+    const name = newGroupName.trim();
+    if (!name) return;
+    createGroupMutation.mutate({
+      data: { name, startDate: new Date().toISOString().slice(0, 10), trainingType: "physical", capacity: 999, status: "open" },
+    });
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadReceiptMutation.mutate({ id: student.id, data: { receipt: file } });
+    e.target.value = "";
+  }
+
+  const isUploading = uploadReceiptMutation.isPending;
+  const receiptUrl  = student.receiptUrl;
+
   return (
     <div className={`${cfg.cardBg} rounded-xl p-4 shadow-sm border ${cfg.cardBorder} hover:shadow-md transition-all group`}>
+
+      {/* Header */}
       <div className="flex justify-between items-start mb-2">
         <h4 className="font-bold text-sm text-gray-800">{fullName}</h4>
         <DropdownMenu>
           <DropdownMenuTrigger className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded-md hover:bg-black/10 active:bg-black/20 transition-opacity touch-manipulation">
             <MoreHorizontal className="w-4 h-4 text-gray-600" />
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuLabel>{t.moveTo}</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-52">
+            {/* Move stage */}
+            <DropdownMenuLabel className="text-xs">{t.moveTo}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {stages.filter((s) => s.id !== student.stage).map((s) => (
               <DropdownMenuItem key={s.id} onClick={() => onStageChange(student.id, s.id)}>
                 {t.stageLabels[s.id]}
               </DropdownMenuItem>
             ))}
+
+            {/* Assign to schedule */}
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs flex items-center gap-1">
+              <CalendarDays className="w-3 h-3" />
+              {t.schedules}
+            </DropdownMenuLabel>
+            {student.groupId !== null && (
+              <DropdownMenuItem onClick={() => handleAssignGroup(null)}>
+                <span className="w-2 h-2 rounded-full bg-gray-400 mr-2 inline-block flex-shrink-0" />
+                {t.noSchedule}
+              </DropdownMenuItem>
+            )}
+            {groups.map((g) => (
+              <DropdownMenuItem
+                key={g.id}
+                onClick={() => handleAssignGroup(g.id)}
+                className={student.groupId === g.id ? "bg-orange-50 font-semibold" : ""}
+              >
+                <span className={`w-2 h-2 rounded-full mr-2 inline-block flex-shrink-0 ${student.groupId === g.id ? "bg-orange-500" : "bg-violet-400"}`} />
+                {g.name}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuItem onClick={() => setShowNewGroup(true)}>
+              <Plus className="w-3.5 h-3.5 mr-2 text-orange-500" />
+              <span className="text-orange-600 font-medium">{t.addSchedule}</span>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
+      {/* Info */}
       <div className="space-y-1.5 mt-2">
-        <div className="flex items-center text-xs text-gray-600"><Phone className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" /> {student.phone}</div>
-        <div className="flex items-center text-xs text-gray-600"><MapPin className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" /> {student.city}</div>
+        <div className="flex items-center text-xs text-gray-600"><Phone className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />{student.phone}</div>
+        <div className="flex items-center text-xs text-gray-600"><MapPin className="w-3.5 h-3.5 mr-1.5 flex-shrink-0" />{student.city}</div>
       </div>
 
+      {/* Current group badge */}
+      {currentGroup && (
+        <div className="mt-2 flex items-center gap-1">
+          <CalendarDays className="w-3 h-3 text-violet-500 flex-shrink-0" />
+          <span className="text-[11px] text-violet-700 font-medium truncate">{currentGroup.name}</span>
+        </div>
+      )}
+
+      {/* Inline create-group form */}
+      {showNewGroup && (
+        <div className="mt-2 flex gap-1">
+          <input
+            ref={newGroupRef}
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") handleCreateAndAssign(); if (e.key === "Escape") { setShowNewGroup(false); setNewGroupName(""); } }}
+            placeholder={t.scheduleNamePlaceholder}
+            className="flex-1 min-w-0 text-xs border border-orange-300 rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+          />
+          <button
+            onClick={handleCreateAndAssign}
+            disabled={!newGroupName.trim() || createGroupMutation.isPending}
+            className="bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white rounded-lg px-2 py-1.5 transition-colors flex-shrink-0"
+          >
+            {createGroupMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+          </button>
+          <button onClick={() => { setShowNewGroup(false); setNewGroupName(""); }} className="text-gray-400 hover:text-gray-600 rounded-lg px-1.5 py-1.5 flex-shrink-0">
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
+
+      {/* Contacted extras */}
       {isContacted && (
         <div className="mt-3 space-y-2">
           <DropdownMenu>
@@ -186,8 +304,10 @@ function StageStudentCard({ student, cfg, t, stages, onStageChange, onUpdate }: 
         </div>
       )}
 
+      {/* Interested: payment + receipt */}
       {isInterested && (
-        <div className="mt-3">
+        <div className="mt-3 space-y-2">
+          {/* Payment cycle button */}
           {localPaymentStatus === "paid" ? (
             <div className="flex items-center justify-center gap-2 bg-green-100 text-green-700 font-semibold text-xs rounded-lg py-2 border border-green-200">
               <CheckCircle2 className="w-4 h-4" />{t.paidBadge}
@@ -201,9 +321,39 @@ function StageStudentCard({ student, cfg, t, stages, onStageChange, onUpdate }: 
               <DollarSign className="w-3.5 h-3.5" />{t.depositPaidBadge}
             </button>
           )}
+
+          {/* Receipt upload */}
+          <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleFileChange} />
+          {receiptUrl ? (
+            <div className="flex items-center gap-2">
+              <a href={receiptUrl} target="_blank" rel="noopener noreferrer"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-lg py-1.5 hover:bg-blue-100 transition-colors">
+                <ImageIcon className="w-3.5 h-3.5" />
+                {lang === "fr" ? "Voir le reçu" : "عرض الوصل"}
+              </a>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                title={t.receiptUpload}
+                className="flex-shrink-0 p-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors disabled:opacity-50"
+              >
+                {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="w-full flex items-center justify-center gap-2 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold rounded-lg py-2 hover:bg-blue-100 transition-colors disabled:opacity-50"
+            >
+              {isUploading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+              {isUploading ? t.uploading : t.receiptUpload}
+            </button>
+          )}
         </div>
       )}
 
+      {/* no_show/archived payment badge */}
       {!isInterested && ["no_show", "archived"].includes(student.stage) && localPaymentStatus !== "unpaid" && (
         <div className="mt-3">
           {localPaymentStatus === "paid" ? (
@@ -218,6 +368,7 @@ function StageStudentCard({ student, cfg, t, stages, onStageChange, onUpdate }: 
         </div>
       )}
 
+      {/* Footer */}
       <div className="mt-3 pt-3 border-t border-black/10 flex justify-between items-center gap-2">
         <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md ${cfg.badgeBg}`}>
           {student.trainingType === "online" ? t.online : t.physical}
@@ -225,19 +376,21 @@ function StageStudentCard({ student, cfg, t, stages, onStageChange, onUpdate }: 
         <span className="text-[10px] text-gray-500">{format(new Date(student.createdAt), "MMM d")}</span>
       </div>
 
-      <button onClick={() => openWhatsApp(student.phone, waMsg)} className={`mt-3 w-full flex items-center justify-center gap-2 text-white text-xs font-semibold py-2 rounded-lg transition-colors ${cfg.waBtnClass}`}>
+      <button
+        onClick={() => window.open(`https://wa.me/${toIntlPhone(student.phone)}?text=${encodeURIComponent(waMsg)}`, "_blank")}
+        className={`mt-3 w-full flex items-center justify-center gap-2 text-white text-xs font-semibold py-2 rounded-lg transition-colors ${cfg.waBtnClass}`}
+      >
         <MessageCircle className="w-3.5 h-3.5" />{t.sendWhatsApp}
       </button>
     </div>
   );
 }
 
-// ─── Groups Kanban helpers ───────────────────────────────────────────────────
+// ─── Groups kanban helpers ───────────────────────────────────────────────────
 
 const STAGE_COLORS: Record<string, string> = {
   new: "bg-blue-500", contacted: "bg-yellow-500", interested: "bg-green-500", no_show: "bg-red-500", archived: "bg-gray-400",
 };
-
 const COLUMN_PALETTE = [
   { header: "bg-violet-600", light: "bg-violet-50", border: "border-violet-200" },
   { header: "bg-teal-600",   light: "bg-teal-50",   border: "border-teal-200" },
@@ -252,16 +405,14 @@ const UNASSIGNED_COL = { header: "bg-gray-500", light: "bg-gray-50", border: "bo
 const colFor = (idx: number) => COLUMN_PALETTE[idx % COLUMN_PALETTE.length];
 
 function GroupStudentCard({ student, groups, currentGroupId, onMove, t }: {
-  student: Student;
-  groups: Group[];
-  currentGroupId: number | null;
-  onMove: (studentId: number, groupId: number | null) => void;
+  student: Student; groups: Group[]; currentGroupId: number | null;
+  onMove: (id: number, groupId: number | null) => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
   const stageLabel = t.stageLabels[student.stage as keyof typeof t.stageLabels] ?? student.stage;
-  const stageDot = STAGE_COLORS[student.stage] ?? "bg-gray-400";
-  const fullName = `${student.firstName} ${student.lastName}`;
-  const otherGroups = groups.filter((g) => g.id !== currentGroupId);
+  const stageDot   = STAGE_COLORS[student.stage] ?? "bg-gray-400";
+  const fullName   = `${student.firstName} ${student.lastName}`;
+  const others     = groups.filter((g) => g.id !== currentGroupId);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group">
@@ -276,14 +427,12 @@ function GroupStudentCard({ student, groups, currentGroupId, onMove, t }: {
             <DropdownMenuSeparator />
             {currentGroupId !== null && (
               <DropdownMenuItem onClick={() => onMove(student.id, null)}>
-                <span className="w-2 h-2 rounded-full bg-gray-400 mr-2 flex-shrink-0 inline-block" />
-                {t.noSchedule}
+                <span className="w-2 h-2 rounded-full bg-gray-400 mr-2 flex-shrink-0 inline-block" />{t.noSchedule}
               </DropdownMenuItem>
             )}
-            {otherGroups.map((g) => (
+            {others.map((g) => (
               <DropdownMenuItem key={g.id} onClick={() => onMove(student.id, g.id)}>
-                <span className="w-2 h-2 rounded-full bg-violet-500 mr-2 flex-shrink-0 inline-block" />
-                {g.name}
+                <span className="w-2 h-2 rounded-full bg-violet-500 mr-2 flex-shrink-0 inline-block" />{g.name}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>
@@ -308,93 +457,67 @@ function RenameInput({ value, onConfirm, onCancel }: { value: string; onConfirm:
   const [val, setVal] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
-
   return (
     <form onSubmit={(e) => { e.preventDefault(); if (val.trim()) onConfirm(val.trim()); }} className="flex items-center gap-1">
-      <input
-        ref={ref}
-        value={val}
-        onChange={(e) => setVal(e.target.value)}
+      <input ref={ref} value={val} onChange={(e) => setVal(e.target.value)}
         onBlur={() => { if (val.trim()) onConfirm(val.trim()); else onCancel(); }}
-        className="flex-1 min-w-0 bg-white/20 text-white text-sm font-semibold rounded px-2 py-0.5 outline-none border border-white/40"
-      />
+        className="flex-1 min-w-0 bg-white/20 text-white text-sm font-semibold rounded px-2 py-0.5 outline-none border border-white/40" />
       <button type="submit" className="text-white hover:text-green-200"><Check className="w-3.5 h-3.5" /></button>
       <button type="button" onClick={onCancel} className="text-white hover:text-red-200"><X className="w-3.5 h-3.5" /></button>
     </form>
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
+// ─── Main page ───────────────────────────────────────────────────────────────
 
 export default function Pipeline() {
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
   const { t } = useI18n();
   const { user } = useAuth();
   const { toast } = useToast();
 
   const [view, setView] = useState<"stages" | "groups">("stages");
 
-  // Stage view data
-  const { data: students, isLoading: stagesLoading } = useListStudents();
+  const { data: students = [], isLoading: stagesLoading } = useListStudents();
+  const { data: groups   = [], isLoading: gLoading }      = useListGroups();
+  const { data: allStudents = [], isLoading: sLoading }   = useListStudents();
+
   const updateStageMutation = useUpdateStudentStage({
-    mutation: { onSuccess: () => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() }) },
+    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getListStudentsQueryKey() }) },
   });
-
-  // Groups view data
-  const { data: groups = [], isLoading: gLoading } = useListGroups();
-  const { data: allStudents = [], isLoading: sLoading } = useListStudents();
-
   const assignMutation = useAssignStudentToGroup({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
-      },
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getListStudentsQueryKey() }); qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }); },
       onError: () => toast({ title: t.errorMoving, variant: "destructive" }),
     },
   });
-
   const createMutation = useCreateGroup({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
-        setAddingNew(false);
-        setNewName("");
-      },
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }); setAddingNew(false); setNewName(""); },
       onError: () => toast({ title: t.errorCreating, variant: "destructive" }),
     },
   });
-
   const updateGroupMutation = useUpdateGroup({
-    mutation: {
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() }),
-      onError: () => toast({ title: t.errorUpdating, variant: "destructive" }),
-    },
+    mutation: { onSuccess: () => qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }), onError: () => toast({ title: t.errorUpdating, variant: "destructive" }) },
   });
-
   const deleteGroupMutation = useDeleteGroup({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListGroupsQueryKey() });
-        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
-      },
+      onSuccess: () => { qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }); qc.invalidateQueries({ queryKey: getListStudentsQueryKey() }); },
       onError: () => toast({ title: t.errorDeleting, variant: "destructive" }),
     },
   });
 
   const [renamingId, setRenamingId] = useState<number | null>(null);
-  const [addingNew, setAddingNew] = useState(false);
-  const [newName, setNewName] = useState("");
+  const [addingNew, setAddingNew]   = useState(false);
+  const [newName, setNewName]       = useState("");
   const newInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = user?.role === "admin";
 
-  // Stage view handlers
   const grouped = STAGE_CONFIGS.reduce((acc, cfg) => {
-    acc[cfg.id] = students?.filter((s) => s.stage === cfg.id) || [];
+    acc[cfg.id] = students.filter((s) => s.stage === cfg.id);
     return acc;
   }, {} as Record<StudentStage, Student[]>);
 
-  // Groups view handlers
   const byGroup = (() => {
     const map: Record<string, Student[]> = { unassigned: [] };
     groups.forEach((g) => { map[String(g.id)] = []; });
@@ -406,12 +529,8 @@ export default function Pipeline() {
     return map;
   })();
 
-  function handleMove(studentId: number, groupId: number | null) {
-    assignMutation.mutate({ id: studentId, data: { groupId } });
-  }
-
-  function handleRename(group: Group, newNameVal: string) {
-    updateGroupMutation.mutate({ id: group.id, data: { name: newNameVal } });
+  function handleRename(group: Group, name: string) {
+    updateGroupMutation.mutate({ id: group.id, data: { name } });
     setRenamingId(null);
   }
 
@@ -422,12 +541,8 @@ export default function Pipeline() {
 
   function handleCreateGroup(name: string) {
     if (!name.trim()) return;
-    createMutation.mutate({
-      data: { name: name.trim(), startDate: new Date().toISOString().slice(0, 10), trainingType: "physical", capacity: 999, status: "open" },
-    });
+    createMutation.mutate({ data: { name: name.trim(), startDate: new Date().toISOString().slice(0, 10), trainingType: "physical", capacity: 999, status: "open" } });
   }
-
-  const groupsLoading = gLoading || sLoading;
 
   return (
     <AdminLayout>
@@ -457,8 +572,7 @@ export default function Pipeline() {
               <div key={cfg.id} className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden shadow-sm border border-gray-200">
                 <div className={`${cfg.headerBg} px-4 py-3 flex items-center justify-between`}>
                   <h3 className={`font-bold text-sm flex items-center gap-2 ${cfg.headerText}`}>
-                    <span className="w-2 h-2 rounded-full bg-white/70" />
-                    {t.stageLabels[cfg.id]}
+                    <span className="w-2 h-2 rounded-full bg-white/70" />{t.stageLabels[cfg.id]}
                   </h3>
                   <span className="bg-white/20 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">{grouped[cfg.id].length}</span>
                 </div>
@@ -470,8 +584,9 @@ export default function Pipeline() {
                       cfg={cfg}
                       t={t}
                       stages={STAGE_CONFIGS}
+                      groups={groups}
                       onStageChange={(id, stage) => updateStageMutation.mutate({ id, data: { stage } })}
-                      onUpdate={() => queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() })}
+                      onUpdate={() => qc.invalidateQueries({ queryKey: getListStudentsQueryKey() })}
                     />
                   ))}
                   {grouped[cfg.id].length === 0 && (
@@ -484,13 +599,13 @@ export default function Pipeline() {
         )
       )}
 
-      {/* ── Groups/Schedules view ── */}
+      {/* ── Groups view ── */}
       {view === "groups" && (
-        groupsLoading ? (
+        (gLoading || sLoading) ? (
           <div className="flex items-center justify-center h-64 text-muted-foreground">{t.loading}</div>
         ) : (
           <div className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-14rem)] items-start">
-            {/* Unassigned column */}
+            {/* Unassigned */}
             <div className="flex-shrink-0 w-72 rounded-2xl overflow-hidden shadow-sm border border-gray-200 flex flex-col">
               <div className={`${UNASSIGNED_COL.header} px-4 py-3 flex items-center justify-between`}>
                 <h3 className="text-white font-bold text-sm truncate">{t.noSchedule}</h3>
@@ -499,18 +614,16 @@ export default function Pipeline() {
               <div className={`${UNASSIGNED_COL.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-18rem)]`}>
                 {(byGroup.unassigned ?? []).length === 0 ? (
                   <p className="text-xs text-gray-400 text-center py-4">{t.noStudents}</p>
-                ) : (
-                  (byGroup.unassigned ?? []).map((s) => (
-                    <GroupStudentCard key={s.id} student={s} groups={groups} currentGroupId={null} onMove={handleMove} t={t} />
-                  ))
-                )}
+                ) : (byGroup.unassigned ?? []).map((s) => (
+                  <GroupStudentCard key={s.id} student={s} groups={groups} currentGroupId={null} onMove={(id, gid) => assignMutation.mutate({ id, data: { groupId: gid } })} t={t} />
+                ))}
               </div>
             </div>
 
             {/* Group columns */}
             {groups.map((group, idx) => {
               const col = colFor(idx);
-              const groupStudents = byGroup[String(group.id)] ?? [];
+              const gs  = byGroup[String(group.id)] ?? [];
               const isRenaming = renamingId === group.id;
               return (
                 <div key={group.id} className={`flex-shrink-0 w-72 rounded-2xl overflow-hidden shadow-sm border ${col.border} flex flex-col`}>
@@ -522,7 +635,7 @@ export default function Pipeline() {
                         <>
                           <h3 className="text-white font-bold text-sm truncate flex-1">{group.name}</h3>
                           <div className="flex items-center gap-1 flex-shrink-0">
-                            <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">{groupStudents.length}</span>
+                            <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">{gs.length}</span>
                             <button onClick={() => setRenamingId(group.id)} title={t.renameSchedule} className="text-white/70 hover:text-white transition-colors p-0.5 rounded">
                               <Pencil className="w-3 h-3" />
                             </button>
@@ -538,13 +651,11 @@ export default function Pipeline() {
                     {!isRenaming && <p className="text-white/70 text-[11px] mt-0.5 capitalize">{group.status}</p>}
                   </div>
                   <div className={`${col.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-18rem)]`}>
-                    {groupStudents.length === 0 ? (
+                    {gs.length === 0 ? (
                       <p className="text-xs text-gray-400 text-center py-4">{t.noStudents}</p>
-                    ) : (
-                      groupStudents.map((s) => (
-                        <GroupStudentCard key={s.id} student={s} groups={groups} currentGroupId={group.id} onMove={handleMove} t={t} />
-                      ))
-                    )}
+                    ) : gs.map((s) => (
+                      <GroupStudentCard key={s.id} student={s} groups={groups} currentGroupId={group.id} onMove={(id, gid) => assignMutation.mutate({ id, data: { groupId: gid } })} t={t} />
+                    ))}
                   </div>
                 </div>
               );
@@ -556,28 +667,25 @@ export default function Pipeline() {
                 <div className="rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50 p-4">
                   <p className="text-sm font-semibold text-orange-800 mb-2">{t.scheduleNameLabel}</p>
                   <form onSubmit={(e) => { e.preventDefault(); handleCreateGroup(newName); }}>
-                    <input
-                      ref={newInputRef}
-                      autoFocus
-                      value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
+                    <input ref={newInputRef} autoFocus value={newName} onChange={(e) => setNewName(e.target.value)}
                       placeholder={t.scheduleNamePlaceholder}
-                      className="w-full border border-orange-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 mb-2"
-                    />
+                      className="w-full border border-orange-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 mb-2" />
                     <div className="flex gap-2">
-                      <button type="submit" disabled={!newName.trim() || createMutation.isPending} className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg transition-colors">
+                      <button type="submit" disabled={!newName.trim() || createMutation.isPending}
+                        className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg transition-colors">
                         {createMutation.isPending ? "..." : t.create}
                       </button>
-                      <button type="button" onClick={() => { setAddingNew(false); setNewName(""); }} className="px-3 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                      <button type="button" onClick={() => { setAddingNew(false); setNewName(""); }}
+                        className="px-3 py-2 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
                         <X className="w-4 h-4" />
                       </button>
                     </div>
                   </form>
                 </div>
               ) : (
-                <button onClick={() => setAddingNew(true)} className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-transparent hover:border-orange-400 hover:bg-orange-50 transition-all flex items-center justify-center gap-2 px-4 py-6 text-sm font-medium text-gray-500 hover:text-orange-600 group">
-                  <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  {t.addSchedule}
+                <button onClick={() => setAddingNew(true)}
+                  className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-transparent hover:border-orange-400 hover:bg-orange-50 transition-all flex items-center justify-center gap-2 px-4 py-6 text-sm font-medium text-gray-500 hover:text-orange-600 group">
+                  <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />{t.addSchedule}
                 </button>
               )}
             </div>
