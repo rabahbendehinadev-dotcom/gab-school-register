@@ -82,6 +82,11 @@ const translations = {
     delete: "حذف",
     deleteScheduleConfirm: (name: string) =>
       `حذف الجدول "${name}"؟ سيتم نقل الطلاب إلى "بدون جدول".`,
+    returnToPipeline: "إرجاع إلى خط الإنتاج",
+    cannotDeleteNonEmpty: "قم بإفراغ الجدول أولاً قبل الحذف",
+    moveToScheduleBtn: "نقل إلى جدول",
+    newScheduleTitle: "إضافة جدول جديد",
+    pipelineStudentsOnly: "طلاب خط الإنتاج فقط",
   },
   fr: {
     dashboard: "Tableau de Bord",
@@ -162,6 +167,11 @@ const translations = {
     delete: "Supprimer",
     deleteScheduleConfirm: (name: string) =>
       `Supprimer le planning "${name}" ? Les étudiants seront déplacés vers "Sans planning".`,
+    returnToPipeline: "Retour au Pipeline",
+    cannotDeleteNonEmpty: "Videz le planning avant de le supprimer",
+    moveToScheduleBtn: "Déplacer vers un planning",
+    newScheduleTitle: "Nouveau planning",
+    pipelineStudentsOnly: "Étudiants Pipeline uniquement",
   },
 };
 
