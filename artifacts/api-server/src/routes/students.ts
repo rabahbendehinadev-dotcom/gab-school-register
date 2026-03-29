@@ -29,10 +29,10 @@ import "../types/session";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-function gcsPathParts(gcsPath: string): { bucketName: string; objectName: string } {
-  const without = gcsPath.replace(/^gs:\/\//, "");
-  const slash = without.indexOf("/");
-  return { bucketName: without.slice(0, slash), objectName: without.slice(slash + 1) };
+function parseStoragePath(path: string): { bucketName: string; objectName: string } {
+  if (!path.startsWith("/")) path = `/${path}`;
+  const parts = path.split("/");
+  return { bucketName: parts[1], objectName: parts.slice(2).join("/") };
 }
 
 const router: IRouter = Router();
@@ -308,7 +308,7 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
   try {
     const objectId = randomUUID();
     const fullGcsPath = `${privateDir}/uploads/${objectId}`;
-    const { bucketName, objectName } = gcsPathParts(fullGcsPath);
+    const { bucketName, objectName } = parseStoragePath(fullGcsPath);
 
     await objectStorageClient.bucket(bucketName).file(objectName).save(req.file.buffer, {
       contentType: req.file.mimetype,

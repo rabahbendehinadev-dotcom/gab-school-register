@@ -389,6 +389,14 @@ export const ListStudentsHousingNeeded = {
   false: "false",
 } as const;
 
+export type UploadStudentReceiptBody = {
+  receipt: Blob;
+};
+
+export type UploadStudentReceipt200 = {
+  receiptUrl: string;
+};
+
 export type ListActivityParams = {
   limit?: number;
   offset?: number;

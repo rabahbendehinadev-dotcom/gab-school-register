@@ -48,5 +48,7 @@ export * from "./updateStudentBodyPaymentStatus";
 export * from "./updateStudentBodyStage";
 export * from "./updateStudentBodyTrainingType";
 export * from "./uploadGalleryImageBody";
+export * from "./uploadStudentReceipt200";
+export * from "./uploadStudentReceiptBody";
 export * from "./uploadUrlRequest";
 export * from "./uploadUrlResponse";

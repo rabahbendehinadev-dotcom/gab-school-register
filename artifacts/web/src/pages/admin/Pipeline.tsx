@@ -346,7 +346,7 @@ function StudentCard({
           {localPaymentStatus === "paid" ? (
             <div className="flex items-center justify-center gap-2 bg-green-100 text-green-700 font-semibold text-xs rounded-lg py-2 border border-green-200">
               <CheckCircle2 className="w-4 h-4" />
-              {lang === "fr" ? "Paiement complet ✅" : "مدفوع ✅"}
+              {t.paidBadge}
             </div>
           ) : localPaymentStatus === "deposited" ? (
             <button
@@ -354,7 +354,7 @@ function StudentCard({
               className="w-full flex items-center justify-center gap-2 bg-white border-2 border-green-400 text-green-700 font-semibold text-xs rounded-lg py-2 hover:bg-green-50 transition-colors"
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              {lang === "fr" ? "Paiement complet ?" : "مدفوع كامل؟"}
+              {t.markPaid}
             </button>
           ) : (
             <button
@@ -362,24 +362,24 @@ function StudentCard({
               className="w-full flex items-center justify-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-900 font-semibold text-xs rounded-lg py-2 transition-colors"
             >
               <DollarSign className="w-3.5 h-3.5" />
-              {lang === "fr" ? "Dépôt payé 💰" : "تم إيداع المبلغ 💰"}
+              {t.depositPaidBadge}
             </button>
           )}
         </div>
       )}
 
-      {/* Payment badge for interested and beyond (excluding the interactive button which handles it for interested) */}
-      {!isInterested && ["interested", "no_show", "archived"].includes(student.stage) && localPaymentStatus !== "unpaid" && (
+      {/* Payment badge for no_show/archived stages when payment was made */}
+      {!isInterested && ["no_show", "archived"].includes(student.stage) && localPaymentStatus !== "unpaid" && (
         <div className="mt-3">
           {localPaymentStatus === "paid" ? (
             <div className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 text-xs font-semibold rounded-lg py-1.5 border border-green-200">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              {lang === "fr" ? "Paiement complet ✅" : "مدفوع ✅"}
+              {t.paidBadge}
             </div>
           ) : (
             <div className="flex items-center justify-center gap-1.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-lg py-1.5 border border-yellow-200">
               <DollarSign className="w-3.5 h-3.5" />
-              {lang === "fr" ? "Dépôt payé 💰" : "تم الإيداع 💰"}
+              {t.depositPaidBadge}
             </div>
           )}
         </div>

@@ -38,6 +38,8 @@ import type {
   UpdateStageBody,
   UpdateStudentBody,
   UploadGalleryImageBody,
+  UploadStudentReceipt200,
+  UploadStudentReceiptBody,
   UploadUrlRequest,
   UploadUrlResponse,
 } from "./api.schemas";
@@ -964,6 +966,96 @@ export const useAssignStudentToGroup = <
   TContext
 > => {
   return useMutation(getAssignStudentToGroupMutationOptions(options));
+};
+
+/**
+ * @summary Upload payment receipt for a student
+ */
+export const getUploadStudentReceiptUrl = (id: number) => {
+  return `/api/students/${id}/receipt`;
+};
+
+export const uploadStudentReceipt = async (
+  id: number,
+  uploadStudentReceiptBody: UploadStudentReceiptBody,
+  options?: RequestInit,
+): Promise<UploadStudentReceipt200> => {
+  const formData = new FormData();
+  formData.append(`receipt`, uploadStudentReceiptBody.receipt);
+
+  return customFetch<UploadStudentReceipt200>(getUploadStudentReceiptUrl(id), {
+    ...options,
+    method: "POST",
+    body: formData,
+  });
+};
+
+export const getUploadStudentReceiptMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadStudentReceipt>>,
+    TError,
+    { id: number; data: BodyType<UploadStudentReceiptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof uploadStudentReceipt>>,
+  TError,
+  { id: number; data: BodyType<UploadStudentReceiptBody> },
+  TContext
+> => {
+  const mutationKey = ["uploadStudentReceipt"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof uploadStudentReceipt>>,
+    { id: number; data: BodyType<UploadStudentReceiptBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return uploadStudentReceipt(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type UploadStudentReceiptMutationResult = NonNullable<
+  Awaited<ReturnType<typeof uploadStudentReceipt>>
+>;
+export type UploadStudentReceiptMutationBody =
+  BodyType<UploadStudentReceiptBody>;
+export type UploadStudentReceiptMutationError = ErrorType<void>;
+
+/**
+ * @summary Upload payment receipt for a student
+ */
+export const useUploadStudentReceipt = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof uploadStudentReceipt>>,
+    TError,
+    { id: number; data: BodyType<UploadStudentReceiptBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof uploadStudentReceipt>>,
+  TError,
+  { id: number; data: BodyType<UploadStudentReceiptBody> },
+  TContext
+> => {
+  return useMutation(getUploadStudentReceiptMutationOptions(options));
 };
 
 /**

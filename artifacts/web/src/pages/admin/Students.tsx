@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useAuth } from "@/hooks/use-auth";
+import { useI18n } from "@/contexts/i18n-context";
 import { 
   useListStudents, useDeleteStudent, useUpdateStudent, useUpdateStudentStage, 
   useAssignStudentToGroup, useListGroups, getListStudentsQueryKey,
@@ -34,11 +35,6 @@ const PAYMENT_COLORS: Record<string, string> = {
   paid: "bg-green-100 text-green-700 border-green-200",
 };
 
-const PAYMENT_LABELS: Record<string, string> = {
-  unpaid: "لم يدفع",
-  deposited: "تم الإيداع 💰",
-  paid: "مدفوع ✅",
-};
 
 export default function Students() {
   const searchParams = useSearch();
@@ -394,6 +390,7 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
   student: Student | null; onClose: () => void;
   onSave: (id: number, data: UpdateStudentBody) => void; isPending: boolean;
 }) {
+  const { t } = useI18n();
   const form = useForm<UpdateStudentBody>();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -434,9 +431,9 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
       const { receiptUrl } = await res.json();
       setReceiptPreview(receiptUrl);
       onSave(student.id, { receiptUrl });
-      toast({ title: "تم رفع الوصل بنجاح" });
+      toast({ title: t.receiptUploaded });
     } catch (e) {
-      toast({ title: "خطأ في رفع الوصل", variant: "destructive" });
+      toast({ title: t.receiptError, variant: "destructive" });
     } finally {
       setUploading(false);
     }
@@ -539,7 +536,7 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
                   className="w-full border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center gap-2 hover:bg-muted/30 transition-colors text-muted-foreground text-sm"
                 >
                   <Upload className="w-5 h-5" />
-                  {uploading ? "جاري الرفع..." : "رفع وصل الدفع"}
+                  {uploading ? t.uploading : t.receiptUpload}
                 </button>
               )}
               <input

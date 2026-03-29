@@ -237,6 +237,21 @@ export const AssignStudentToGroupResponse = zod.object({
 });
 
 /**
+ * @summary Upload payment receipt for a student
+ */
+export const UploadStudentReceiptParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UploadStudentReceiptBody = zod.object({
+  receipt: zod.instanceof(File),
+});
+
+export const UploadStudentReceiptResponse = zod.object({
+  receiptUrl: zod.string(),
+});
+
+/**
  * @summary List all groups
  */
 export const ListGroupsResponseItem = zod.object({

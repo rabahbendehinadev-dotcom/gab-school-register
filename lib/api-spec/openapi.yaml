@@ -257,6 +257,46 @@ paths:
         "404":
           description: Not found
 
+  /students/{id}/receipt:
+    post:
+      operationId: uploadStudentReceipt
+      tags: [students]
+      summary: Upload payment receipt for a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [receipt]
+              properties:
+                receipt:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: Receipt uploaded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [receiptUrl]
+                properties:
+                  receiptUrl:
+                    type: string
+        "400":
+          description: No file provided
+        "404":
+          description: Student not found
+        "500":
+          description: Upload failed
+
   /groups:
     get:
       operationId: listGroups
