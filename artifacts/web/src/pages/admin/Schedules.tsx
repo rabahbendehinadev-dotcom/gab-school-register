@@ -34,20 +34,6 @@ const STAGE_COLORS: Record<string, string> = {
   archived: "bg-gray-400",
 };
 
-const STAGE_LABELS_AR: Record<string, string> = {
-  new: "جديد",
-  contacted: "تم التواصل",
-  interested: "مهتم",
-  no_show: "لم يحضر",
-  archived: "مؤرشف",
-};
-const STAGE_LABELS_FR: Record<string, string> = {
-  new: "Nouveau",
-  contacted: "Contacté",
-  interested: "Intéressé",
-  no_show: "Absent",
-  archived: "Archivé",
-};
 
 const COLUMN_PALETTE = [
   { header: "bg-violet-600", light: "bg-violet-50", border: "border-violet-200", badge: "bg-violet-100 text-violet-700" },
@@ -86,9 +72,7 @@ function StudentCard({
   onMove: (studentId: number, groupId: number | null) => void;
   t: ReturnType<typeof useI18n>["t"];
 }) {
-  const stageLabel = lang === "fr"
-    ? (STAGE_LABELS_FR[student.stage] ?? student.stage)
-    : (STAGE_LABELS_AR[student.stage] ?? student.stage);
+  const stageLabel = t.stageLabels[student.stage as keyof typeof t.stageLabels] ?? student.stage;
   const stageDot = STAGE_COLORS[student.stage] ?? "bg-gray-400";
   const fullName = `${student.firstName} ${student.lastName}`;
 
@@ -132,7 +116,7 @@ function StudentCard({
           {stageLabel}
         </span>
         <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-          {student.trainingType === "online" ? (lang === "fr" ? "En ligne" : "أونلاين") : (lang === "fr" ? "Présentiel" : "حضوري")}
+          {student.trainingType === "online" ? t.online : t.physical}
         </span>
       </div>
     </div>
@@ -196,7 +180,7 @@ export default function Schedules() {
         qc.invalidateQueries({ queryKey: getListStudentsQueryKey() });
         qc.invalidateQueries({ queryKey: getListGroupsQueryKey() });
       },
-      onError: () => toast({ title: lang === "fr" ? "Erreur de déplacement" : "خطأ في النقل", variant: "destructive" }),
+      onError: () => toast({ title: t.errorMoving, variant: "destructive" }),
     },
   });
 
@@ -207,14 +191,14 @@ export default function Schedules() {
         setAddingNew(false);
         setNewName("");
       },
-      onError: () => toast({ title: lang === "fr" ? "Erreur de création" : "خطأ في الإنشاء", variant: "destructive" }),
+      onError: () => toast({ title: t.errorCreating, variant: "destructive" }),
     },
   });
 
   const updateMutation = useUpdateGroup({
     mutation: {
       onSuccess: () => qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }),
-      onError: () => toast({ title: lang === "fr" ? "Erreur de mise à jour" : "خطأ في التعديل", variant: "destructive" }),
+      onError: () => toast({ title: t.errorUpdating, variant: "destructive" }),
     },
   });
 
@@ -224,7 +208,7 @@ export default function Schedules() {
         qc.invalidateQueries({ queryKey: getListGroupsQueryKey() });
         qc.invalidateQueries({ queryKey: getListStudentsQueryKey() });
       },
-      onError: () => toast({ title: lang === "fr" ? "Erreur de suppression" : "خطأ في الحذف", variant: "destructive" }),
+      onError: () => toast({ title: t.errorDeleting, variant: "destructive" }),
     },
   });
 
@@ -245,10 +229,7 @@ export default function Schedules() {
   }
 
   function handleDelete(group: Group) {
-    if (!confirm(lang === "fr"
-      ? `Supprimer le planning "${group.name}" ? Les étudiants seront déplacés vers "Sans planning".`
-      : `حذف الجدول "${group.name}"؟ سيتم نقل الطلاب إلى "بدون جدول".`
-    )) return;
+    if (!confirm(t.deleteScheduleConfirm(group.name))) return;
     deleteMutation.mutate({ id: group.id });
   }
 
@@ -283,7 +264,7 @@ export default function Schedules() {
     <AdminLayout>
       {isLoading ? (
         <div className="flex items-center justify-center h-64 text-muted-foreground">
-          {lang === "fr" ? "Chargement..." : "جاري التحميل..."}
+          {t.loading}
         </div>
       ) : (
         <div className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-12rem)] items-start">
@@ -298,7 +279,7 @@ export default function Schedules() {
             </div>
             <div className={`${UNASSIGNED_COL.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-16rem)]`}>
               {(byGroup.unassigned ?? []).length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">{lang === "fr" ? "Aucun étudiant" : "لا يوجد طلاب"}</p>
+                <p className="text-xs text-gray-400 text-center py-4">{t.noStudents}</p>
               ) : (
                 (byGroup.unassigned ?? []).map((s) => (
                   <StudentCard
@@ -348,7 +329,7 @@ export default function Schedules() {
                           {isAdmin && (
                             <button
                               onClick={() => handleDelete(group)}
-                              title={lang === "fr" ? "Supprimer" : "حذف"}
+                              title={t.delete}
                               className="text-white/70 hover:text-red-200 transition-colors p-0.5 rounded"
                             >
                               <Trash2 className="w-3 h-3" />
@@ -365,7 +346,7 @@ export default function Schedules() {
 
                 <div className={`${col.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-16rem)]`}>
                   {students.length === 0 ? (
-                    <p className="text-xs text-gray-400 text-center py-4">{lang === "fr" ? "Aucun étudiant" : "لا يوجد طلاب"}</p>
+                    <p className="text-xs text-gray-400 text-center py-4">{t.noStudents}</p>
                   ) : (
                     students.map((s) => (
                       <StudentCard
@@ -389,7 +370,7 @@ export default function Schedules() {
             {addingNew ? (
               <div className="rounded-2xl border-2 border-dashed border-orange-300 bg-orange-50 p-4">
                 <p className="text-sm font-semibold text-orange-800 mb-2">
-                  {lang === "fr" ? "Nom du planning" : "اسم الجدول"}
+                  {t.scheduleNameLabel}
                 </p>
                 <form
                   onSubmit={(e) => {
@@ -402,7 +383,7 @@ export default function Schedules() {
                     autoFocus
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
-                    placeholder={lang === "fr" ? "Ex: Groupe A" : "مثال: المجموعة أ"}
+                    placeholder={t.scheduleNamePlaceholder}
                     className="w-full border border-orange-300 bg-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 mb-2"
                   />
                   <div className="flex gap-2">
@@ -411,7 +392,7 @@ export default function Schedules() {
                       disabled={!newName.trim() || createMutation.isPending}
                       className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white text-xs font-semibold py-2 rounded-lg transition-colors"
                     >
-                      {createMutation.isPending ? "..." : (lang === "fr" ? "Créer" : "إنشاء")}
+                      {createMutation.isPending ? "..." : t.create}
                     </button>
                     <button
                       type="button"

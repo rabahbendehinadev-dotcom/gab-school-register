@@ -70,6 +70,18 @@ const translations = {
     addSchedule: "إضافة جدول جديد",
     moveToSchedule: "نقل إلى...",
     renameSchedule: "تعديل الاسم",
+    loading: "جاري التحميل...",
+    noStudents: "لا يوجد طلاب",
+    errorMoving: "خطأ في النقل",
+    errorCreating: "خطأ في الإنشاء",
+    errorUpdating: "خطأ في التعديل",
+    errorDeleting: "خطأ في الحذف",
+    scheduleNameLabel: "اسم الجدول",
+    scheduleNamePlaceholder: "مثال: المجموعة أ",
+    create: "إنشاء",
+    delete: "حذف",
+    deleteScheduleConfirm: (name: string) =>
+      `حذف الجدول "${name}"؟ سيتم نقل الطلاب إلى "بدون جدول".`,
   },
   fr: {
     dashboard: "Tableau de Bord",
@@ -138,6 +150,18 @@ const translations = {
     addSchedule: "Nouveau planning",
     moveToSchedule: "Déplacer vers...",
     renameSchedule: "Renommer",
+    loading: "Chargement...",
+    noStudents: "Aucun étudiant",
+    errorMoving: "Erreur de déplacement",
+    errorCreating: "Erreur de création",
+    errorUpdating: "Erreur de mise à jour",
+    errorDeleting: "Erreur de suppression",
+    scheduleNameLabel: "Nom du planning",
+    scheduleNamePlaceholder: "Ex: Groupe A",
+    create: "Créer",
+    delete: "Supprimer",
+    deleteScheduleConfirm: (name: string) =>
+      `Supprimer le planning "${name}" ? Les étudiants seront déplacés vers "Sans planning".`,
   },
 };
 
