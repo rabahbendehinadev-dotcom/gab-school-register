@@ -34,7 +34,7 @@ import {
   Phone, MapPin, MoreHorizontal, MessageCircle, ChevronDown,
   DollarSign, CheckCircle2, Pencil, Trash2, Plus, Check, X,
   Upload, ImageIcon, Loader2, CalendarDays, ArrowLeftCircle,
-  GripVertical,
+  GripVertical, StickyNote,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -140,11 +140,13 @@ function StageStudentCard({ student, cfg, t, stages, groups, onStageChange, onUp
   const [localPaymentStatus, setLocalPaymentStatus] = useState<"unpaid"|"deposited"|"paid">((student.paymentStatus as "unpaid"|"deposited"|"paid") ?? "unpaid");
   const [showNewGroup, setShowNewGroup]             = useState(false);
   const [newGroupName, setNewGroupName]             = useState("");
+  const [showNote, setShowNote]                     = useState(!!student.note);
   const noteRef      = useRef<HTMLTextAreaElement>(null);
   const newGroupRef  = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { if (showNewGroup) newGroupRef.current?.focus(); }, [showNewGroup]);
+  useEffect(() => { if (showNote && !student.note) noteRef.current?.focus(); }, [showNote]);
 
   const fullName      = `${student.firstName} ${student.lastName}`;
   const waMsg         = getWhatsAppMsg(student.stage as StudentStage, fullName, t, localReason);
@@ -266,7 +268,7 @@ function StageStudentCard({ student, cfg, t, stages, groups, onStageChange, onUp
 
       {/* Contacted extras */}
       {isContacted && (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="w-full flex items-center justify-between gap-2 bg-white border border-orange-200 rounded-lg px-3 py-2 text-xs font-medium text-gray-700 hover:bg-orange-50 transition-colors">
@@ -288,15 +290,6 @@ function StageStudentCard({ student, cfg, t, stages, groups, onStageChange, onUp
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
-          <textarea
-            ref={noteRef}
-            value={localNote}
-            onChange={(e) => setLocalNote(e.target.value)}
-            onBlur={handleNoteBlur}
-            placeholder={lang === "fr" ? "Ajouter une note..." : "أضف ملاحظة..."}
-            rows={2}
-            className="w-full text-xs rounded-lg border border-orange-200 bg-white px-3 py-2 resize-none placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-300 transition"
-          />
         </div>
       )}
 
@@ -357,6 +350,33 @@ function StageStudentCard({ student, cfg, t, stages, groups, onStageChange, onUp
         </div>
       )}
 
+      {/* ── Universal Notes section ── */}
+      <div className="mt-3">
+        <button
+          onClick={() => setShowNote((p) => !p)}
+          className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors ${showNote ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}`}
+        >
+          <StickyNote className="w-3.5 h-3.5 flex-shrink-0" />
+          {localNote && !showNote ? (
+            <span className="truncate text-left">{localNote}</span>
+          ) : (
+            <span>{lang === "fr" ? "Note" : "ملاحظة"}</span>
+          )}
+          {localNote && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0 mr-auto" />}
+        </button>
+        {showNote && (
+          <textarea
+            ref={noteRef}
+            value={localNote}
+            onChange={(e) => setLocalNote(e.target.value)}
+            onBlur={handleNoteBlur}
+            placeholder={lang === "fr" ? "Ajouter une note..." : "أضف ملاحظة..."}
+            rows={3}
+            className="mt-1.5 w-full text-xs rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 resize-none placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition"
+          />
+        )}
+      </div>
+
       {/* Footer */}
       <div className="mt-3 pt-3 border-t border-black/10 flex justify-between items-center gap-2">
         <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md ${cfg.badgeBg}`}>
@@ -391,17 +411,40 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
   t: ReturnType<typeof useI18n>["t"];
   dragHandleProps?: Record<string, unknown>;
 }) {
+  const { lang } = useI18n();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const updateMutation = useUpdateStudent({
+    mutation: { onError: () => toast({ title: t.errorUpdating, variant: "destructive" }) },
+  });
+
+  const [localNote, setLocalNote] = useState(student.note ?? "");
+  const [showNote, setShowNote]   = useState(!!student.note);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => { if (showNote && !student.note) noteRef.current?.focus(); }, [showNote]);
+
+  function handleNoteBlur() {
+    if (localNote !== (student.note ?? "")) {
+      updateMutation.mutate(
+        { id: student.id, data: { note: localNote || null } },
+        { onSuccess: () => qc.invalidateQueries({ queryKey: getListStudentsQueryKey() }) },
+      );
+    }
+  }
+
   const stageLabel = t.stageLabels[student.stage as keyof typeof t.stageLabels] ?? student.stage;
   const stageDot   = STAGE_COLORS[student.stage] ?? "bg-gray-400";
   const fullName   = `${student.firstName} ${student.lastName}`;
   const others     = groups.filter((g) => g.id !== currentGroupId);
 
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group select-none">
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-1.5 flex-1 min-w-0">
           {/* Drag handle */}
-          <span {...(dragHandleProps ?? {})} className="text-gray-300 hover:text-gray-500 flex-shrink-0 cursor-grab active:cursor-grabbing touch-manipulation">
+          <span {...(dragHandleProps ?? {})} className="text-gray-300 hover:text-gray-500 flex-shrink-0 cursor-grab active:cursor-grabbing touch-manipulation select-none">
             <GripVertical className="w-4 h-4" />
           </span>
           <p className="font-semibold text-sm text-gray-800 leading-tight truncate">{fullName}</p>
@@ -451,14 +494,41 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
         )}
       </div>
 
-      {/* Receipt link if available */}
+      {/* Receipt link */}
       {student.receiptUrl && (
         <a href={student.receiptUrl} target="_blank" rel="noopener noreferrer"
           className="mt-2 flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 underline">
           <ImageIcon className="w-3 h-3" />
-          {t.receiptUpload}
+          {lang === "fr" ? "Voir le reçu" : "عرض الوصل"}
         </a>
       )}
+
+      {/* ── Notes section ── */}
+      <div className="mt-2">
+        <button
+          onClick={() => setShowNote((p) => !p)}
+          className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors ${showNote ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}`}
+        >
+          <StickyNote className="w-3.5 h-3.5 flex-shrink-0" />
+          {localNote && !showNote ? (
+            <span className="truncate text-left">{localNote}</span>
+          ) : (
+            <span>{lang === "fr" ? "Note" : "ملاحظة"}</span>
+          )}
+          {localNote && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0 mr-auto" />}
+        </button>
+        {showNote && (
+          <textarea
+            ref={noteRef}
+            value={localNote}
+            onChange={(e) => setLocalNote(e.target.value)}
+            onBlur={handleNoteBlur}
+            placeholder={lang === "fr" ? "Ajouter une note..." : "أضف ملاحظة..."}
+            rows={3}
+            className="mt-1.5 w-full text-xs rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 resize-none placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition select-text"
+          />
+        )}
+      </div>
     </div>
   );
 }
