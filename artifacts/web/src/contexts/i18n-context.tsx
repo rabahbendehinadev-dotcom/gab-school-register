@@ -54,7 +54,7 @@ const translations = {
     },
     paymentLabels: {
       unpaid: "غير مدفوع",
-      deposit_paid: "تم الإيداع 💰",
+      deposited: "تم الإيداع 💰",
       paid: "مدفوع ✅",
     },
     depositPaidBadge: "تم الإيداع 💰",
@@ -117,7 +117,7 @@ const translations = {
     },
     paymentLabels: {
       unpaid: "Non payé",
-      deposit_paid: "Dépôt payé 💰",
+      deposited: "Dépôt payé 💰",
       paid: "Paiement complet ✅",
     },
     depositPaidBadge: "Dépôt payé 💰",

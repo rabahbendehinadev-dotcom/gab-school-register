@@ -293,7 +293,7 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
 });
 
 router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.single("receipt"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id), 10);
   if (!req.file) {
     res.status(400).json({ error: "No file provided" });
     return;
@@ -315,7 +315,7 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
       resumable: false,
     });
 
-    const serveUrl = `/api/storage/objects/uploads/${objectId}`;
+    const serveUrl = `/api/storage/receipts/${objectId}`;
 
     const [student] = await db
       .update(studentsTable)

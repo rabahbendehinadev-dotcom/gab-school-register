@@ -52,6 +52,30 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Respon
   }
 });
 
+router.get("/storage/receipts/:uuid", async (req: Request, res: Response) => {
+  try {
+    const uuid = String(req.params.uuid);
+    const objectPath = `/objects/uploads/${uuid}`;
+    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+    const response = await objectStorageService.downloadObject(objectFile, 86400);
+    res.status(response.status);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    if (response.body) {
+      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
+      nodeStream.pipe(res);
+    } else {
+      res.end();
+    }
+  } catch (error) {
+    if (error instanceof ObjectNotFoundError) {
+      res.status(404).json({ error: "Receipt not found" });
+      return;
+    }
+    console.error("Error serving receipt", error);
+    res.status(500).json({ error: "Failed to serve receipt" });
+  }
+});
+
 router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
   try {
     const raw = req.params.path;
