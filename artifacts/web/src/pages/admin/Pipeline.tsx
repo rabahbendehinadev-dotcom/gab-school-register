@@ -368,6 +368,23 @@ function StudentCard({
         </div>
       )}
 
+      {/* Payment badge for interested and beyond (excluding the interactive button which handles it for interested) */}
+      {!isInterested && ["interested", "no_show", "archived"].includes(student.stage) && localPaymentStatus !== "unpaid" && (
+        <div className="mt-3">
+          {localPaymentStatus === "paid" ? (
+            <div className="flex items-center justify-center gap-1.5 bg-green-100 text-green-700 text-xs font-semibold rounded-lg py-1.5 border border-green-200">
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {lang === "fr" ? "Paiement complet ✅" : "مدفوع ✅"}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-1.5 bg-yellow-100 text-yellow-700 text-xs font-semibold rounded-lg py-1.5 border border-yellow-200">
+              <DollarSign className="w-3.5 h-3.5" />
+              {lang === "fr" ? "Dépôt payé 💰" : "تم الإيداع 💰"}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Footer */}
       <div className="mt-3 pt-3 border-t border-black/10 flex justify-between items-center gap-2">
         <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 rounded-md ${cfg.badgeBg}`}>

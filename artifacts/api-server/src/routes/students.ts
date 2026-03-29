@@ -22,7 +22,18 @@ import {
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import { sendTelegramNotification } from "../lib/telegram";
+import { objectStorageClient } from "../lib/objectStorage";
+import multer from "multer";
+import { randomUUID } from "crypto";
 import "../types/session";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+function gcsPathParts(gcsPath: string): { bucketName: string; objectName: string } {
+  const without = gcsPath.replace(/^gs:\/\//, "");
+  const slash = without.indexOf("/");
+  return { bucketName: without.slice(0, slash), objectName: without.slice(slash + 1) };
+}
 
 const router: IRouter = Router();
 
@@ -279,6 +290,49 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
   );
 
   res.json(AssignStudentToGroupResponse.parse(student));
+});
+
+router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.single("receipt"), async (req, res): Promise<void> => {
+  const id = parseInt(req.params.id);
+  if (!req.file) {
+    res.status(400).json({ error: "No file provided" });
+    return;
+  }
+
+  const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
+  if (!privateDir) {
+    res.status(500).json({ error: "Storage not configured" });
+    return;
+  }
+
+  try {
+    const objectId = randomUUID();
+    const fullGcsPath = `${privateDir}/uploads/${objectId}`;
+    const { bucketName, objectName } = gcsPathParts(fullGcsPath);
+
+    await objectStorageClient.bucket(bucketName).file(objectName).save(req.file.buffer, {
+      contentType: req.file.mimetype,
+      resumable: false,
+    });
+
+    const serveUrl = `/api/storage/objects/uploads/${objectId}`;
+
+    const [student] = await db
+      .update(studentsTable)
+      .set({ receiptUrl: serveUrl })
+      .where(eq(studentsTable.id, id))
+      .returning();
+
+    if (!student) {
+      res.status(404).json({ error: "Student not found" });
+      return;
+    }
+
+    res.json({ receiptUrl: serveUrl });
+  } catch (error) {
+    console.error("Receipt upload error:", error);
+    res.status(500).json({ error: "Upload failed" });
+  }
 });
 
 router.get("/stats", requireRole("admin", "manager"), async (_req, res): Promise<void> => {

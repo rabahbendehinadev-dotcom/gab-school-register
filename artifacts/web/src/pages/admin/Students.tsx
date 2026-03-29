@@ -421,25 +421,19 @@ function StudentDetailDialog({ student, onClose, onSave, isPending }: {
     if (!student) return;
     setUploading(true);
     try {
-      const urlRes = await fetch("/api/storage/uploads/request-url", {
+      const formData = new FormData();
+      formData.append("receipt", file);
+
+      const res = await fetch(`/api/students/${student.id}/receipt`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: file.name, size: file.size, contentType: file.type }),
+        body: formData,
         credentials: "include",
       });
-      if (!urlRes.ok) throw new Error("Failed to get upload URL");
-      const { uploadURL, objectPath } = await urlRes.json();
+      if (!res.ok) throw new Error("Upload failed");
 
-      const putRes = await fetch(uploadURL, {
-        method: "PUT",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!putRes.ok) throw new Error("Failed to upload file");
-
-      const serveUrl = `/api/storage${objectPath}`;
-      setReceiptPreview(serveUrl);
-      onSave(student.id, { receiptUrl: serveUrl });
+      const { receiptUrl } = await res.json();
+      setReceiptPreview(receiptUrl);
+      onSave(student.id, { receiptUrl });
       toast({ title: "تم رفع الوصل بنجاح" });
     } catch (e) {
       toast({ title: "خطأ في رفع الوصل", variant: "destructive" });
