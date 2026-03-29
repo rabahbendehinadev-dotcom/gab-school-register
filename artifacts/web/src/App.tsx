@@ -16,7 +16,6 @@ import Staff from "@/pages/admin/Staff";
 import Activity from "@/pages/admin/Activity";
 import Gallery from "@/pages/admin/Gallery";
 import OpenDay from "@/pages/admin/OpenDay";
-import Schedules from "@/pages/admin/Schedules";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -40,7 +39,6 @@ function Router() {
       {/* Admin Protected Routes wrapped in AuthProvider logic inside AdminLayout */}
       <Route path="/gab-c7x2p" component={Dashboard} />
       <Route path="/gab-c7x2p/pipeline" component={Pipeline} />
-      <Route path="/gab-c7x2p/schedules" component={Schedules} />
       <Route path="/gab-c7x2p/students" component={Students} />
       <Route path="/gab-c7x2p/groups" component={Groups} />
       <Route path="/gab-c7x2p/staff" component={Staff} />
