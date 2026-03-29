@@ -735,6 +735,7 @@ components:
         paymentStatus:
           type: string
           enum: [unpaid, deposited, paid]
+          default: unpaid
         receiptUrl:
           type: ["string", "null"]
         stage:
@@ -824,6 +825,7 @@ components:
         paymentStatus:
           type: string
           enum: [unpaid, deposited, paid]
+          default: unpaid
         receiptUrl:
           type: ["string", "null"]
         stage:

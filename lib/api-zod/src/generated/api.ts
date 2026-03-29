@@ -53,6 +53,8 @@ export const ListStudentsQueryParams = zod.object({
   housingNeeded: zod.enum(["true", "false"]).optional(),
 });
 
+export const listStudentsResponsePaymentStatusDefault = `unpaid`;
+
 export const ListStudentsResponseItem = zod.object({
   id: zod.number(),
   firstName: zod.string(),
@@ -66,7 +68,9 @@ export const ListStudentsResponseItem = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
-  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  paymentStatus: zod
+    .enum(["unpaid", "deposited", "paid"])
+    .default(listStudentsResponsePaymentStatusDefault),
   receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
@@ -97,6 +101,8 @@ export const GetStudentParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getStudentResponsePaymentStatusDefault = `unpaid`;
+
 export const GetStudentResponse = zod.object({
   id: zod.number(),
   firstName: zod.string(),
@@ -110,7 +116,9 @@ export const GetStudentResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
-  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  paymentStatus: zod
+    .enum(["unpaid", "deposited", "paid"])
+    .default(getStudentResponsePaymentStatusDefault),
   receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
@@ -125,6 +133,8 @@ export const UpdateStudentParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const updateStudentBodyPaymentStatusDefault = `unpaid`;
+
 export const UpdateStudentBody = zod.object({
   firstName: zod.string().optional(),
   lastName: zod.string().optional(),
@@ -137,12 +147,16 @@ export const UpdateStudentBody = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
-  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]).optional(),
+  paymentStatus: zod
+    .enum(["unpaid", "deposited", "paid"])
+    .default(updateStudentBodyPaymentStatusDefault),
   receiptUrl: zod.string().nullish(),
   stage: zod
     .enum(["new", "contacted", "interested", "no_show", "archived"])
     .optional(),
 });
+
+export const updateStudentResponsePaymentStatusDefault = `unpaid`;
 
 export const UpdateStudentResponse = zod.object({
   id: zod.number(),
@@ -157,7 +171,9 @@ export const UpdateStudentResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
-  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  paymentStatus: zod
+    .enum(["unpaid", "deposited", "paid"])
+    .default(updateStudentResponsePaymentStatusDefault),
   receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
@@ -183,6 +199,8 @@ export const UpdateStudentStageBody = zod.object({
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
 });
 
+export const updateStudentStageResponsePaymentStatusDefault = `unpaid`;
+
 export const UpdateStudentStageResponse = zod.object({
   id: zod.number(),
   firstName: zod.string(),
@@ -196,7 +214,9 @@ export const UpdateStudentStageResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
-  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  paymentStatus: zod
+    .enum(["unpaid", "deposited", "paid"])
+    .default(updateStudentStageResponsePaymentStatusDefault),
   receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
@@ -215,6 +235,8 @@ export const AssignStudentToGroupBody = zod.object({
   groupId: zod.number().nullable(),
 });
 
+export const assignStudentToGroupResponsePaymentStatusDefault = `unpaid`;
+
 export const AssignStudentToGroupResponse = zod.object({
   id: zod.number(),
   firstName: zod.string(),
@@ -228,7 +250,9 @@ export const AssignStudentToGroupResponse = zod.object({
   note: zod.string().nullish(),
   contactReason: zod.string().nullish(),
   depositPaid: zod.boolean().optional(),
-  paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+  paymentStatus: zod
+    .enum(["unpaid", "deposited", "paid"])
+    .default(assignStudentToGroupResponsePaymentStatusDefault),
   receiptUrl: zod.string().nullish(),
   stage: zod.enum(["new", "contacted", "interested", "no_show", "archived"]),
   groupId: zod.number().nullish(),
@@ -286,6 +310,8 @@ export const GetGroupParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const getGroupResponseStudentsItemPaymentStatusDefault = `unpaid`;
+
 export const GetGroupResponse = zod.object({
   id: zod.number(),
   name: zod.string(),
@@ -310,7 +336,9 @@ export const GetGroupResponse = zod.object({
       note: zod.string().nullish(),
       contactReason: zod.string().nullish(),
       depositPaid: zod.boolean().optional(),
-      paymentStatus: zod.enum(["unpaid", "deposited", "paid"]),
+      paymentStatus: zod
+        .enum(["unpaid", "deposited", "paid"])
+        .default(getGroupResponseStudentsItemPaymentStatusDefault),
       receiptUrl: zod.string().nullish(),
       stage: zod.enum([
         "new",

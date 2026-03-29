@@ -305,6 +305,12 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
     return;
   }
 
+  const [existing] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.id, id));
+  if (!existing) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
   try {
     const objectId = randomUUID();
     const fullGcsPath = `${privateDir}/uploads/${objectId}`;
@@ -317,16 +323,10 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
 
     const serveUrl = `/api/storage/receipts/${objectId}`;
 
-    const [student] = await db
+    await db
       .update(studentsTable)
       .set({ receiptUrl: serveUrl })
-      .where(eq(studentsTable.id, id))
-      .returning();
-
-    if (!student) {
-      res.status(404).json({ error: "Student not found" });
-      return;
-    }
+      .where(eq(studentsTable.id, id));
 
     res.json({ receiptUrl: serveUrl });
   } catch (error) {
