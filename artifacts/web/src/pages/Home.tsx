@@ -31,12 +31,6 @@ const FEATURES = [
   { icon: "💼", title: "توظيف بعد التخرج", desc: "مساعدة في إيجاد عمل أو فتح محل خاص بك بعد نهاية الدورة" },
 ];
 
-const WHY_ITEMS = [
-  { emoji: "🚀", title: "الأوائل في صنع الأدوات", desc: "أدوات احترافية حصرية لا توجد في أي أكاديمية أخرى" },
-  { emoji: "🎁", title: "الأدوات مجانية 100%", desc: "تحديثات أسبوعية + قناة تليجرام خاصة بالخريجين" },
-  { emoji: "📱", title: "متابعة مدى الحياة", desc: "دعم فني 24/7 من أول يوم ولغاية نهاية مسيرتك المهنية" },
-  { emoji: "🥇", title: "أفضل أكاديمية في الجزائر", desc: "اعتراف رسمي وسمعة مثبتة لدى المحترفين في الجزائر" },
-];
 
 function useScrollVisible() {
   const ref = useRef<HTMLDivElement>(null);
@@ -61,7 +55,6 @@ export default function Home() {
   const { data: gallery } = useListGalleryImages();
   const createStudentMutation = useCreateStudent();
   const featuresAnim = useScrollVisible();
-  const whyAnim = useScrollVisible();
 
   const form = useForm<RegistrationForm>({
     resolver: zodResolver(registrationSchema),
@@ -325,44 +318,6 @@ export default function Home() {
                 </div>
                 <h3 className="text-base font-black mb-3 text-[#111]">{f.title}</h3>
                 <p className="text-sm text-[#525252] leading-7">{f.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ─── WHY #1 ─── */}
-      <section className="py-20 relative overflow-hidden" style={{ background: "linear-gradient(135deg,#f97316 0%,#ea580c 100%)" }}>
-        <div className="absolute -top-20 -right-20 w-72 h-72 rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,.06)" }} />
-        <div className="absolute -bottom-16 -left-16 w-56 h-56 rounded-full pointer-events-none" style={{ background: "rgba(255,255,255,.06)" }} />
-        <div className="max-w-7xl mx-auto px-5 relative">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 bg-white/20 text-white border border-white/30 px-4 py-1.5 rounded-full text-xs font-bold mb-3">
-              🏆 الأفضل في الجزائر
-            </div>
-            <h2 className="text-3xl md:text-4xl font-black text-white mb-3">
-              نحن الرقم <span className="text-[#ffedd5]">#1</span>
-            </h2>
-            <div className="w-14 h-1 rounded-full mx-auto mb-3 bg-white/40" />
-            <p className="text-white/85 text-sm max-w-xl mx-auto">منذ سنوات ونحن نبني محترفين في مجال تصليح الهواتف</p>
-          </div>
-          <div ref={whyAnim.ref} className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-            {WHY_ITEMS.map((w, i) => (
-              <div
-                key={w.title}
-                className="rounded-3xl p-7 text-white transition-all hover:-translate-y-2 cursor-default"
-                style={{
-                  background: "rgba(255,255,255,.15)",
-                  backdropFilter: "blur(12px)",
-                  border: "1.5px solid rgba(255,255,255,.3)",
-                  opacity: whyAnim.visible ? 1 : 0,
-                  transform: whyAnim.visible ? "translateY(0)" : "translateY(32px)",
-                  transition: `opacity .5s ${i * 0.1}s ease, transform .5s ${i * 0.1}s ease`,
-                }}
-              >
-                <span className="text-4xl mb-4 block" style={{ animationDelay: `${i * 0.4}s` }}>{w.emoji}</span>
-                <h4 className="font-black text-base mb-2">{w.title}</h4>
-                <p className="text-white/85 text-sm leading-7">{w.desc}</p>
               </div>
             ))}
           </div>
