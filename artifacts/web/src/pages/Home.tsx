@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -22,31 +22,7 @@ const registrationSchema = z.object({
 
 type RegistrationForm = z.infer<typeof registrationSchema>;
 
-const FEATURES = [
-  { icon: "🔧", title: "تدريب عملي 80%", desc: "تدريب يومي على أجهزة حقيقية + أحدث الأدوات والمعدات الاحترافية" },
-  { icon: "🎓", title: "شهادة رسمية", desc: "شهادة رسمية من الأكاديمية + ملف تدريبي كامل يؤهلك للعمل المهني فوراً" },
-  { icon: "👥", title: "دعم مدى الحياة", desc: "مجموعة واتساب دائمة + متابعة مجانية بعد انتهاء الدورة بدون حد زمني" },
-  { icon: "🖥️", title: "سيرفر خاص بنا", desc: "أدوات حصرية على سيرفرنا الخاص لا تجدها في أي مكان آخر" },
-  { icon: "🎬", title: "فيديوهات مسجّلة", desc: "مكتبة فيديوهات شاملة تبقى معك إلى الأبد لمراجعة كل المواد" },
-  { icon: "💼", title: "توظيف بعد التخرج", desc: "مساعدة في إيجاد عمل أو فتح محل خاص بك بعد نهاية الدورة" },
-];
 
-
-function useScrollVisible() {
-  const ref = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(
-      ([e]) => { if (e.isIntersecting) { setVisible(true); obs.disconnect(); } },
-      { threshold: 0.06, rootMargin: "0px 0px 60px 0px" }
-    );
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, []);
-  return { ref, visible };
-}
 
 export default function Home() {
   const { toast } = useToast();
@@ -54,8 +30,6 @@ export default function Home() {
   const [registeredAsOnline, setRegisteredAsOnline] = useState(false);
   const { data: gallery } = useListGalleryImages();
   const createStudentMutation = useCreateStudent();
-  const featuresAnim = useScrollVisible();
-
   const form = useForm<RegistrationForm>({
     resolver: zodResolver(registrationSchema),
     defaultValues: { housingNeeded: false, trainingType: "physical", experienceLevel: "none" },
@@ -293,33 +267,6 @@ export default function Home() {
                 )}
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ─── FEATURES ─── */}
-      <section id="features" className="py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-5">
-          <SectionHeader tag="⭐ مميزاتنا" title={<>لماذا تختار <Accent>GAB SCHOOL</Accent>؟</>} desc="نقدم أفضل تجربة تعليمية في مجال تصليح الهواتف على مستوى الجزائر" />
-          <div ref={featuresAnim.ref} className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((f, i) => (
-              <div
-                key={f.title}
-                className="bg-[#fafafa] border border-[#e5e5e5] rounded-3xl p-8 text-center transition-all hover:-translate-y-2 hover:shadow-2xl hover:border-[#fed7aa] relative overflow-hidden group cursor-default"
-                style={{
-                  opacity: featuresAnim.visible ? 1 : 0,
-                  transform: featuresAnim.visible ? "translateY(0)" : "translateY(32px)",
-                  transition: `opacity .5s ${i * 0.08}s ease, transform .5s ${i * 0.08}s ease`,
-                }}
-              >
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 origin-right scale-x-0 group-hover:scale-x-100 transition-transform duration-500" style={{ background: "linear-gradient(90deg,#f97316,#ea580c)" }} />
-                <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-5 transition-all group-hover:scale-110 group-hover:shadow-xl" style={{ background: "#ffedd5" }}>
-                  {f.icon}
-                </div>
-                <h3 className="text-base font-black mb-3 text-[#111]">{f.title}</h3>
-                <p className="text-sm text-[#525252] leading-7">{f.desc}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
