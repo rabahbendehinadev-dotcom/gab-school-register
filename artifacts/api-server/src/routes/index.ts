@@ -9,6 +9,7 @@ import galleryRouter from "./gallery";
 import settingsRouter from "./settings";
 import openDayRouter from "./open-day";
 import storageRouter from "./storage";
+import coursesRouter from "./courses";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(galleryRouter);
 router.use(settingsRouter);
 router.use(openDayRouter);
 router.use(storageRouter);
+router.use(coursesRouter);
 
 export default router;

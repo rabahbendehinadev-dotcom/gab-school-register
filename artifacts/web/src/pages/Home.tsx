@@ -5,7 +5,7 @@ import { z } from "zod";
 import { PublicLayout } from "@/components/layout/PublicLayout";
 import { useToast } from "@/hooks/use-toast";
 import { useCreateStudent, useListGalleryImages } from "@workspace/api-client-react";
-import CourseCountdown from "@/components/CourseCountdown";
+import CoursesSection from "@/components/CoursesSection";
 import OpenDaySection from "@/components/OpenDaySection";
 
 const registrationSchema = z.object({
@@ -95,7 +95,7 @@ export default function Home() {
 
             {/* Registration Form */}
             <div id="register" className="animate-fadeup-delay order-1 md:order-2">
-              <CourseCountdown />
+              <CoursesSection />
               <OpenDaySection />
               <div className="bg-white rounded-3xl p-7 md:p-10 shadow-2xl border border-[#e5e5e5] relative overflow-hidden">
                 {/* Shimmer top bar */}

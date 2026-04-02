@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Ticket,
+  BookOpen,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { href: "/gab-c7x2p/students", label: t.students, icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/groups", label: t.groups, icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/open-day", label: t.openDay, icon: Ticket, roles: ["admin", "manager"] },
+    { href: "/gab-c7x2p/courses", label: t.courses, icon: BookOpen, roles: ["admin", "manager"] },
     { href: "/gab-c7x2p/gallery", label: t.gallery, icon: ImageIcon, roles: ["admin", "manager"] },
     { href: "/gab-c7x2p/staff", label: t.staff, icon: ShieldCheck, roles: ["admin"] },
     { href: "/gab-c7x2p/activity", label: t.activityLog, icon: Activity, roles: ["admin", "manager"] },

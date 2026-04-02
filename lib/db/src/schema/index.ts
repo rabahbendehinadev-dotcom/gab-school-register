@@ -5,3 +5,4 @@ export * from "./activity";
 export * from "./gallery";
 export * from "./settings";
 export * from "./open-day";
+export * from "./courses";

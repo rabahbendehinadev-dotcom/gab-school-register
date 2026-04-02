@@ -16,6 +16,7 @@ import Staff from "@/pages/admin/Staff";
 import Activity from "@/pages/admin/Activity";
 import Gallery from "@/pages/admin/Gallery";
 import OpenDay from "@/pages/admin/OpenDay";
+import Courses from "@/pages/admin/Courses";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -45,6 +46,7 @@ function Router() {
       <Route path="/gab-c7x2p/activity" component={Activity} />
       <Route path="/gab-c7x2p/gallery" component={Gallery} />
       <Route path="/gab-c7x2p/open-day" component={OpenDay} />
+      <Route path="/gab-c7x2p/courses" component={Courses} />
       
       {/* 404 */}
       <Route component={NotFound} />
