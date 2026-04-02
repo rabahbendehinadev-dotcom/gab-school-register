@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Users, Clock, Power, Settings2, Trash2, Download } from "lucide-react";
+import { Calendar, Users, Clock, Power, Settings2, Trash2, Download, Eye, EyeOff } from "lucide-react";
 
 interface OpenDayStatus {
   enabled: boolean;
+  sectionVisible: boolean;
   seats: number;
   date: string | null;
   opensAt: string | null;
@@ -79,6 +80,19 @@ export default function OpenDay() {
     toast({ title: !status.enabled ? "✅ تم تفعيل اليوم المفتوح" : "⛔ تم إيقاف اليوم المفتوح" });
   }
 
+  async function toggleSectionVisible() {
+    if (!status) return;
+    setSaving(true);
+    await fetch("/api/open-day/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionVisible: !status.sectionVisible }),
+    });
+    await load();
+    setSaving(false);
+    toast({ title: !status.sectionVisible ? "👁️ يظهر القسم الآن في الصفحة الرئيسية" : "🙈 تم إخفاء القسم من الصفحة الرئيسية" });
+  }
+
   async function saveSettings() {
     setSaving(true);
     const dateVal = form.date ? `${form.date}T${form.dateTime}:00` : "";
@@ -121,18 +135,33 @@ export default function OpenDay() {
             <h2 className="text-2xl font-black text-foreground">🎟️ اليوم المفتوح</h2>
             <p className="text-sm text-muted-foreground mt-0.5">إدارة التسجيل في اليوم المفتوح المجاني</p>
           </div>
-          <button
-            onClick={toggleEnabled}
-            disabled={saving}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg ${
-              status?.enabled
-                ? "bg-red-500 hover:bg-red-600 text-white shadow-red-200"
-                : "bg-green-500 hover:bg-green-600 text-white shadow-green-200"
-            }`}
-          >
-            <Power className="w-4 h-4" />
-            {status?.enabled ? "إيقاف التسجيل" : "تفعيل التسجيل"}
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={toggleSectionVisible}
+              disabled={saving}
+              title={status?.sectionVisible ? "إخفاء القسم من الصفحة الرئيسية" : "إظهار القسم في الصفحة الرئيسية"}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all shadow-md ${
+                status?.sectionVisible
+                  ? "bg-blue-500 hover:bg-blue-600 text-white shadow-blue-200"
+                  : "bg-gray-200 hover:bg-gray-300 text-gray-600 shadow-gray-100"
+              }`}
+            >
+              {status?.sectionVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+              {status?.sectionVisible ? "ظاهر في الصفحة" : "مخفي من الصفحة"}
+            </button>
+            <button
+              onClick={toggleEnabled}
+              disabled={saving}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all shadow-lg ${
+                status?.enabled
+                  ? "bg-red-500 hover:bg-red-600 text-white shadow-red-200"
+                  : "bg-green-500 hover:bg-green-600 text-white shadow-green-200"
+              }`}
+            >
+              <Power className="w-4 h-4" />
+              {status?.enabled ? "إيقاف التسجيل" : "تفعيل التسجيل"}
+            </button>
+          </div>
         </div>
 
         {/* Status cards */}

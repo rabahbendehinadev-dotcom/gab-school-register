@@ -3,6 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface OpenDayStatus {
   enabled: boolean;
+  sectionVisible: boolean;
   seats: number;
   date: string | null;
   opensAt: string | null;
@@ -57,6 +58,8 @@ export default function OpenDaySection() {
     const id = setInterval(() => setTimeLeft(calcTimeLeft(countdownTarget)), 1000);
     return () => clearInterval(id);
   }, [countdownTarget]);
+
+  if (status && !status.sectionVisible) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -13,6 +13,7 @@ const KEYS = {
   date: "open_day_date",
   opensAt: "open_day_opens_at",
   title: "open_day_title",
+  sectionVisible: "open_day_section_visible",
 };
 
 async function getSetting(key: string): Promise<string | null> {
@@ -28,12 +29,13 @@ async function setSetting(key: string, value: string) {
 }
 
 router.get("/open-day/status", async (_req, res): Promise<void> => {
-  const [enabled, seats, date, opensAt, title] = await Promise.all([
+  const [enabled, seats, date, opensAt, title, sectionVisible] = await Promise.all([
     getSetting(KEYS.enabled),
     getSetting(KEYS.seats),
     getSetting(KEYS.date),
     getSetting(KEYS.opensAt),
     getSetting(KEYS.title),
+    getSetting(KEYS.sectionVisible),
   ]);
 
   const [countResult] = await db
@@ -42,9 +44,11 @@ router.get("/open-day/status", async (_req, res): Promise<void> => {
 
   const totalSeats = Number(seats ?? "15");
   const registrationCount = countResult?.count ?? 0;
+  const isEnabled = enabled === "true";
 
   res.json({
-    enabled: enabled === "true",
+    enabled: isEnabled,
+    sectionVisible: sectionVisible !== null ? sectionVisible === "true" : isEnabled,
     seats: totalSeats,
     date: date ?? null,
     opensAt: opensAt ?? null,
@@ -126,16 +130,23 @@ router.post("/open-day/register", async (req, res): Promise<void> => {
 });
 
 router.put("/open-day/settings", requireRole("admin", "manager"), async (req, res): Promise<void> => {
-  const { enabled, seats, date, opensAt, title } = req.body;
+  const { enabled, seats, date, opensAt, title, sectionVisible } = req.body;
 
-  await Promise.all([
-    enabled !== undefined && setSetting(KEYS.enabled, enabled ? "true" : "false"),
-    seats !== undefined && setSetting(KEYS.seats, String(Number(seats))),
-    date !== undefined && setSetting(KEYS.date, date),
-    opensAt !== undefined && setSetting(KEYS.opensAt, opensAt),
-    title !== undefined && setSetting(KEYS.title, title),
-  ].filter(Boolean));
+  const ops: Promise<void>[] = [];
 
+  if (enabled !== undefined) {
+    ops.push(setSetting(KEYS.enabled, enabled ? "true" : "false"));
+    if (sectionVisible === undefined) {
+      ops.push(setSetting(KEYS.sectionVisible, enabled ? "true" : "false"));
+    }
+  }
+  if (sectionVisible !== undefined) ops.push(setSetting(KEYS.sectionVisible, sectionVisible ? "true" : "false"));
+  if (seats !== undefined)   ops.push(setSetting(KEYS.seats, String(Number(seats))));
+  if (date !== undefined)    ops.push(setSetting(KEYS.date, date));
+  if (opensAt !== undefined) ops.push(setSetting(KEYS.opensAt, opensAt));
+  if (title !== undefined)   ops.push(setSetting(KEYS.title, title));
+
+  await Promise.all(ops);
   res.json({ success: true });
 });
 
