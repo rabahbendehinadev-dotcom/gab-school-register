@@ -207,7 +207,7 @@ export default function CourseInfoSection() {
             { icon: "⚠️", parts: ["في حالة الإلغاء لا يُمكن استرداد مبلغ العربون"] },
             { icon: "📄", parts: ["المستندات: نسخة من بطاقة التعريف الوطني"] },
             { icon: "📞", parts: ["للتسجيل والاستفسار: ", "0772 339 494", " (واتساب / فايبر)"] },
-            { icon: "📍", parts: ["المقر: براقي · الجزائر العاصمة"] },
+            { icon: "📍", parts: ["المقر: Mohamadia Mall — رقم الباب ", "1154", " — المحمدية · الجزائر"] },
           ].map(({ icon, parts }, i) => (
             <div key={i} className="flex items-start gap-2.5">
               <span className="text-base flex-shrink-0 mt-0.5">{icon}</span>
