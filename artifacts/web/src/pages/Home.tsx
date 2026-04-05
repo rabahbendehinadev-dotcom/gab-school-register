@@ -201,8 +201,6 @@ export default function Home() {
                       <textarea {...form.register("note")} placeholder="مثال: أفضل الدراسة صباحاً..." rows={2} className={inputCls + " resize-none"} />
                     </Field>
 
-                    <CourseInfoSection />
-
                     <button
                       type="submit"
                       disabled={createStudentMutation.isPending}
@@ -269,6 +267,8 @@ export default function Home() {
                   </form>
                 )}
               </div>
+
+              <CourseInfoSection />
             </div>
           </div>
         </div>
