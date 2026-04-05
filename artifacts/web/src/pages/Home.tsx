@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCreateStudent, useListGalleryImages } from "@workspace/api-client-react";
 import CoursesSection from "@/components/CoursesSection";
 import OpenDaySection from "@/components/OpenDaySection";
+import CourseInfoSection from "@/components/CourseInfoSection";
 
 const registrationSchema = z.object({
   firstName: z.string().min(2, "الاسم الأول مطلوب"),
@@ -199,6 +200,8 @@ export default function Home() {
                     <Field label="📝 ملاحظة (اختياري)">
                       <textarea {...form.register("note")} placeholder="مثال: أفضل الدراسة صباحاً..." rows={2} className={inputCls + " resize-none"} />
                     </Field>
+
+                    <CourseInfoSection />
 
                     <button
                       type="submit"
