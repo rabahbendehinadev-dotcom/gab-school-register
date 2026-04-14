@@ -189,18 +189,6 @@ export default function Home() {
                       </Field>
                     </div>
 
-                    <Field label="📈 مستوى خبرتك">
-                      <select {...form.register("experienceLevel")} className={selectCls}>
-                        <option value="none">لا خبرة، أبدأ من الصفر</option>
-                        <option value="basic">أساسيات بسيطة</option>
-                        <option value="advanced">خبرة وأريد الاحتراف</option>
-                      </select>
-                    </Field>
-
-                    <Field label="📝 ملاحظة (اختياري)">
-                      <textarea {...form.register("note")} placeholder="مثال: أفضل الدراسة صباحاً..." rows={2} className={inputCls + " resize-none"} />
-                    </Field>
-
                     <button
                       type="submit"
                       disabled={createStudentMutation.isPending}
