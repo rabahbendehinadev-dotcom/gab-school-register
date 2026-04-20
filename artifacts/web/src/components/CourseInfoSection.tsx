@@ -32,17 +32,6 @@ export default function CourseInfoSection() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2.5 bg-orange-50 border border-orange-200 rounded-xl px-4 py-3">
-              <span className="text-2xl">💰</span>
-              <div>
-                <p className="text-[13px] font-black text-orange-700">
-                  بسعر خرافي:{" "}
-                  <bdi className="text-orange-600 text-base">250</bdi>
-                  {" "}دج فقط
-                </p>
-              </div>
-            </div>
-
             <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
               <span className="text-base flex-shrink-0">⚠️</span>
               <p className="text-[12px] text-red-700 font-bold leading-snug">
