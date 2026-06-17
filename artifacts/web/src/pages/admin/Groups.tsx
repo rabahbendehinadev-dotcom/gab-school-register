@@ -1,807 +1,583 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/AdminLayout";
-import { useI18n } from "@/contexts/i18n-context";
-import { useToast } from "@/hooks/use-toast";
-import { useForm } from "react-hook-form";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
-  Users, Calendar, Plus, Edit, Trash2, ArrowRight,
-  MessageCircle, ExternalLink, StickyNote, CheckCircle2,
-  ChevronRight, Loader2, Search, UserPlus,
+  useListStudents,
+  useListGroups,
+  useUpdateStudent,
+  useAssignStudentToGroup,
+  useCreateGroup,
+  useUpdateGroup,
+  useDeleteGroup,
+  getListStudentsQueryKey,
+  getListGroupsQueryKey,
+  type Student,
+  type Group,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  type DropResult,
+} from "@hello-pangea/dnd";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  MoreHorizontal, ArrowLeftCircle, GripVertical, StickyNote,
+  Pencil, Trash2, Plus, Check, X, Loader2, CalendarDays, ImageIcon,
+  ChevronDown,
 } from "lucide-react";
 import { format } from "date-fns";
+import { useI18n } from "@/contexts/i18n-context";
+import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
 
-// ─── Stage config ─────────────────────────────────────────────────────────────
+// ─── Stage dot colors ─────────────────────────────────────────────────────────
 
-const ALL_STAGES = [
-  { value: "new",               ar: "تسجيل جديد",     fr: "Nouveau",              cls: "bg-blue-100 text-blue-700 border-blue-200" },
-  { value: "contacted",         ar: "تم التواصل",       fr: "Contacté",             cls: "bg-amber-100 text-amber-700 border-amber-200" },
-  { value: "interested",        ar: "مهتم",             fr: "Intéressé",            cls: "bg-green-100 text-green-700 border-green-200" },
-  { value: "payment_pending",   ar: "ينتظر الدفع",     fr: "Attente paiement",     cls: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  { value: "payment_confirmed", ar: "تم الدفع",         fr: "Paiement confirmé",    cls: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  { value: "confirmed",         ar: "مؤكد للدورة",     fr: "Confirmé",             cls: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  { value: "attended",          ar: "حضر",              fr: "Présent",              cls: "bg-teal-100 text-teal-700 border-teal-200" },
-  { value: "no_show",           ar: "لم يحضر",          fr: "Absent",               cls: "bg-red-100 text-red-700 border-red-200" },
-  { value: "completed",         ar: "مكتمل التكوين",   fr: "Terminé",              cls: "bg-purple-100 text-purple-700 border-purple-200" },
-  { value: "archived",          ar: "أرشيف",            fr: "Archivé",              cls: "bg-gray-100 text-gray-500 border-gray-200" },
-] as const;
+const STAGE_COLORS: Record<string, string> = {
+  new: "bg-blue-500", contacted: "bg-yellow-500", interested: "bg-green-500",
+  payment_pending: "bg-orange-400", payment_confirmed: "bg-emerald-500",
+  confirmed: "bg-indigo-500", attended: "bg-teal-500",
+  no_show: "bg-red-500", completed: "bg-purple-500", archived: "bg-gray-400",
+};
 
-function stageInfo(value: string) {
-  return ALL_STAGES.find(s => s.value === value) ?? { ar: value, fr: value, cls: "bg-gray-100 text-gray-500 border-gray-200" };
+// ─── Column palette ───────────────────────────────────────────────────────────
+
+const COLUMN_PALETTE = [
+  { header: "bg-violet-600", light: "bg-violet-50",   border: "border-violet-200" },
+  { header: "bg-teal-600",   light: "bg-teal-50",     border: "border-teal-200" },
+  { header: "bg-indigo-600", light: "bg-indigo-50",   border: "border-indigo-200" },
+  { header: "bg-rose-600",   light: "bg-rose-50",     border: "border-rose-200" },
+  { header: "bg-amber-600",  light: "bg-amber-50",    border: "border-amber-200" },
+  { header: "bg-cyan-600",   light: "bg-cyan-50",     border: "border-cyan-200" },
+  { header: "bg-emerald-600",light: "bg-emerald-50",  border: "border-emerald-200" },
+  { header: "bg-fuchsia-600",light: "bg-fuchsia-50",  border: "border-fuchsia-200" },
+];
+const colFor = (idx: number) => COLUMN_PALETTE[idx % COLUMN_PALETTE.length];
+
+// ─── Rename input ─────────────────────────────────────────────────────────────
+
+function RenameInput({ value, onConfirm, onCancel }: {
+  value: string; onConfirm: (v: string) => void; onCancel: () => void;
+}) {
+  const [val, setVal] = useState(value);
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => { ref.current?.focus(); ref.current?.select(); }, []);
+  return (
+    <form
+      onSubmit={(e) => { e.preventDefault(); if (val.trim()) onConfirm(val.trim()); }}
+      className="flex items-center gap-1 flex-1"
+    >
+      <input
+        ref={ref}
+        value={val}
+        onChange={(e) => setVal(e.target.value)}
+        onBlur={() => { if (val.trim()) onConfirm(val.trim()); else onCancel(); }}
+        className="flex-1 min-w-0 bg-white/20 text-white text-sm font-semibold rounded px-2 py-0.5 outline-none border border-white/40"
+      />
+      <button type="submit" className="text-white hover:text-green-200 flex-shrink-0">
+        <Check className="w-3.5 h-3.5" />
+      </button>
+      <button type="button" onClick={onCancel} className="text-white hover:text-red-200 flex-shrink-0">
+        <X className="w-3.5 h-3.5" />
+      </button>
+    </form>
+  );
 }
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// ─── Schedule Student Card ────────────────────────────────────────────────────
 
-type GroupSummary = {
-  id: number; name: string; startDate: string; trainingType: string;
-  capacity: number; status: string; notes: string | null;
-  studentCount: number; confirmedCount: number; paidCount: number; absentCount: number;
-};
+function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturnToPipeline, t, dragHandleProps }: {
+  student: Student;
+  groups: Group[];
+  currentGroupId: number;
+  onMove: (studentId: number, groupId: number) => void;
+  onReturnToPipeline: (studentId: number) => void;
+  t: ReturnType<typeof useI18n>["t"];
+  dragHandleProps?: Record<string, unknown>;
+}) {
+  const { lang } = useI18n();
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
-type GroupStudent = {
-  id: number; firstName: string; lastName: string; phone: string;
-  whatsapp: string; city: string; stage: string; paymentStatus: string;
-  note: string | null; trainingType: string;
-};
-
-type GroupDetail = GroupSummary & { students: GroupStudent[] };
-
-type GroupFormData = {
-  name: string; startDate: string; trainingType: string;
-  capacity: number; status: string; notes?: string;
-};
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function apiFetch(path: string, opts?: RequestInit) {
-  return fetch("/api" + path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...opts,
+  const updateMutation = useUpdateStudent({
+    mutation: { onError: () => toast({ title: t.errorUpdating, variant: "destructive" }) },
   });
-}
 
-function toIntlPhone(p: string): string {
-  let c = p.replace(/\D/g, "");
-  if (c.startsWith("0") && c.length === 10) c = "213" + c.slice(1);
-  else if (c.startsWith("5") && c.length === 9) c = "213" + c;
-  return c;
-}
+  const [localNote, setLocalNote] = useState(student.note ?? "");
+  const [showNote, setShowNote]   = useState(!!student.note);
+  const noteRef = useRef<HTMLTextAreaElement>(null);
 
-function buildWaMsg(studentName: string, stage: string): string {
-  switch (stage) {
-    case "new":               return `مرحباً ${studentName}! 🎉 تم تسجيلك في أكاديمية GAB SCHOOL. سنتواصل معك قريباً لتأكيد تفاصيل الدورة.`;
-    case "payment_pending":   return `مرحباً ${studentName}! 💳 تذكير: يرجى إتمام الدفع لتأكيد مقعدك في الدورة. المقاعد محدودة!`;
-    case "payment_confirmed": return `مرحباً ${studentName}! ✅ تأكدنا من استلام دفعتك. شكراً لك!`;
-    case "confirmed":         return `مرحباً ${studentName}! 🎯 تم تأكيد مشاركتك في الدورة. في انتظار حضورك!`;
-    case "attended":          return `مرحباً ${studentName}! 👋 شكراً على حضورك. نتمنى أن تستفيد من الدورة.`;
-    case "no_show":           return `مرحباً ${studentName}! 📞 لاحظنا غيابك عن الدورة. هل أنت بخير؟ يرجى التواصل معنا.`;
-    case "completed":         return `مبروك ${studentName}! 🏆 لقد أتممت دورتك بنجاح في أكاديمية GAB SCHOOL. نفخر بك!`;
-    default:                  return `مرحباً ${studentName}! 👋 تواصلنا معك من أكاديمية GAB SCHOOL.`;
+  useEffect(() => { if (showNote && !student.note) noteRef.current?.focus(); }, [showNote]);
+
+  function handleNoteBlur() {
+    if (localNote !== (student.note ?? "")) {
+      updateMutation.mutate(
+        { id: student.id, data: { note: localNote || null } },
+        { onSuccess: () => qc.invalidateQueries({ queryKey: getListStudentsQueryKey() }) },
+      );
+    }
   }
+
+  const stageLabel = t.stageLabels[student.stage as keyof typeof t.stageLabels] ?? student.stage;
+  const stageDot   = STAGE_COLORS[student.stage] ?? "bg-gray-400";
+  const fullName   = `${student.firstName} ${student.lastName}`;
+  const others     = groups.filter((g) => g.id !== currentGroupId);
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+          <span
+            {...(dragHandleProps ?? {})}
+            className="text-gray-300 hover:text-gray-500 flex-shrink-0 cursor-grab active:cursor-grabbing touch-manipulation select-none"
+          >
+            <GripVertical className="w-4 h-4" />
+          </span>
+          <Link
+            href={`/gab-c7x2p/students/${student.id}`}
+            className="font-semibold text-sm text-gray-800 leading-tight truncate hover:text-primary hover:underline cursor-pointer"
+          >
+            {fullName}
+          </Link>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-md hover:bg-gray-100 transition-opacity flex-shrink-0">
+            <MoreHorizontal className="w-4 h-4 text-gray-500" />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={() => onReturnToPipeline(student.id)} className="text-orange-600 font-medium">
+              <ArrowLeftCircle className="w-3.5 h-3.5 mr-2" />
+              {t.returnToPipeline}
+            </DropdownMenuItem>
+            {others.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-gray-500">{t.moveToSchedule}</DropdownMenuLabel>
+                {others.map((g) => (
+                  <DropdownMenuItem key={g.id} onClick={() => onMove(student.id, g.id)}>
+                    <span className="w-2 h-2 rounded-full bg-violet-500 mr-2 flex-shrink-0 inline-block" />
+                    {g.name}
+                  </DropdownMenuItem>
+                ))}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
+      <div className="flex items-center gap-1 mt-1.5 text-xs text-gray-500">
+        <span>📞</span><span>{student.phone}</span>
+      </div>
+
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
+        <span className="flex items-center gap-1 text-[11px] font-medium text-gray-600">
+          <span className={`w-1.5 h-1.5 rounded-full ${stageDot}`} />{stageLabel}
+        </span>
+        <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
+          {student.trainingType === "online" ? t.online : t.physical}
+        </span>
+        {student.paymentStatus && student.paymentStatus !== "unpaid" && (
+          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${student.paymentStatus === "paid" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"}`}>
+            {student.paymentStatus === "paid" ? t.paidBadge : t.depositPaidBadge}
+          </span>
+        )}
+      </div>
+
+      {student.receiptUrl && (
+        <a
+          href={student.receiptUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 underline"
+        >
+          <ImageIcon className="w-3 h-3" />
+          {lang === "fr" ? "Voir le reçu" : "عرض الوصل"}
+        </a>
+      )}
+
+      {/* Notes */}
+      <div className="mt-2">
+        <button
+          onClick={() => setShowNote((p) => !p)}
+          className={`w-full flex items-center gap-2 text-xs px-2 py-1.5 rounded-lg transition-colors ${showNote ? "bg-yellow-50 text-yellow-700 border border-yellow-200" : "text-gray-400 hover:text-gray-600 hover:bg-gray-50"}`}
+        >
+          <StickyNote className="w-3.5 h-3.5 flex-shrink-0" />
+          {localNote && !showNote ? (
+            <span className="truncate text-left">{localNote}</span>
+          ) : (
+            <span>{lang === "fr" ? "Note" : "ملاحظة"}</span>
+          )}
+          {localNote && <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 flex-shrink-0 mr-auto" />}
+        </button>
+        {showNote && (
+          <textarea
+            ref={noteRef}
+            value={localNote}
+            onChange={(e) => setLocalNote(e.target.value)}
+            onBlur={handleNoteBlur}
+            placeholder={lang === "fr" ? "Ajouter une note..." : "أضف ملاحظة..."}
+            rows={3}
+            className="mt-1.5 w-full text-xs rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 resize-none placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-300 transition select-text"
+          />
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function Groups() {
-  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-
-  if (selectedGroupId !== null) {
-    return <GroupDetailView groupId={selectedGroupId} onBack={() => setSelectedGroupId(null)} />;
-  }
-  return <GroupsListView onSelect={setSelectedGroupId} />;
-}
-
-// ─── Groups List View ─────────────────────────────────────────────────────────
-
-function GroupsListView({ onSelect }: { onSelect: (id: number) => void }) {
-  const { lang } = useI18n();
-  const { toast } = useToast();
   const qc = useQueryClient();
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editGroup, setEditGroup] = useState<GroupSummary | null>(null);
+  const { t, lang } = useI18n();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const isAdmin = user?.role === "admin";
 
-  const s = lang === "ar"
-    ? { title: "الجداول والدورات", subtitle: "إدارة الدورات التدريبية والطلاب المسجلين", addBtn: "+ إضافة دورة", total: "طالب", confirmed: "مؤكد", paid: "دفع", absent: "غائب", fill: "امتلاء", openBtn: "فتح الدورة", physical: "حضوري", online: "عن بعد", open: "مفتوح", closed: "مغلق", deleteConfirm: "هل تريد حذف هذه الدورة؟", deleted: "تم حذف الدورة", created: "تم إنشاء الدورة ✅", updated: "تم تحديث الدورة ✅", noGroups: "لا توجد دورات بعد. ابدأ بإنشاء دورة جديدة!" }
-    : { title: "Plannings & Formations", subtitle: "Gérer les sessions de formation et les apprenants", addBtn: "+ Ajouter", total: "étudiant", confirmed: "confirmé", paid: "payé", absent: "absent", fill: "remplissage", openBtn: "Ouvrir", physical: "Présentiel", online: "En ligne", open: "Ouvert", closed: "Fermé", deleteConfirm: "Supprimer cette session?", deleted: "Session supprimée", created: "Session créée ✅", updated: "Session mise à jour ✅", noGroups: "Aucune session. Commencez par en créer une!" };
+  const [selectedGroupId, setSelectedGroupId] = useState<"all" | string>("all");
+  const [modalOpen,  setModalOpen]  = useState(false);
+  const [modalName,  setModalName]  = useState("");
+  const [renamingId, setRenamingId] = useState<number | null>(null);
 
-  const { data: groups = [], isLoading, refetch } = useQuery<GroupSummary[]>({
-    queryKey: ["groups-list"],
-    queryFn: async () => {
-      const r = await apiFetch("/groups");
-      if (!r.ok) throw new Error(String(r.status));
-      return r.json();
+  const { data: allStudents = [], isLoading: studentsLoading } = useListStudents();
+  const { data: groups = [],      isLoading: groupsLoading }   = useListGroups();
+
+  // Students grouped by their schedule
+  const byGroup = (() => {
+    const map: Record<string, Student[]> = {};
+    groups.forEach((g) => { map[String(g.id)] = []; });
+    allStudents.filter((s) => s.groupId).forEach((s) => {
+      const key = String(s.groupId);
+      if (!map[key]) map[key] = [];
+      map[key].push(s);
+    });
+    return map;
+  })();
+
+  // Filter displayed groups based on dropdown selection
+  const displayedGroups = selectedGroupId === "all"
+    ? groups
+    : groups.filter((g) => String(g.id) === selectedGroupId);
+
+  const assignMutation = useAssignStudentToGroup({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+        qc.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+      },
+      onError: () => toast({ title: t.errorMoving, variant: "destructive" }),
     },
-    refetchInterval: 30_000,
-    staleTime: 10_000,
   });
 
-  async function deleteGroup(id: number) {
-    if (!confirm(s.deleteConfirm)) return;
-    await apiFetch(`/groups/${id}`, { method: "DELETE" });
-    toast({ title: s.deleted });
-    qc.invalidateQueries({ queryKey: ["groups-list"] });
-    refetch();
+  const createMutation = useCreateGroup({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        setModalOpen(false);
+        setModalName("");
+      },
+      onError: () => toast({ title: t.errorCreating, variant: "destructive" }),
+    },
+  });
+
+  const updateGroupMutation = useUpdateGroup({
+    mutation: {
+      onSuccess: () => qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }),
+      onError:   () => toast({ title: t.errorUpdating, variant: "destructive" }),
+    },
+  });
+
+  const deleteGroupMutation = useDeleteGroup({
+    mutation: {
+      onSuccess: () => {
+        qc.invalidateQueries({ queryKey: getListGroupsQueryKey() });
+        qc.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+      },
+      onError: () => toast({ title: t.errorDeleting, variant: "destructive" }),
+    },
+  });
+
+  function handleRename(group: Group, name: string) {
+    updateGroupMutation.mutate({ id: group.id, data: { name } });
+    setRenamingId(null);
   }
 
-  const fillPct = (g: GroupSummary) => Math.min(100, Math.round((g.studentCount / (g.capacity || 1)) * 100));
+  function handleDelete(group: Group) {
+    const students = byGroup[String(group.id)] ?? [];
+    if (students.length > 0) {
+      toast({ title: t.cannotDeleteNonEmpty, variant: "destructive" });
+      return;
+    }
+    if (!confirm(t.deleteScheduleConfirm(group.name))) return;
+    deleteGroupMutation.mutate({ id: group.id });
+  }
+
+  function handleCreateGroup() {
+    const name = modalName.trim();
+    if (!name) return;
+    createMutation.mutate({
+      data: { name, startDate: new Date().toISOString().slice(0, 10), trainingType: "physical", capacity: 999, status: "open" },
+    });
+  }
+
+  function handleReturnToPipeline(studentId: number) {
+    assignMutation.mutate({ id: studentId, data: { groupId: null } });
+  }
+
+  function handleMoveToGroup(studentId: number, groupId: number) {
+    assignMutation.mutate({ id: studentId, data: { groupId } });
+  }
+
+  function handleDragEnd(result: DropResult) {
+    const { destination, source, draggableId } = result;
+    if (!destination) return;
+    if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+    const studentId  = parseInt(draggableId.replace("s-", ""), 10);
+    const destGroupId = parseInt(destination.droppableId, 10);
+    if (isNaN(destGroupId)) return;
+    if (destGroupId === parseInt(source.droppableId, 10)) return;
+    assignMutation.mutate({ id: studentId, data: { groupId: destGroupId } });
+  }
+
+  const isLoading = studentsLoading || groupsLoading;
+
+  // Labels
+  const allLabel = lang === "fr" ? `Tous les plannings (${groups.length})` : `كل الجداول (${groups.length})`;
+  const addLabel  = lang === "fr" ? "Nouveau planning" : t.addSchedule;
+  const noData    = lang === "fr" ? "Aucun planning créé." : t.noStudents;
 
   return (
     <AdminLayout>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <div>
-          <h2 className="text-2xl font-bold text-foreground">{s.title}</h2>
-          <p className="text-muted-foreground text-sm mt-1">{s.subtitle}</p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)} className="rounded-xl shadow-lg shadow-primary/20 shrink-0">
-          <Plus className="w-4 h-4 me-2" />{s.addBtn}
-        </Button>
-      </div>
-
-      {isLoading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {[1,2,3].map(i => <div key={i} className="h-64 bg-muted rounded-2xl animate-pulse" />)}
-        </div>
-      )}
-
-      {!isLoading && groups.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-64 text-muted-foreground gap-3">
-          <Calendar className="w-12 h-12 text-muted" />
-          <p>{s.noGroups}</p>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {groups.map(g => {
-          const pct = fillPct(g);
-          const isOpen = g.status === "open";
-          return (
-            <div key={g.id} className="bg-card rounded-2xl border border-border/60 shadow-sm hover:shadow-md transition-all flex flex-col overflow-hidden group/card">
-              {/* Status bar */}
-              <div className={`h-1.5 ${isOpen ? "bg-green-500" : "bg-muted-foreground/40"}`} />
-
-              <div className="p-5 flex-1 flex flex-col gap-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-lg text-foreground leading-tight truncate">{g.name}</h3>
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${isOpen ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
-                        {isOpen ? s.open : s.closed}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">
-                        {g.trainingType === "physical" ? s.physical : s.online}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="flex gap-1 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                    <button
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                      onClick={() => setEditGroup(g)}
-                    ><Edit className="w-3.5 h-3.5" /></button>
-                    <button
-                      className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                      onClick={() => deleteGroup(g.id)}
-                    ><Trash2 className="w-3.5 h-3.5" /></button>
-                  </div>
-                </div>
-
-                {/* Date */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Calendar className="w-4 h-4 text-primary shrink-0" />
-                  {g.startDate ? format(new Date(g.startDate), "dd / MM / yyyy") : "—"}
-                </div>
-
-                {/* Stats grid */}
-                <div className="grid grid-cols-4 gap-2 text-center">
-                  {[
-                    { val: g.studentCount,   label: s.total,     cls: "bg-blue-50 text-blue-700" },
-                    { val: g.confirmedCount, label: s.confirmed, cls: "bg-indigo-50 text-indigo-700" },
-                    { val: g.paidCount,      label: s.paid,      cls: "bg-emerald-50 text-emerald-700" },
-                    { val: g.absentCount,    label: s.absent,    cls: "bg-red-50 text-red-700" },
-                  ].map(({ val, label, cls }) => (
-                    <div key={label} className={`rounded-xl p-2 ${cls}`}>
-                      <div className="text-xl font-bold leading-none">{val}</div>
-                      <div className="text-xs mt-0.5 font-medium">{label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* Fill bar */}
-                <div>
-                  <div className="flex justify-between text-xs text-muted-foreground mb-1">
-                    <span>{s.fill}</span>
-                    <span className="font-semibold">{pct}% · {g.studentCount}/{g.capacity}</span>
-                  </div>
-                  <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${pct >= 90 ? "bg-red-500" : pct >= 70 ? "bg-orange-500" : "bg-primary"}`}
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Open button */}
-                <Button
-                  className="w-full mt-auto rounded-xl gap-2"
-                  onClick={() => onSelect(g.id)}
-                >
-                  <Users className="w-4 h-4" />
-                  {s.openBtn}
-                  <ChevronRight className="w-4 h-4 ms-auto" />
-                </Button>
-              </div>
+      {/* ── Top bar: dropdown + add button ── */}
+      <div className="flex items-center gap-3 mb-5 flex-wrap">
+        {/* Group selector dropdown */}
+        <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
+          <SelectTrigger className="w-60 rounded-xl bg-white border-border shadow-sm font-medium">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="w-4 h-4 text-primary flex-shrink-0" />
+              <SelectValue />
             </div>
-          );
-        })}
-      </div>
-
-      <GroupFormDialog
-        open={createOpen}
-        onClose={() => setCreateOpen(false)}
-        onSaved={() => { qc.invalidateQueries({ queryKey: ["groups-list"] }); refetch(); toast({ title: s.created }); }}
-        lang={lang}
-      />
-
-      <GroupFormDialog
-        open={!!editGroup}
-        group={editGroup ?? undefined}
-        onClose={() => setEditGroup(null)}
-        onSaved={() => { qc.invalidateQueries({ queryKey: ["groups-list"] }); refetch(); setEditGroup(null); toast({ title: s.updated }); }}
-        lang={lang}
-      />
-    </AdminLayout>
-  );
-}
-
-// ─── Group Detail View ────────────────────────────────────────────────────────
-
-function GroupDetailView({ groupId, onBack }: { groupId: number; onBack: () => void }) {
-  const { lang } = useI18n();
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [editOpen, setEditOpen] = useState(false);
-  const [addOpen, setAddOpen] = useState(false);
-
-  const s = lang === "ar"
-    ? { back: "← الجداول", total: "إجمالي الطلاب", confirmed: "مؤكدون", paid: "دفعوا", absent: "غائبون", fill: "الامتلاء", physical: "حضوري", online: "عن بعد", open: "مفتوح", closed: "مغلق", editBtn: "تعديل", addStudentBtn: "إضافة طالب", deleteConfirm: "حذف هذه الدورة؟", deleted: "تم الحذف", updated: "تم التحديث ✅", noStudents: "لا يوجد طلاب في هذه الدورة بعد.", colName: "الاسم", colPhone: "الهاتف", colCity: "المدينة", colStage: "الحالة", colPayment: "الدفع", colActions: "إجراءات" }
-    : { back: "← Plannings", total: "Total", confirmed: "Confirmés", paid: "Payés", absent: "Absents", fill: "Remplissage", physical: "Présentiel", online: "En ligne", open: "Ouvert", closed: "Fermé", editBtn: "Modifier", addStudentBtn: "Ajouter apprenant", deleteConfirm: "Supprimer cette session?", deleted: "Session supprimée", updated: "Mis à jour ✅", noStudents: "Aucun apprenant dans cette session.", colName: "Nom", colPhone: "Téléphone", colCity: "Ville", colStage: "Statut", colPayment: "Paiement", colActions: "Actions" };
-
-  const { data: group, isLoading, refetch } = useQuery<GroupDetail>({
-    queryKey: ["group-detail", groupId],
-    queryFn: async () => {
-      const r = await apiFetch(`/groups/${groupId}`);
-      if (!r.ok) throw new Error(String(r.status));
-      return r.json();
-    },
-    refetchInterval: 30_000,
-    staleTime: 5_000,
-  });
-
-  const fillPct = group ? Math.min(100, Math.round((group.studentCount / (group.capacity || 1)) * 100)) : 0;
-
-  return (
-    <AdminLayout>
-      {isLoading && (
-        <div className="flex items-center justify-center h-64 text-muted-foreground gap-2">
-          <Loader2 className="w-5 h-5 animate-spin" />
-        </div>
-      )}
-
-      {group && (
-        <div className="space-y-6">
-          {/* Header */}
-          <div className="flex flex-col gap-4">
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-fit"
-            >
-              <ArrowRight className="w-4 h-4 rotate-180" />
-              {s.back}
-            </button>
-
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-              <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-2xl font-bold text-foreground">{group.name}</h2>
-                  <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${group.status === "open" ? "bg-green-100 text-green-700" : "bg-muted text-muted-foreground"}`}>
-                    {group.status === "open" ? s.open : s.closed}
-                  </span>
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                    {group.trainingType === "physical" ? s.physical : s.online}
-                  </span>
-                </div>
-                {group.startDate && (
-                  <p className="text-muted-foreground text-sm mt-1.5 flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {format(new Date(group.startDate), "EEEE, dd MMMM yyyy")}
-                  </p>
-                )}
-              </div>
-              <div className="flex gap-2 shrink-0">
-                <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setEditOpen(true)}>
-                  <Edit className="w-4 h-4 me-1.5" />{s.editBtn}
-                </Button>
-                <Button size="sm" className="rounded-xl" onClick={() => setAddOpen(true)}>
-                  <UserPlus className="w-4 h-4 me-1.5" />{s.addStudentBtn}
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-            {[
-              { label: s.total,     val: group.studentCount,   cls: "bg-blue-50 text-blue-700 border-blue-100" },
-              { label: s.confirmed, val: group.confirmedCount, cls: "bg-indigo-50 text-indigo-700 border-indigo-100" },
-              { label: s.paid,      val: group.paidCount,      cls: "bg-emerald-50 text-emerald-700 border-emerald-100" },
-              { label: s.absent,    val: group.absentCount,    cls: "bg-red-50 text-red-700 border-red-100" },
-              { label: s.fill,      val: `${fillPct}%`,        cls: "bg-orange-50 text-orange-700 border-orange-100" },
-            ].map(({ label, val, cls }) => (
-              <div key={label} className={`rounded-xl border p-3 text-center ${cls}`}>
-                <div className="text-2xl font-bold leading-none">{val}</div>
-                <div className="text-xs mt-1 font-medium opacity-80">{label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Students table */}
-          <div className="bg-card rounded-2xl border border-border/60 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40">
-                    <TableHead className="font-semibold">{s.colName}</TableHead>
-                    <TableHead className="font-semibold">{s.colPhone}</TableHead>
-                    <TableHead className="font-semibold hidden sm:table-cell">{s.colCity}</TableHead>
-                    <TableHead className="font-semibold">{s.colStage}</TableHead>
-                    <TableHead className="font-semibold hidden md:table-cell">{s.colPayment}</TableHead>
-                    <TableHead className="font-semibold text-center">{s.colActions}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {group.students.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-16 text-muted-foreground">
-                        <div className="flex flex-col items-center gap-2">
-                          <Users className="w-10 h-10 text-muted" />
-                          <p className="text-sm">{s.noStudents}</p>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ) : group.students.map(student => (
-                    <StudentRow
-                      key={student.id}
-                      student={student}
-                      lang={lang}
-                      onUpdated={() => {
-                        qc.invalidateQueries({ queryKey: ["group-detail", groupId] });
-                        qc.invalidateQueries({ queryKey: ["groups-list"] });
-                        refetch();
-                      }}
-                      toast={toast}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <GroupFormDialog
-        open={editOpen}
-        group={group}
-        onClose={() => setEditOpen(false)}
-        onSaved={() => {
-          qc.invalidateQueries({ queryKey: ["group-detail", groupId] });
-          qc.invalidateQueries({ queryKey: ["groups-list"] });
-          setEditOpen(false);
-          refetch();
-          toast({ title: s.updated });
-        }}
-        lang={lang}
-      />
-
-      <AddStudentDialog
-        open={addOpen}
-        groupId={groupId}
-        existingIds={group?.students.map(s => s.id) ?? []}
-        onClose={() => setAddOpen(false)}
-        onAdded={() => {
-          qc.invalidateQueries({ queryKey: ["group-detail", groupId] });
-          qc.invalidateQueries({ queryKey: ["groups-list"] });
-          refetch();
-        }}
-        lang={lang}
-        toast={toast}
-      />
-    </AdminLayout>
-  );
-}
-
-// ─── Student Row ──────────────────────────────────────────────────────────────
-
-function StudentRow({ student, lang, onUpdated, toast }: {
-  student: GroupStudent;
-  lang: string;
-  onUpdated: () => void;
-  toast: ReturnType<typeof useToast>["toast"];
-}) {
-  const [editingNote, setEditingNote] = useState(false);
-  const [noteVal, setNoteVal]         = useState(student.note ?? "");
-  const [stagePending, setStagePending] = useState(false);
-  const [payPending, setPayPending]     = useState(false);
-  const noteRef = useRef<HTMLTextAreaElement>(null);
-
-  const fullName  = `${student.firstName} ${student.lastName}`;
-  const waPhone   = toIntlPhone(student.whatsapp || student.phone);
-  const waMsg     = buildWaMsg(fullName, student.stage);
-  const waUrl     = `https://wa.me/${waPhone}?text=${encodeURIComponent(waMsg)}`;
-
-  const paymentCycles: Record<string, string> = { unpaid: "deposited", deposited: "paid", paid: "paid" };
-  const paymentLabels: Record<string, { ar: string; cls: string }> = {
-    unpaid:    { ar: "غير مدفوع",  cls: "bg-red-100 text-red-700" },
-    deposited: { ar: "عربون",      cls: "bg-yellow-100 text-yellow-700" },
-    paid:      { ar: "مدفوع ✅",   cls: "bg-emerald-100 text-emerald-700" },
-  };
-  const payLbl = paymentLabels[student.paymentStatus] ?? paymentLabels.unpaid;
-
-  const si = stageInfo(student.stage);
-
-  async function changeStage(newStage: string) {
-    if (newStage === student.stage) return;
-    setStagePending(true);
-    try {
-      const r = await apiFetch(`/students/${student.id}/stage`, {
-        method: "PATCH",
-        body: JSON.stringify({ stage: newStage }),
-      });
-      if (!r.ok) throw new Error();
-      onUpdated();
-    } catch {
-      toast({ title: lang === "ar" ? "خطأ في تغيير الحالة" : "Erreur", variant: "destructive" });
-    } finally { setStagePending(false); }
-  }
-
-  async function cyclePayment() {
-    const next = paymentCycles[student.paymentStatus] ?? "deposited";
-    if (next === student.paymentStatus) return;
-    setPayPending(true);
-    try {
-      const r = await apiFetch(`/students/${student.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ paymentStatus: next }),
-      });
-      if (!r.ok) throw new Error();
-      onUpdated();
-    } catch {
-      toast({ title: lang === "ar" ? "خطأ في تحديث الدفع" : "Erreur", variant: "destructive" });
-    } finally { setPayPending(false); }
-  }
-
-  async function saveNote() {
-    if (noteVal === (student.note ?? "")) { setEditingNote(false); return; }
-    try {
-      const r = await apiFetch(`/students/${student.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ note: noteVal || null }),
-      });
-      if (!r.ok) throw new Error();
-      onUpdated();
-    } catch {
-      toast({ title: lang === "ar" ? "خطأ في حفظ الملاحظة" : "Erreur", variant: "destructive" });
-    } finally { setEditingNote(false); }
-  }
-
-  return (
-    <TableRow className="hover:bg-muted/30 transition-colors group/row">
-      {/* Name */}
-      <TableCell>
-        <Link
-          href={`/gab-c7x2p/students/${student.id}`}
-          className="font-semibold text-foreground hover:text-primary hover:underline flex items-center gap-1"
-        >
-          {fullName}
-          <ExternalLink className="w-3 h-3 opacity-0 group-hover/row:opacity-60 transition-opacity" />
-        </Link>
-        <div className="text-xs text-muted-foreground mt-0.5">{student.city}</div>
-      </TableCell>
-
-      {/* Phone */}
-      <TableCell className="text-sm text-muted-foreground font-mono">{student.phone}</TableCell>
-
-      {/* City (hidden mobile) */}
-      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{student.city}</TableCell>
-
-      {/* Stage dropdown */}
-      <TableCell>
-        <Select value={student.stage} onValueChange={changeStage} disabled={stagePending}>
-          <SelectTrigger className={`h-8 text-xs font-medium border rounded-lg px-2 min-w-32 ${si.cls}`}>
-            {stagePending ? <Loader2 className="w-3 h-3 animate-spin" /> : <SelectValue />}
           </SelectTrigger>
           <SelectContent>
-            {ALL_STAGES.map(st => (
-              <SelectItem key={st.value} value={st.value}>
-                <span className={`text-xs px-1.5 py-0.5 rounded ${st.cls}`}>
-                  {lang === "ar" ? st.ar : st.fr}
-                </span>
+            <SelectItem value="all">{allLabel}</SelectItem>
+            {groups.map((g) => (
+              <SelectItem key={g.id} value={String(g.id)}>
+                <div className="flex items-center gap-2">
+                  <span className="font-medium">{g.name}</span>
+                  {g.startDate && (
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(g.startDate), "dd/MM/yy")}
+                    </span>
+                  )}
+                  <span className="text-xs bg-muted px-1.5 py-0.5 rounded-full text-muted-foreground ms-auto">
+                    {(byGroup[String(g.id)] ?? []).length}
+                  </span>
+                </div>
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
-      </TableCell>
 
-      {/* Payment cycling (hidden mobile) */}
-      <TableCell className="hidden md:table-cell">
+        {/* Add schedule button */}
         <button
-          onClick={cyclePayment}
-          disabled={payPending || student.paymentStatus === "paid"}
-          className={`text-xs px-2.5 py-1 rounded-full font-medium transition-all hover:opacity-80 disabled:cursor-default ${payLbl.cls}`}
-          title={lang === "ar" ? "انقر للتغيير" : "Cliquer pour changer"}
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 transition-colors"
         >
-          {payPending ? "..." : payLbl.ar}
+          <Plus className="w-4 h-4" />{addLabel}
         </button>
-      </TableCell>
+      </div>
 
-      {/* Actions */}
-      <TableCell>
-        <div className="flex items-center gap-1 justify-center">
-          {/* Note toggle */}
-          <button
-            className={`p-1.5 rounded-lg transition-colors ${student.note || editingNote ? "text-amber-500 bg-amber-50" : "text-muted-foreground hover:text-amber-500 hover:bg-amber-50"}`}
-            onClick={() => { setEditingNote(v => !v); setTimeout(() => noteRef.current?.focus(), 50); }}
-            title={lang === "ar" ? "ملاحظة" : "Note"}
-          >
-            <StickyNote className="w-4 h-4" />
-          </button>
+      {isLoading && (
+        <div className="flex items-center justify-center h-64 text-muted-foreground">{t.loading}</div>
+      )}
 
-          {/* WhatsApp */}
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50 transition-colors"
-            title="WhatsApp"
-          >
-            <MessageCircle className="w-4 h-4" />
-          </a>
-
-          {/* Profile link */}
-          <Link
-            href={`/gab-c7x2p/students/${student.id}`}
-            className="p-1.5 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-            title={lang === "ar" ? "فتح الملف" : "Voir le profil"}
-          >
-            <ExternalLink className="w-4 h-4" />
-          </Link>
-        </div>
-
-        {/* Inline note editor */}
-        {editingNote && (
-          <div className="mt-2 flex gap-1 items-end">
-            <textarea
-              ref={noteRef}
-              value={noteVal}
-              onChange={e => setNoteVal(e.target.value)}
-              rows={2}
-              className="flex-1 text-xs border border-amber-200 rounded-lg p-1.5 resize-none focus:outline-none focus:ring-1 focus:ring-amber-400 bg-amber-50/50"
-              placeholder={lang === "ar" ? "اكتب ملاحظة..." : "Écrire une note..."}
-              onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); saveNote(); } if (e.key === "Escape") setEditingNote(false); }}
-            />
-            <button onClick={saveNote} className="p-1.5 rounded-lg bg-amber-500 text-white hover:bg-amber-600">
-              <CheckCircle2 className="w-4 h-4" />
+      {/* ── Schedules Kanban with drag-and-drop ── */}
+      {!isLoading && (
+        groups.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-64 gap-4 text-gray-400">
+            <CalendarDays className="w-12 h-12 opacity-30" />
+            <p className="text-sm">{noData}</p>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 transition-colors"
+            >
+              <Plus className="w-4 h-4" />{addLabel}
             </button>
           </div>
-        )}
-      </TableCell>
-    </TableRow>
-  );
-}
+        ) : (
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <div className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-14rem)] items-start">
+              {displayedGroups.map((group, idx) => {
+                const col        = colFor(idx);
+                const gs         = byGroup[String(group.id)] ?? [];
+                const isRenaming = renamingId === group.id;
 
-// ─── Group Form Dialog ────────────────────────────────────────────────────────
+                return (
+                  <div
+                    key={group.id}
+                    className={`flex-shrink-0 w-72 rounded-2xl overflow-hidden shadow-sm border ${col.border} flex flex-col`}
+                  >
+                    {/* Column header */}
+                    <div className={`${col.header} px-4 py-3`}>
+                      <div className="flex items-center gap-2">
+                        {isRenaming ? (
+                          <RenameInput
+                            value={group.name}
+                            onConfirm={(v) => handleRename(group, v)}
+                            onCancel={() => setRenamingId(null)}
+                          />
+                        ) : (
+                          <>
+                            <h3 className="text-white font-bold text-sm truncate flex-1">{group.name}</h3>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                                {gs.length}
+                              </span>
+                              <button
+                                onClick={() => setRenamingId(group.id)}
+                                title={t.renameSchedule}
+                                className="text-white/70 hover:text-white transition-colors p-0.5 rounded"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                              {isAdmin && (
+                                <button
+                                  onClick={() => handleDelete(group)}
+                                  title={t.delete}
+                                  className="text-white/70 hover:text-red-200 transition-colors p-0.5 rounded"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                      {!isRenaming && (
+                        <p className="text-white/60 text-[11px] mt-0.5">
+                          {format(new Date(group.startDate || Date.now()), "dd/MM/yyyy")}
+                        </p>
+                      )}
+                    </div>
 
-function GroupFormDialog({ open, group, onClose, onSaved, lang }: {
-  open: boolean;
-  group?: Partial<GroupSummary>;
-  onClose: () => void;
-  onSaved: () => void;
-  lang: string;
-}) {
-  const isEdit = !!group?.id;
-  const s = lang === "ar"
-    ? { title: isEdit ? "تعديل الدورة" : "إضافة دورة جديدة", name: "اسم الدورة", date: "تاريخ البدء", type: "نوع التدريب", capacity: "الطاقة الاستيعابية", status: "الحالة", notes: "ملاحظات", save: isEdit ? "حفظ التغييرات" : "إنشاء", physical: "حضوري", online: "عن بعد", open: "مفتوح", closed: "مغلق", saving: "جاري الحفظ..." }
-    : { title: isEdit ? "Modifier la session" : "Nouvelle session", name: "Nom", date: "Date de début", type: "Type de formation", capacity: "Capacité", status: "Statut", notes: "Notes", save: isEdit ? "Enregistrer" : "Créer", physical: "Présentiel", online: "En ligne", open: "Ouvert", closed: "Fermé", saving: "Enregistrement..." };
+                    {/* Droppable column body */}
+                    <Droppable droppableId={String(group.id)}>
+                      {(provided, snapshot) => (
+                        <div
+                          ref={provided.innerRef}
+                          {...provided.droppableProps}
+                          className={`${col.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-18rem)] transition-colors ${snapshot.isDraggingOver ? "ring-2 ring-inset ring-white/50 bg-opacity-70" : ""}`}
+                        >
+                          {gs.length === 0 && !snapshot.isDraggingOver && (
+                            <div className="h-24 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl">
+                              <p className="text-xs text-gray-400 text-center px-2">{t.noStudents}</p>
+                            </div>
+                          )}
+                          {gs.map((s, sIdx) => (
+                            <Draggable key={s.id} draggableId={`s-${s.id}`} index={sIdx}>
+                              {(drag, dragSnap) => (
+                                <div
+                                  ref={drag.innerRef}
+                                  {...drag.draggableProps}
+                                  className={dragSnap.isDragging ? "opacity-90 rotate-1 shadow-xl" : ""}
+                                >
+                                  <ScheduleStudentCard
+                                    student={s}
+                                    groups={groups}
+                                    currentGroupId={group.id}
+                                    onMove={handleMoveToGroup}
+                                    onReturnToPipeline={handleReturnToPipeline}
+                                    t={t}
+                                    dragHandleProps={drag.dragHandleProps as unknown as Record<string, unknown>}
+                                  />
+                                </div>
+                              )}
+                            </Draggable>
+                          ))}
+                          {provided.placeholder}
+                        </div>
+                      )}
+                    </Droppable>
+                  </div>
+                );
+              })}
 
-  const { register, handleSubmit, setValue, watch, reset } = useForm<GroupFormData>({
-    defaultValues: {
-      name: group?.name ?? "",
-      startDate: group?.startDate ?? "",
-      trainingType: group?.trainingType ?? "physical",
-      capacity: group?.capacity ?? 20,
-      status: group?.status ?? "open",
-      notes: group?.notes ?? "",
-    },
-  });
-
-  const [saving, setSaving] = useState(false);
-
-  const onSubmit = useCallback(async (data: GroupFormData) => {
-    setSaving(true);
-    try {
-      const url  = isEdit ? `/groups/${group!.id}` : "/groups";
-      const method = isEdit ? "PATCH" : "POST";
-      const r = await apiFetch(url, { method, body: JSON.stringify(data) });
-      if (!r.ok) throw new Error();
-      onSaved();
-      reset();
-    } catch {
-      // silent — onSaved handles toast
-    } finally { setSaving(false); }
-  }, [isEdit, group, onSaved, reset]);
-
-  return (
-    <Dialog open={open} onOpenChange={o => { if (!o) { onClose(); reset(); } }}>
-      <DialogContent className="sm:max-w-md rounded-3xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">{s.title}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label>{s.name}</Label>
-            <Input {...register("name", { required: true })} className="rounded-xl" />
-          </div>
-          <div className="space-y-2">
-            <Label>{s.date}</Label>
-            <Input type="date" {...register("startDate", { required: true })} className="rounded-xl" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>{s.type}</Label>
-              <Select value={watch("trainingType")} onValueChange={v => setValue("trainingType", v)}>
-                <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="physical">{s.physical}</SelectItem>
-                  <SelectItem value="online">{s.online}</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Add schedule column — only when showing all */}
+              {selectedGroupId === "all" && (
+                <div className="flex-shrink-0 w-64 self-start">
+                  <button
+                    onClick={() => setModalOpen(true)}
+                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-transparent hover:border-orange-400 hover:bg-orange-50 transition-all flex items-center justify-center gap-2 px-4 py-6 text-sm font-medium text-gray-500 hover:text-orange-600 group"
+                  >
+                    <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />{addLabel}
+                  </button>
+                </div>
+              )}
             </div>
-            <div className="space-y-2">
-              <Label>{s.capacity}</Label>
-              <Input type="number" min={1} {...register("capacity", { valueAsNumber: true })} className="rounded-xl" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label>{s.status}</Label>
-            <Select value={watch("status")} onValueChange={v => setValue("status", v)}>
-              <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="open">{s.open}</SelectItem>
-                <SelectItem value="closed">{s.closed}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>{s.notes}</Label>
-            <Input {...register("notes")} className="rounded-xl" />
-          </div>
-          <Button type="submit" className="w-full rounded-xl" disabled={saving}>
-            {saving ? s.saving : s.save}
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+          </DragDropContext>
+        )
+      )}
 
-// ─── Add Student Dialog ───────────────────────────────────────────────────────
-
-function AddStudentDialog({ open, groupId, existingIds, onClose, onAdded, lang, toast }: {
-  open: boolean;
-  groupId: number;
-  existingIds: number[];
-  onClose: () => void;
-  onAdded: () => void;
-  lang: string;
-  toast: ReturnType<typeof useToast>["toast"];
-}) {
-  const [search, setSearch] = useState("");
-  const [assigning, setAssigning] = useState<number | null>(null);
-
-  const s = lang === "ar"
-    ? { title: "إضافة طالب للدورة", placeholder: "ابحث بالاسم أو الهاتف...", inGroup: "مسجل مسبقاً", add: "إضافة", added: "تمت الإضافة ✅", noResults: "لا نتائج" }
-    : { title: "Ajouter un apprenant", placeholder: "Chercher par nom ou téléphone...", inGroup: "Déjà inscrit", add: "Ajouter", added: "Ajouté ✅", noResults: "Aucun résultat" };
-
-  type RawStudent = { id: number; firstName: string; lastName: string; phone: string; city: string; stage: string };
-
-  const { data: results = [] } = useQuery<RawStudent[]>({
-    queryKey: ["student-search", search],
-    queryFn: async () => {
-      if (search.trim().length < 2) return [];
-      const r = await apiFetch(`/students?search=${encodeURIComponent(search)}&limit=20`);
-      if (!r.ok) return [];
-      const data = await r.json();
-      return Array.isArray(data) ? data : [];
-    },
-    enabled: open && search.trim().length >= 2,
-    staleTime: 5_000,
-  });
-
-  async function assignStudent(studentId: number) {
-    setAssigning(studentId);
-    try {
-      const r = await apiFetch(`/students/${studentId}`, {
-        method: "PATCH",
-        body: JSON.stringify({ groupId }),
-      });
-      if (!r.ok) throw new Error();
-      toast({ title: s.added });
-      onAdded();
-    } catch {
-      toast({ title: lang === "ar" ? "خطأ" : "Erreur", variant: "destructive" });
-    } finally { setAssigning(null); }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={o => { if (!o) { onClose(); setSearch(""); } }}>
-      <DialogContent className="sm:max-w-md rounded-3xl p-6">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold">{s.title}</DialogTitle>
-        </DialogHeader>
-        <div className="mt-4 space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder={s.placeholder}
-              className="rounded-xl pl-9"
+      {/* ── Add Schedule Modal ── */}
+      <Dialog open={modalOpen} onOpenChange={(o) => { setModalOpen(o); if (!o) setModalName(""); }}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5 text-orange-500" />
+              {t.newScheduleTitle}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-2">
+            <label className="text-sm font-medium text-gray-700 block mb-1.5">{t.scheduleNameLabel}</label>
+            <input
               autoFocus
+              value={modalName}
+              onChange={(e) => setModalName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") handleCreateGroup(); }}
+              placeholder={t.scheduleNamePlaceholder}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent"
             />
           </div>
-
-          {search.trim().length >= 2 && results.length === 0 && (
-            <p className="text-center text-sm text-muted-foreground py-4">{s.noResults}</p>
-          )}
-
-          <div className="space-y-2 max-h-72 overflow-y-auto">
-            {results.map(student => {
-              const alreadyIn = existingIds.includes(student.id);
-              const si = stageInfo(student.stage);
-              return (
-                <div key={student.id} className="flex items-center justify-between p-3 rounded-xl border border-border/60 hover:bg-muted/30 transition-colors">
-                  <div>
-                    <p className="font-medium text-sm">{student.firstName} {student.lastName}</p>
-                    <p className="text-xs text-muted-foreground">{student.phone} · {student.city}</p>
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full border font-medium mt-1 inline-block ${si.cls}`}>
-                      {lang === "ar" ? si.ar : si.fr}
-                    </span>
-                  </div>
-                  {alreadyIn ? (
-                    <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-lg">{s.inGroup}</span>
-                  ) : (
-                    <Button
-                      size="sm"
-                      className="rounded-lg h-8"
-                      disabled={assigning === student.id}
-                      onClick={() => assignStudent(student.id)}
-                    >
-                      {assigning === student.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <><UserPlus className="w-3 h-3 me-1" />{s.add}</>}
-                    </Button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="mt-4 gap-2 flex-row">
+            <button
+              onClick={() => { setModalOpen(false); setModalName(""); }}
+              className="flex-1 px-4 py-2 text-sm text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors font-medium"
+            >
+              {lang === "ar" ? "إلغاء" : "Annuler"}
+            </button>
+            <button
+              onClick={handleCreateGroup}
+              disabled={!modalName.trim() || createMutation.isPending}
+              className="flex-1 px-4 py-2 text-sm text-white bg-orange-500 rounded-lg hover:bg-orange-600 transition-colors font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              {t.create}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </AdminLayout>
   );
 }
