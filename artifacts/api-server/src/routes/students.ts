@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, sql, desc, isNull, gte } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc, isNull, gte, lt } from "drizzle-orm";
 import { db, studentsTable, groupsTable } from "@workspace/db";
 import {
   CreateStudentBody,
@@ -28,6 +28,11 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import "../types/session";
 
+const ALL_STAGE_VALUES = [
+  "new", "contacted", "interested", "payment_pending", "payment_confirmed",
+  "confirmed", "attended", "no_show", "completed", "archived",
+] as const;
+
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 function parseStoragePath(path: string): { bucketName: string; objectName: string } {
@@ -39,36 +44,49 @@ function parseStoragePath(path: string): { bucketName: string; objectName: strin
 const router: IRouter = Router();
 
 router.get("/students", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
-  const query = ListStudentsQueryParams.safeParse(req.query);
+  const rq = req.query as Record<string, string | undefined>;
   const conditions = [isNull(studentsTable.deletedAt)];
 
-  if (query.success) {
-    if (query.data.stage) {
-      conditions.push(eq(studentsTable.stage, query.data.stage));
-    }
-    if (query.data.trainingType) {
-      conditions.push(eq(studentsTable.trainingType, query.data.trainingType));
-    }
-    if (query.data.groupId) {
-      conditions.push(eq(studentsTable.groupId, query.data.groupId));
-    }
-    if (query.data.paymentStatus) {
-      conditions.push(eq(studentsTable.paymentStatus, query.data.paymentStatus));
-    }
-    if (query.data.housingNeeded !== undefined) {
-      conditions.push(eq(studentsTable.housingNeeded, query.data.housingNeeded === "true"));
-    }
-    if (query.data.search) {
-      const term = `%${query.data.search}%`;
-      conditions.push(
-        or(
-          ilike(studentsTable.firstName, term),
-          ilike(studentsTable.lastName, term),
-          ilike(studentsTable.phone, term),
-          ilike(studentsTable.city, term)
-        )!
-      );
-    }
+  const rawStage = rq.stage;
+  if (rawStage && (ALL_STAGE_VALUES as readonly string[]).includes(rawStage)) {
+    conditions.push(eq(studentsTable.stage, rawStage));
+  }
+  const rawTrainingType = rq.trainingType;
+  if (rawTrainingType && ["physical", "online"].includes(rawTrainingType)) {
+    conditions.push(eq(studentsTable.trainingType, rawTrainingType));
+  }
+  const rawGroupId = rq.groupId ? parseInt(rq.groupId, 10) : undefined;
+  if (rawGroupId && !isNaN(rawGroupId)) {
+    conditions.push(eq(studentsTable.groupId, rawGroupId));
+  }
+  const rawPaymentStatus = rq.paymentStatus;
+  if (rawPaymentStatus && ["unpaid", "deposited", "paid"].includes(rawPaymentStatus)) {
+    conditions.push(eq(studentsTable.paymentStatus, rawPaymentStatus));
+  }
+  if (rq.housingNeeded === "true" || rq.housingNeeded === "false") {
+    conditions.push(eq(studentsTable.housingNeeded, rq.housingNeeded === "true"));
+  }
+  if (rq.city) {
+    conditions.push(ilike(studentsTable.city, `%${rq.city}%`));
+  }
+  if (rq.search) {
+    const term = `%${rq.search}%`;
+    conditions.push(or(
+      ilike(studentsTable.firstName, term),
+      ilike(studentsTable.lastName, term),
+      ilike(studentsTable.phone, term),
+      ilike(studentsTable.city, term),
+    )!);
+  }
+  if (rq.dateFrom) {
+    try { conditions.push(gte(studentsTable.createdAt, new Date(rq.dateFrom))); } catch { /* ignore invalid date */ }
+  }
+  if (rq.dateTo) {
+    try {
+      const end = new Date(rq.dateTo);
+      end.setDate(end.getDate() + 1);
+      conditions.push(lt(studentsTable.createdAt, end));
+    } catch { /* ignore invalid date */ }
   }
 
   const students = await db
@@ -77,7 +95,7 @@ router.get("/students", requireRole("admin", "manager", "staff", "assistant"), a
     .where(and(...conditions))
     .orderBy(desc(studentsTable.createdAt));
 
-  res.json(ListStudentsResponse.parse(students));
+  res.json(students);
 });
 
 router.post("/students", async (req, res): Promise<void> => {
@@ -136,7 +154,52 @@ router.post("/students", async (req, res): Promise<void> => {
 
   sendTelegramNotification(telegramMsg).catch(() => {});
 
-  res.status(201).json(GetStudentResponse.parse(student));
+  res.status(201).json(student);
+});
+
+router.get("/students/stage-counts", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
+  const rows = await db
+    .select({ stage: studentsTable.stage, cnt: sql<number>`count(*)::int` })
+    .from(studentsTable)
+    .where(isNull(studentsTable.deletedAt))
+    .groupBy(studentsTable.stage);
+
+  const result: Record<string, number> = { _total: 0 };
+  for (const row of rows) {
+    result[row.stage] = row.cnt;
+    result["_total"] = (result["_total"] ?? 0) + row.cnt;
+  }
+  res.json(result);
+});
+
+router.patch("/students/bulk/stage", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
+  const ids: unknown = req.body?.ids;
+  const stage: unknown = req.body?.stage;
+  if (!Array.isArray(ids) || ids.length === 0 || typeof stage !== "string" || !(ALL_STAGE_VALUES as readonly string[]).includes(stage)) {
+    res.status(400).json({ error: "Invalid ids or stage" });
+    return;
+  }
+  const numIds = ids.map(Number).filter(n => !isNaN(n) && n > 0);
+  if (numIds.length === 0) {
+    res.status(400).json({ error: "No valid ids" });
+    return;
+  }
+
+  const { inArray } = await import("drizzle-orm");
+  const updated = await db
+    .update(studentsTable)
+    .set({ stage })
+    .where(and(inArray(studentsTable.id, numIds), isNull(studentsTable.deletedAt)))
+    .returning({ id: studentsTable.id });
+
+  const performer = req.session.fullName ?? "Unknown";
+  await logActivity(
+    "stage_changed",
+    `🔄 تغيير مرحلة جماعي → ${stage} (${updated.length} طالب)`,
+    performer
+  ).catch(() => {});
+
+  res.json({ updated: updated.length });
 });
 
 router.get("/students/:id", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
@@ -156,7 +219,7 @@ router.get("/students/:id", requireRole("admin", "manager", "staff", "assistant"
     return;
   }
 
-  res.json(GetStudentResponse.parse(student));
+  res.json(student);
 });
 
 router.patch("/students/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
@@ -191,7 +254,7 @@ router.patch("/students/:id", requireRole("admin", "manager"), async (req, res):
     student.id
   );
 
-  res.json(UpdateStudentResponse.parse(student));
+  res.json(student);
 });
 
 router.delete("/students/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
@@ -230,9 +293,9 @@ router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "as
     return;
   }
 
-  const parsed = UpdateStudentStageBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+  const stageVal = typeof req.body?.stage === "string" ? req.body.stage : "";
+  if (!(ALL_STAGE_VALUES as readonly string[]).includes(stageVal)) {
+    res.status(400).json({ error: "Invalid stage value" });
     return;
   }
 
@@ -248,19 +311,19 @@ router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "as
 
   const [student] = await db
     .update(studentsTable)
-    .set({ stage: parsed.data.stage })
+    .set({ stage: stageVal })
     .where(eq(studentsTable.id, params.data.id))
     .returning();
 
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "stage_changed",
-    `🔄 ${student.firstName} ${student.lastName}: ${oldStudent.stage} → ${parsed.data.stage}`,
+    `🔄 ${student.firstName} ${student.lastName}: ${oldStudent.stage} → ${stageVal}`,
     performer,
     student.id
   );
 
-  res.json(UpdateStudentStageResponse.parse(student));
+  res.json(student);
 });
 
 router.patch("/students/:id/group", requireRole("admin", "manager"), async (req, res): Promise<void> => {
@@ -303,7 +366,7 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
     student.id
   );
 
-  res.json(AssignStudentToGroupResponse.parse(student));
+  res.json(student);
 });
 
 router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.single("receipt"), async (req, res): Promise<void> => {
