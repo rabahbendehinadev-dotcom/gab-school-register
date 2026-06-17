@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { Link } from "wouter";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import {
   useListStudents,
@@ -194,7 +195,7 @@ function StageStudentCard({ student, cfg, t, stages, groups, onStageChange, onUp
 
       {/* Header */}
       <div className="flex justify-between items-start mb-2">
-        <h4 className="font-bold text-sm text-gray-800">{fullName}</h4>
+        <Link href={`/gab-c7x2p/students/${student.id}`} className="font-bold text-sm text-gray-800 hover:text-primary hover:underline cursor-pointer">{fullName}</Link>
         <DropdownMenu>
           <DropdownMenuTrigger className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded-md hover:bg-black/10 active:bg-black/20 transition-opacity touch-manipulation">
             <MoreHorizontal className="w-4 h-4 text-gray-600" />
@@ -447,7 +448,7 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
           <span {...(dragHandleProps ?? {})} className="text-gray-300 hover:text-gray-500 flex-shrink-0 cursor-grab active:cursor-grabbing touch-manipulation select-none">
             <GripVertical className="w-4 h-4" />
           </span>
-          <p className="font-semibold text-sm text-gray-800 leading-tight truncate">{fullName}</p>
+          <Link href={`/gab-c7x2p/students/${student.id}`} className="font-semibold text-sm text-gray-800 leading-tight truncate hover:text-primary hover:underline cursor-pointer">{fullName}</Link>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger className="opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1 rounded-md hover:bg-gray-100 transition-opacity flex-shrink-0">
@@ -821,7 +822,7 @@ export default function Pipeline() {
                                     onMove={handleMoveToGroup}
                                     onReturnToPipeline={handleReturnToPipeline}
                                     t={t}
-                                    dragHandleProps={drag.dragHandleProps as Record<string, unknown>}
+                                    dragHandleProps={drag.dragHandleProps as unknown as Record<string, unknown>}
                                   />
                                 </div>
                               )}

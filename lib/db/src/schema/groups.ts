@@ -10,6 +10,10 @@ export const groupsTable = pgTable("groups", {
   capacity: integer("capacity").notNull(),
   notes: text("notes"),
   status: text("status").notNull().default("open"),
+  endDate: timestamp("end_date", { withTimezone: true }),
+  instructor: text("instructor"),
+  price: integer("price"),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

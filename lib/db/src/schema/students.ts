@@ -20,6 +20,12 @@ export const studentsTable = pgTable("students", {
   receiptUrl: text("receipt_url"),
   stage: text("stage").notNull().default("new"),
   groupId: integer("group_id").references(() => groupsTable.id, { onDelete: "set null" }),
+  source: text("source").notNull().default("website"),
+  agreedPrice: integer("agreed_price"),
+  nextFollowupAt: timestamp("next_followup_at", { withTimezone: true }),
+  lastContactedAt: timestamp("last_contacted_at", { withTimezone: true }),
+  contactAttempts: integer("contact_attempts").notNull().default(0),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
 });

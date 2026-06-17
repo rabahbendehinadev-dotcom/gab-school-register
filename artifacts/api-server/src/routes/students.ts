@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, sql, desc } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc, isNull, gte } from "drizzle-orm";
 import { db, studentsTable, groupsTable } from "@workspace/db";
 import {
   CreateStudentBody,
@@ -21,6 +21,7 @@ import {
 } from "@workspace/api-zod";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
+import { createNotification } from "../lib/notifications";
 import { sendTelegramNotification } from "../lib/telegram";
 import { objectStorageClient } from "../lib/objectStorage";
 import multer from "multer";
@@ -39,7 +40,7 @@ const router: IRouter = Router();
 
 router.get("/students", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
   const query = ListStudentsQueryParams.safeParse(req.query);
-  const conditions = [];
+  const conditions = [isNull(studentsTable.deletedAt)];
 
   if (query.success) {
     if (query.data.stage) {
@@ -73,7 +74,7 @@ router.get("/students", requireRole("admin", "manager", "staff", "assistant"), a
   const students = await db
     .select()
     .from(studentsTable)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .where(and(...conditions))
     .orderBy(desc(studentsTable.createdAt));
 
   res.json(ListStudentsResponse.parse(students));
@@ -93,9 +94,17 @@ router.post("/students", async (req, res): Promise<void> => {
 
   await logActivity(
     "student_registered",
-    `New student registered: ${student.firstName} ${student.lastName}`,
-    "Public Registration"
+    `🎓 تسجيل جديد: ${student.firstName} ${student.lastName} — ${student.city}`,
+    "Public Registration",
+    student.id
   );
+
+  await createNotification(
+    "new_registration",
+    "🎓 تسجيل جديد!",
+    `${student.firstName} ${student.lastName} من ${student.city} — ${student.phone}`,
+    student.id
+  ).catch(() => {});
 
   const trainingLabel = student.trainingType === "physical" ? "حضوري" : "أونلاين";
 
@@ -177,8 +186,9 @@ router.patch("/students/:id", requireRole("admin", "manager"), async (req, res):
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "student_updated",
-    `Student updated: ${student.firstName} ${student.lastName}`,
-    performer
+    `✏️ تحديث بيانات: ${student.firstName} ${student.lastName}`,
+    performer,
+    student.id
   );
 
   res.json(UpdateStudentResponse.parse(student));
@@ -192,8 +202,9 @@ router.delete("/students/:id", requireRole("admin", "manager"), async (req, res)
   }
 
   const [student] = await db
-    .delete(studentsTable)
-    .where(eq(studentsTable.id, params.data.id))
+    .update(studentsTable)
+    .set({ deletedAt: new Date() })
+    .where(and(eq(studentsTable.id, params.data.id), isNull(studentsTable.deletedAt)))
     .returning();
 
   if (!student) {
@@ -204,8 +215,9 @@ router.delete("/students/:id", requireRole("admin", "manager"), async (req, res)
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "student_deleted",
-    `Student deleted: ${student.firstName} ${student.lastName}`,
-    performer
+    `🗑️ أرشفة طالب (soft delete): ${student.firstName} ${student.lastName}`,
+    performer,
+    student.id
   );
 
   res.sendStatus(204);
@@ -243,8 +255,9 @@ router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "as
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "stage_changed",
-    `${student.firstName} ${student.lastName}: ${oldStudent.stage} → ${parsed.data.stage}`,
-    performer
+    `🔄 ${student.firstName} ${student.lastName}: ${oldStudent.stage} → ${parsed.data.stage}`,
+    performer,
+    student.id
   );
 
   res.json(UpdateStudentStageResponse.parse(student));
@@ -285,8 +298,9 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "group_assigned",
-    `${student.firstName} ${student.lastName} assigned to group ${parsed.data.groupId ?? "none"}`,
-    performer
+    `👥 ${student.firstName} ${student.lastName} → مجموعة ${parsed.data.groupId ?? "بدون"}`,
+    performer,
+    student.id
   );
 
   res.json(AssignStudentToGroupResponse.parse(student));
@@ -336,7 +350,7 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
 });
 
 router.get("/stats", requireRole("admin", "manager"), async (_req, res): Promise<void> => {
-  const students = await db.select().from(studentsTable);
+  const students = (await db.select().from(studentsTable)).filter((s) => !s.deletedAt);
   const stats = {
     totalStudents: students.length,
     newStudents: students.filter((s) => s.stage === "new").length,
@@ -349,11 +363,48 @@ router.get("/stats", requireRole("admin", "manager"), async (_req, res): Promise
   };
 
   const { groupsTable } = await import("@workspace/db");
-  const groups = await db.select().from(groupsTable);
+  const groups = (await db.select().from(groupsTable)).filter((g) => !g.deletedAt);
   stats.totalGroups = groups.length;
   stats.openGroups = groups.filter((g) => g.status === "open").length;
 
   res.json(GetDashboardStatsResponse.parse(stats));
+});
+
+// Extended ERP dashboard metrics for the 5-day training journey
+router.get("/stats/erp", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
+  const all = await db.select().from(studentsTable);
+  const students = all.filter((s) => !s.deletedAt);
+
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const todayRegistrations = students.filter((s) => new Date(s.createdAt) >= startOfDay).length;
+  const monthRegistrations = students.filter((s) => new Date(s.createdAt) >= startOfMonth).length;
+
+  const isStage = (s: typeof students[number], ...stages: string[]) => stages.includes(s.stage);
+  const notContacted = students.filter((s) => isStage(s, "new")).length;
+  const waitingPayment = students.filter((s) => isStage(s, "payment_pending", "interested")).length;
+  const confirmed = students.filter((s) => isStage(s, "payment_confirmed")).length;
+  const inTraining = students.filter((s) => isStage(s, "assigned", "in_training")).length;
+  const completed = students.filter((s) => isStage(s, "completed")).length;
+  const archived = students.filter((s) => isStage(s, "archived")).length;
+
+  const paidCount = students.filter((s) => s.paymentStatus === "paid").length;
+  const conversionRate = students.length > 0 ? Math.round((paidCount / students.length) * 100) : 0;
+
+  res.json({
+    todayRegistrations,
+    monthRegistrations,
+    notContacted,
+    waitingPayment,
+    confirmed,
+    inTraining,
+    completed,
+    archived,
+    totalStudents: students.length,
+    conversionRate,
+  });
 });
 
 export default router;

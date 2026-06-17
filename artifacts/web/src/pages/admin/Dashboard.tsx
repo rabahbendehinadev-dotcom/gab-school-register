@@ -1,12 +1,84 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { useGetDashboardStats, useListActivity } from "@workspace/api-client-react";
-import { Users, UserPlus, PhoneCall, CheckCircle, XCircle, Archive, Layers, FolderOpen, CalendarDays, Save } from "lucide-react";
+import { Users, UserPlus, PhoneCall, CheckCircle, XCircle, Archive, Layers, FolderOpen, CalendarDays, Save, Wallet, Banknote, Target, AlertCircle, GraduationCap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { format } from "date-fns";
 import { useLocation } from "wouter";
 import { useI18n } from "@/contexts/i18n-context";
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+
+interface ErpStats {
+  todayRegistrations: number; monthRegistrations: number; notContacted: number;
+  waitingPayment: number; confirmed: number; inTraining: number; completed: number;
+  archived: number; totalStudents: number; conversionRate: number;
+}
+interface FinancialStats { todayRevenue: number; monthRevenue: number; totalRevenue: number; outstanding: number }
+
+async function statFetch(path: string) {
+  const res = await fetch(`/api${path}`, { credentials: "include" });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function ErpMetrics() {
+  const { lang } = useI18n();
+  const isFr = lang === "fr";
+  const { data: erp } = useQuery<ErpStats>({ queryKey: ["stats-erp"], queryFn: () => statFetch("/stats/erp") });
+  const { data: fin } = useQuery<FinancialStats>({ queryKey: ["stats-financials"], queryFn: () => statFetch("/stats/financials") });
+
+  const metrics = [
+    { label: isFr ? "Inscrits aujourd'hui" : "تسجيلات اليوم", value: erp?.todayRegistrations ?? 0, icon: UserPlus, color: "text-purple-600", bg: "bg-purple-50" },
+    { label: isFr ? "Inscrits ce mois" : "تسجيلات الشهر", value: erp?.monthRegistrations ?? 0, icon: CalendarDays, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: isFr ? "Revenu aujourd'hui" : "إيرادات اليوم", value: `${fin?.todayRevenue ?? 0}`, icon: Wallet, color: "text-green-600", bg: "bg-green-50" },
+    { label: isFr ? "Revenu ce mois" : "إيرادات الشهر", value: `${fin?.monthRevenue ?? 0}`, icon: Banknote, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: isFr ? "Taux de conversion" : "نسبة التحويل", value: `${erp?.conversionRate ?? 0}%`, icon: Target, color: "text-orange-600", bg: "bg-orange-50" },
+    { label: isFr ? "Impayés" : "مبالغ مستحقة", value: `${fin?.outstanding ?? 0}`, icon: AlertCircle, color: "text-red-600", bg: "bg-red-50" },
+  ];
+
+  const funnel = [
+    { label: isFr ? "Non contactés" : "لم يتم الاتصال", value: erp?.notContacted ?? 0, color: "bg-blue-500" },
+    { label: isFr ? "Attente paiement" : "بانتظار الدفع", value: erp?.waitingPayment ?? 0, color: "bg-amber-500" },
+    { label: isFr ? "Confirmés" : "مؤكّدون", value: erp?.confirmed ?? 0, color: "bg-violet-500" },
+    { label: isFr ? "En formation" : "في التدريب", value: erp?.inTraining ?? 0, color: "bg-cyan-500" },
+    { label: isFr ? "Terminés" : "أتموا", value: erp?.completed ?? 0, color: "bg-green-500" },
+  ];
+  const maxFunnel = Math.max(1, ...funnel.map((f) => f.value));
+
+  return (
+    <div className="space-y-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {metrics.map((m, i) => (
+          <div key={i} className="bg-card rounded-2xl border border-border/50 shadow-sm p-4">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${m.bg} ${m.color} mb-2`}><m.icon className="w-4.5 h-4.5" /></div>
+            <p className="text-[11px] text-muted-foreground leading-tight">{m.label}</p>
+            <p className="text-lg font-bold text-foreground mt-0.5">{m.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <GraduationCap className="w-5 h-5 text-primary" />
+          <h2 className="text-base font-bold">{isFr ? "Parcours étudiant" : "رحلة الطالب"}</h2>
+        </div>
+        <div className="space-y-2.5">
+          {funnel.map((f, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-28 flex-shrink-0 text-end">{f.label}</span>
+              <div className="flex-1 bg-muted/40 rounded-full h-6 overflow-hidden">
+                <div className={`${f.color} h-full rounded-full flex items-center justify-end px-2 transition-all`} style={{ width: `${Math.max(8, (f.value / maxFunnel) * 100)}%` }}>
+                  <span className="text-[11px] font-bold text-white">{f.value}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function NextCourseDateCard() {
   const { toast } = useToast();
@@ -158,6 +230,9 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
+      {/* ERP metrics + journey funnel */}
+      <ErpMetrics />
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
         {statCards.map((stat, i) => (
@@ -184,12 +259,6 @@ export default function Dashboard() {
         {/* Left: Overview + Next Course */}
         <div className="lg:col-span-2 space-y-6">
           <NextCourseDateCard />
-          <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-6">
-            <h2 className="text-lg font-bold mb-4">{t.systemOverview}</h2>
-            <div className="h-48 flex items-center justify-center bg-muted/30 rounded-xl border border-dashed border-border">
-              <p className="text-muted-foreground text-sm">Analytics visualization space</p>
-            </div>
-          </div>
         </div>
 
         {/* Right: Recent Activity */}

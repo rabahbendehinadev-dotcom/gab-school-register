@@ -11,6 +11,8 @@ import Login from "@/pages/admin/Login";
 import Dashboard from "@/pages/admin/Dashboard";
 import Pipeline from "@/pages/admin/Pipeline";
 import Students from "@/pages/admin/Students";
+import StudentProfile from "@/pages/admin/StudentProfile";
+import Tasks from "@/pages/admin/Tasks";
 import Groups from "@/pages/admin/Groups";
 import Staff from "@/pages/admin/Staff";
 import Activity from "@/pages/admin/Activity";
@@ -41,6 +43,8 @@ function Router() {
       <Route path="/gab-c7x2p" component={Dashboard} />
       <Route path="/gab-c7x2p/pipeline" component={Pipeline} />
       <Route path="/gab-c7x2p/students" component={Students} />
+      <Route path="/gab-c7x2p/students/:id" component={StudentProfile} />
+      <Route path="/gab-c7x2p/tasks" component={Tasks} />
       <Route path="/gab-c7x2p/groups" component={Groups} />
       <Route path="/gab-c7x2p/staff" component={Staff} />
       <Route path="/gab-c7x2p/activity" component={Activity} />

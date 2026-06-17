@@ -6,3 +6,8 @@ export * from "./gallery";
 export * from "./settings";
 export * from "./open-day";
 export * from "./courses";
+export * from "./payments";
+export * from "./student-notes";
+export * from "./attendance";
+export * from "./tasks";
+export * from "./notifications";

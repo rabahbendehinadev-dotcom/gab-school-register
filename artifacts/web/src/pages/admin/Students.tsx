@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Search, Trash2, ArrowRightLeft, Users, Eye, MessageCircle, Upload, ExternalLink } from "lucide-react";
-import { useSearch } from "wouter";
+import { useSearch, Link } from "wouter";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { useForm } from "react-hook-form";
@@ -197,7 +197,9 @@ export default function Students() {
                 return (
                   <TableRow key={student.id} className="group hover:bg-muted/30">
                     <TableCell className="font-medium">
-                      {student.firstName} {student.lastName}
+                      <Link href={`/gab-c7x2p/students/${student.id}`} className="hover:text-primary hover:underline transition-colors cursor-pointer">
+                        {student.firstName} {student.lastName}
+                      </Link>
                     </TableCell>
                     <TableCell>
                       <div className="text-sm">{student.phone}</div>
