@@ -20,7 +20,7 @@ function dateToStr(d: Date | string | null | undefined): string | null {
   return String(d).split("T")[0];
 }
 
-// GET /groups — returns all groups with per-group stats in a single query
+// GET /groups — returns all groups with per-group stats, ordered by position
 router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
   const result = await db.execute(sql`
     SELECT
@@ -31,6 +31,9 @@ router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), asy
       g.capacity,
       g.status,
       g.notes,
+      g.position,
+      g.color,
+      g.hidden,
       COUNT(s.id)      FILTER (WHERE s.deleted_at IS NULL)::int              AS student_count,
       COUNT(s.id)      FILTER (WHERE s.deleted_at IS NULL
                                AND s.stage IN ('confirmed','attended','completed'))::int
@@ -44,7 +47,7 @@ router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), asy
     LEFT JOIN students s ON s.group_id = g.id
     WHERE g.deleted_at IS NULL
     GROUP BY g.id
-    ORDER BY g.start_date DESC
+    ORDER BY g.position ASC, g.start_date DESC
   `);
 
   const groups = (result.rows as Record<string, unknown>[]).map(r => ({
@@ -55,6 +58,9 @@ router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), asy
     capacity:       Number(r.capacity),
     status:         r.status,
     notes:          r.notes ?? null,
+    position:       Number(r.position ?? 0),
+    color:          (r.color as string | null) ?? null,
+    hidden:         Boolean(r.hidden),
     studentCount:   Number(r.student_count  ?? 0),
     confirmedCount: Number(r.confirmed_count ?? 0),
     paidCount:      Number(r.paid_count      ?? 0),
@@ -62,6 +68,21 @@ router.get("/groups", requireRole("admin", "manager", "staff", "assistant"), asy
   }));
 
   res.json(groups);
+});
+
+// POST /groups/reorder — bulk update positions
+router.post("/groups/reorder", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const { positions } = req.body as { positions: { id: number; position: number }[] };
+  if (!Array.isArray(positions)) {
+    res.status(400).json({ error: "positions must be an array" });
+    return;
+  }
+  await Promise.all(
+    positions.map(({ id, position }) =>
+      db.update(groupsTable).set({ position }).where(eq(groupsTable.id, id)),
+    ),
+  );
+  res.sendStatus(204);
 });
 
 // POST /groups
@@ -72,9 +93,12 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
     return;
   }
 
+  // Place new group at the end
+  const [{ maxPos }] = await db.execute(sql`SELECT COALESCE(MAX(position), -1) AS "maxPos" FROM groups WHERE deleted_at IS NULL`) as unknown as [{ maxPos: number }];
+
   const [group] = await db
     .insert(groupsTable)
-    .values({ ...parsed.data, startDate: new Date(parsed.data.startDate) })
+    .values({ ...parsed.data, startDate: new Date(parsed.data.startDate), position: (maxPos ?? -1) + 1 })
     .returning();
 
   const performer = req.session.fullName ?? "Unknown";
@@ -83,6 +107,9 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
   res.status(201).json({
     ...group,
     startDate:      dateToStr(group.startDate),
+    position:       group.position,
+    color:          group.color ?? null,
+    hidden:         group.hidden,
     studentCount:   0,
     confirmedCount: 0,
     paidCount:      0,
@@ -122,6 +149,9 @@ router.get("/groups/:id", requireRole("admin", "manager", "staff", "assistant"),
     capacity:       group.capacity,
     status:         group.status,
     notes:          group.notes ?? null,
+    position:       group.position,
+    color:          group.color ?? null,
+    hidden:         group.hidden,
     studentCount:   students.length,
     confirmedCount,
     paidCount,
@@ -138,9 +168,28 @@ router.get("/groups/:id", requireRole("admin", "manager", "staff", "assistant"),
       note:            s.note ?? null,
       contactReason:   s.contactReason ?? null,
       trainingType:    s.trainingType,
+      receiptUrl:      s.receiptUrl ?? null,
       createdAt:       formatDate(s.createdAt),
     })),
   });
+});
+
+// PATCH /groups/:id/color — update custom color
+router.patch("/groups/:id/color", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { color } = req.body as { color: string | null };
+  await db.update(groupsTable).set({ color: color ?? null }).where(eq(groupsTable.id, id));
+  res.sendStatus(204);
+});
+
+// PATCH /groups/:id/visibility — show/hide a group
+router.patch("/groups/:id/visibility", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+  const id = Number(req.params.id);
+  if (!id) { res.status(400).json({ error: "Invalid id" }); return; }
+  const { hidden } = req.body as { hidden: boolean };
+  await db.update(groupsTable).set({ hidden: Boolean(hidden) }).where(eq(groupsTable.id, id));
+  res.sendStatus(204);
 });
 
 // PATCH /groups/:id

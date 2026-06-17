@@ -46,12 +46,20 @@ import {
 import {
   MoreHorizontal, ArrowLeftCircle, GripVertical, StickyNote,
   Pencil, Trash2, Plus, Check, X, Loader2, CalendarDays, ImageIcon,
-  ChevronDown,
+  ChevronLeft, ChevronRight, Pin, EyeOff, Eye, Palette,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+
+// ─── Extended group type with new fields ──────────────────────────────────────
+
+interface GroupWithMeta extends Group {
+  position: number;
+  color: string | null;
+  hidden: boolean;
+}
 
 // ─── Stage dot colors ─────────────────────────────────────────────────────────
 
@@ -62,19 +70,29 @@ const STAGE_COLORS: Record<string, string> = {
   no_show: "bg-red-500", completed: "bg-purple-500", archived: "bg-gray-400",
 };
 
-// ─── Column palette ───────────────────────────────────────────────────────────
+// ─── Color palette ────────────────────────────────────────────────────────────
 
-const COLUMN_PALETTE = [
-  { header: "bg-violet-600", light: "bg-violet-50",   border: "border-violet-200" },
-  { header: "bg-teal-600",   light: "bg-teal-50",     border: "border-teal-200" },
-  { header: "bg-indigo-600", light: "bg-indigo-50",   border: "border-indigo-200" },
-  { header: "bg-rose-600",   light: "bg-rose-50",     border: "border-rose-200" },
-  { header: "bg-amber-600",  light: "bg-amber-50",    border: "border-amber-200" },
-  { header: "bg-cyan-600",   light: "bg-cyan-50",     border: "border-cyan-200" },
-  { header: "bg-emerald-600",light: "bg-emerald-50",  border: "border-emerald-200" },
-  { header: "bg-fuchsia-600",light: "bg-fuchsia-50",  border: "border-fuchsia-200" },
+const COLOR_OPTIONS = [
+  { key: "violet",  header: "bg-violet-600",  light: "bg-violet-50",   border: "border-violet-200",  swatch: "bg-violet-500" },
+  { key: "teal",    header: "bg-teal-600",    light: "bg-teal-50",     border: "border-teal-200",    swatch: "bg-teal-500" },
+  { key: "indigo",  header: "bg-indigo-600",  light: "bg-indigo-50",   border: "border-indigo-200",  swatch: "bg-indigo-500" },
+  { key: "rose",    header: "bg-rose-600",    light: "bg-rose-50",     border: "border-rose-200",    swatch: "bg-rose-500" },
+  { key: "amber",   header: "bg-amber-600",   light: "bg-amber-50",    border: "border-amber-200",   swatch: "bg-amber-500" },
+  { key: "cyan",    header: "bg-cyan-600",    light: "bg-cyan-50",     border: "border-cyan-200",    swatch: "bg-cyan-500" },
+  { key: "emerald", header: "bg-emerald-600", light: "bg-emerald-50",  border: "border-emerald-200", swatch: "bg-emerald-500" },
+  { key: "fuchsia", header: "bg-fuchsia-600", light: "bg-fuchsia-50",  border: "border-fuchsia-200", swatch: "bg-fuchsia-500" },
+  { key: "orange",  header: "bg-orange-600",  light: "bg-orange-50",   border: "border-orange-200",  swatch: "bg-orange-500" },
+  { key: "sky",     header: "bg-sky-600",     light: "bg-sky-50",      border: "border-sky-200",     swatch: "bg-sky-500" },
+  { key: "lime",    header: "bg-lime-600",    light: "bg-lime-50",     border: "border-lime-200",    swatch: "bg-lime-500" },
+  { key: "slate",   header: "bg-slate-600",   light: "bg-slate-50",    border: "border-slate-200",   swatch: "bg-slate-500" },
 ];
-const colFor = (idx: number) => COLUMN_PALETTE[idx % COLUMN_PALETTE.length];
+
+function colForGroup(group: GroupWithMeta, idx: number) {
+  if (group.color) {
+    return COLOR_OPTIONS.find(c => c.key === group.color) ?? COLOR_OPTIONS[idx % COLOR_OPTIONS.length];
+  }
+  return COLOR_OPTIONS[idx % COLOR_OPTIONS.length];
+}
 
 // ─── Rename input ─────────────────────────────────────────────────────────────
 
@@ -110,7 +128,7 @@ function RenameInput({ value, onConfirm, onCancel }: {
 
 function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturnToPipeline, t, dragHandleProps }: {
   student: Student;
-  groups: Group[];
+  groups: GroupWithMeta[];
   currentGroupId: number;
   onMove: (studentId: number, groupId: number) => void;
   onReturnToPipeline: (studentId: number) => void;
@@ -205,9 +223,9 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
         )}
       </div>
 
-      {student.receiptUrl && (
+      {(student as Student & { receiptUrl?: string | null }).receiptUrl && (
         <a
-          href={student.receiptUrl}
+          href={(student as Student & { receiptUrl?: string | null }).receiptUrl!}
           target="_blank"
           rel="noopener noreferrer"
           className="mt-2 flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 underline"
@@ -217,7 +235,6 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
         </a>
       )}
 
-      {/* Notes */}
       <div className="mt-2">
         <button
           onClick={() => setShowNote((p) => !p)}
@@ -257,12 +274,17 @@ export default function Groups() {
   const isAdmin = user?.role === "admin";
 
   const [selectedGroupId, setSelectedGroupId] = useState<"all" | string>("all");
-  const [modalOpen,  setModalOpen]  = useState(false);
-  const [modalName,  setModalName]  = useState("");
-  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [showHidden,  setShowHidden]  = useState(false);
+  const [modalOpen,   setModalOpen]   = useState(false);
+  const [modalName,   setModalName]   = useState("");
+  const [renamingId,  setRenamingId]  = useState<number | null>(null);
+  const [colorPickerId, setColorPickerId] = useState<number | null>(null);
 
-  const { data: allStudents = [], isLoading: studentsLoading } = useListStudents();
-  const { data: groups = [],      isLoading: groupsLoading }   = useListGroups();
+  const { data: rawStudents = [], isLoading: studentsLoading } = useListStudents();
+  const { data: rawGroups = [],   isLoading: groupsLoading }   = useListGroups();
+
+  const allStudents = rawStudents as Student[];
+  const groups = (rawGroups as unknown as GroupWithMeta[]).slice().sort((a, b) => (a.position ?? 0) - (b.position ?? 0));
 
   // Students grouped by their schedule
   const byGroup = (() => {
@@ -276,10 +298,15 @@ export default function Groups() {
     return map;
   })();
 
-  // Filter displayed groups based on dropdown selection
+  // Groups to display (filtered by selection + hidden toggle)
+  const visibleGroups = showHidden ? groups : groups.filter(g => !g.hidden);
   const displayedGroups = selectedGroupId === "all"
-    ? groups
-    : groups.filter((g) => String(g.id) === selectedGroupId);
+    ? visibleGroups
+    : visibleGroups.filter(g => String(g.id) === selectedGroupId);
+
+  const hiddenCount = groups.filter(g => g.hidden).length;
+
+  // ── Mutations ────────────────────────────────────────────────────────────────
 
   const assignMutation = useAssignStudentToGroup({
     mutation: {
@@ -319,12 +346,86 @@ export default function Groups() {
     },
   });
 
-  function handleRename(group: Group, name: string) {
+  // ── Group order helpers ───────────────────────────────────────────────────────
+
+  function applyNewOrder(orderedDisplayed: GroupWithMeta[]) {
+    // Merge: displayed groups in new order, non-displayed groups stay at end
+    const displayedIds = new Set(orderedDisplayed.map(g => g.id));
+    const rest = groups.filter(g => !displayedIds.has(g.id));
+    const newAll = [...orderedDisplayed, ...rest];
+    const withPositions = newAll.map((g, idx) => ({ ...g, position: idx }));
+
+    // Optimistic update in cache
+    qc.setQueryData(getListGroupsQueryKey(), withPositions);
+
+    // Save to DB
+    fetch("/api/groups/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ positions: withPositions.map((g, i) => ({ id: g.id, position: i })) }),
+    }).catch(() => qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }));
+  }
+
+  function handleMoveLeft(group: GroupWithMeta) {
+    const idx = displayedGroups.findIndex(g => g.id === group.id);
+    if (idx <= 0) return;
+    const items = [...displayedGroups];
+    [items[idx - 1], items[idx]] = [items[idx], items[idx - 1]];
+    applyNewOrder(items);
+  }
+
+  function handleMoveRight(group: GroupWithMeta) {
+    const idx = displayedGroups.findIndex(g => g.id === group.id);
+    if (idx >= displayedGroups.length - 1) return;
+    const items = [...displayedGroups];
+    [items[idx], items[idx + 1]] = [items[idx + 1], items[idx]];
+    applyNewOrder(items);
+  }
+
+  function handlePinToStart(group: GroupWithMeta) {
+    const idx = displayedGroups.findIndex(g => g.id === group.id);
+    if (idx <= 0) return;
+    const items = [...displayedGroups];
+    items.splice(idx, 1);
+    items.unshift(group);
+    applyNewOrder(items);
+  }
+
+  function handleToggleHidden(group: GroupWithMeta) {
+    const newHidden = !group.hidden;
+    qc.setQueryData(getListGroupsQueryKey(), (old: GroupWithMeta[] | undefined) =>
+      (old ?? []).map(g => g.id === group.id ? { ...g, hidden: newHidden } : g),
+    );
+    fetch(`/api/groups/${group.id}/visibility`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ hidden: newHidden }),
+    }).catch(() => qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }));
+  }
+
+  function handleColorChange(groupId: number, color: string | null) {
+    qc.setQueryData(getListGroupsQueryKey(), (old: GroupWithMeta[] | undefined) =>
+      (old ?? []).map(g => g.id === groupId ? { ...g, color } : g),
+    );
+    fetch(`/api/groups/${groupId}/color`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ color }),
+    }).catch(() => qc.invalidateQueries({ queryKey: getListGroupsQueryKey() }));
+    setColorPickerId(null);
+  }
+
+  // ── Other handlers ────────────────────────────────────────────────────────────
+
+  function handleRename(group: GroupWithMeta, name: string) {
     updateGroupMutation.mutate({ id: group.id, data: { name } });
     setRenamingId(null);
   }
 
-  function handleDelete(group: Group) {
+  function handleDelete(group: GroupWithMeta) {
     const students = byGroup[String(group.id)] ?? [];
     if (students.length > 0) {
       toast({ title: t.cannotDeleteNonEmpty, variant: "destructive" });
@@ -350,10 +451,23 @@ export default function Groups() {
     assignMutation.mutate({ id: studentId, data: { groupId } });
   }
 
+  // ── Drag end ──────────────────────────────────────────────────────────────────
+
   function handleDragEnd(result: DropResult) {
-    const { destination, source, draggableId } = result;
+    const { type, destination, source, draggableId } = result;
     if (!destination) return;
     if (destination.droppableId === source.droppableId && destination.index === source.index) return;
+
+    if (type === "GROUP") {
+      // Reorder columns
+      const items = [...displayedGroups];
+      const [moved] = items.splice(source.index, 1);
+      items.splice(destination.index, 0, moved);
+      applyNewOrder(items);
+      return;
+    }
+
+    // Move student between groups
     const studentId  = parseInt(draggableId.replace("s-", ""), 10);
     const destGroupId = parseInt(destination.droppableId, 10);
     if (isNaN(destGroupId)) return;
@@ -363,16 +477,16 @@ export default function Groups() {
 
   const isLoading = studentsLoading || groupsLoading;
 
-  // Labels
-  const allLabel = lang === "fr" ? `Tous les plannings (${groups.length})` : `كل الجداول (${groups.length})`;
-  const addLabel  = lang === "fr" ? "Nouveau planning" : t.addSchedule;
-  const noData    = lang === "fr" ? "Aucun planning créé." : t.noStudents;
+  const addLabel = lang === "fr" ? "Nouveau planning" : t.addSchedule;
+  const allLabel = lang === "fr"
+    ? `Tous les plannings (${visibleGroups.length})`
+    : `كل الجداول (${visibleGroups.length})`;
 
   return (
     <AdminLayout>
-      {/* ── Top bar: dropdown + add button ── */}
-      <div className="flex items-center gap-3 mb-5 flex-wrap">
-        {/* Group selector dropdown */}
+      {/* ── Top bar ── */}
+      <div className="flex items-center gap-2 mb-5 flex-wrap">
+        {/* Group selector */}
         <Select value={selectedGroupId} onValueChange={setSelectedGroupId}>
           <SelectTrigger className="w-60 rounded-xl bg-white border-border shadow-sm font-medium">
             <div className="flex items-center gap-2">
@@ -382,7 +496,7 @@ export default function Groups() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{allLabel}</SelectItem>
-            {groups.map((g) => (
+            {visibleGroups.map((g) => (
               <SelectItem key={g.id} value={String(g.id)}>
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{g.name}</span>
@@ -400,7 +514,18 @@ export default function Groups() {
           </SelectContent>
         </Select>
 
-        {/* Add schedule button */}
+        {/* Show hidden toggle */}
+        {hiddenCount > 0 && (
+          <button
+            onClick={() => setShowHidden(p => !p)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium border transition-colors ${showHidden ? "bg-gray-200 border-gray-300 text-gray-700" : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50"}`}
+          >
+            {showHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+            <span>{lang === "fr" ? `Masqués (${hiddenCount})` : `المخفية (${hiddenCount})`}</span>
+          </button>
+        )}
+
+        {/* Add schedule */}
         <button
           onClick={() => setModalOpen(true)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100 transition-colors"
@@ -413,12 +538,12 @@ export default function Groups() {
         <div className="flex items-center justify-center h-64 text-muted-foreground">{t.loading}</div>
       )}
 
-      {/* ── Schedules Kanban with drag-and-drop ── */}
+      {/* ── Kanban with nested DnD ── */}
       {!isLoading && (
         groups.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 gap-4 text-gray-400">
             <CalendarDays className="w-12 h-12 opacity-30" />
-            <p className="text-sm">{noData}</p>
+            <p className="text-sm">{lang === "fr" ? "Aucun planning créé." : t.noStudents}</p>
             <button
               onClick={() => setModalOpen(true)}
               className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white text-sm font-semibold rounded-xl hover:bg-orange-600 transition-colors"
@@ -428,114 +553,241 @@ export default function Groups() {
           </div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            <div className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-14rem)] items-start">
-              {displayedGroups.map((group, idx) => {
-                const col        = colFor(idx);
-                const gs         = byGroup[String(group.id)] ?? [];
-                const isRenaming = renamingId === group.id;
+            {/* Outer droppable for column reordering */}
+            <Droppable droppableId="all-groups" direction="horizontal" type="GROUP">
+              {(outerProvided) => (
+                <div
+                  ref={outerProvided.innerRef}
+                  {...outerProvided.droppableProps}
+                  className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-14rem)] items-start"
+                >
+                  {displayedGroups.map((group, idx) => {
+                    const col        = colForGroup(group, idx);
+                    const gs         = byGroup[String(group.id)] ?? [];
+                    const isRenaming = renamingId === group.id;
+                    const isFirst    = idx === 0;
+                    const isLast     = idx === displayedGroups.length - 1;
+                    const showingAll = selectedGroupId === "all";
 
-                return (
-                  <div
-                    key={group.id}
-                    className={`flex-shrink-0 w-72 rounded-2xl overflow-hidden shadow-sm border ${col.border} flex flex-col`}
-                  >
-                    {/* Column header */}
-                    <div className={`${col.header} px-4 py-3`}>
-                      <div className="flex items-center gap-2">
-                        {isRenaming ? (
-                          <RenameInput
-                            value={group.name}
-                            onConfirm={(v) => handleRename(group, v)}
-                            onCancel={() => setRenamingId(null)}
-                          />
-                        ) : (
-                          <>
-                            <h3 className="text-white font-bold text-sm truncate flex-1">{group.name}</h3>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                {gs.length}
-                              </span>
-                              <button
-                                onClick={() => setRenamingId(group.id)}
-                                title={t.renameSchedule}
-                                className="text-white/70 hover:text-white transition-colors p-0.5 rounded"
-                              >
-                                <Pencil className="w-3 h-3" />
-                              </button>
-                              {isAdmin && (
-                                <button
-                                  onClick={() => handleDelete(group)}
-                                  title={t.delete}
-                                  className="text-white/70 hover:text-red-200 transition-colors p-0.5 rounded"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              )}
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      {!isRenaming && (
-                        <p className="text-white/60 text-[11px] mt-0.5">
-                          {format(new Date(group.startDate || Date.now()), "dd/MM/yyyy")}
-                        </p>
-                      )}
-                    </div>
+                    return (
+                      <Draggable
+                        key={group.id}
+                        draggableId={`group-${group.id}`}
+                        index={idx}
+                        isDragDisabled={!showingAll}
+                      >
+                        {(drag, dragSnap) => (
+                          <div
+                            ref={drag.innerRef}
+                            {...drag.draggableProps}
+                            className={`flex-shrink-0 w-72 rounded-2xl overflow-hidden shadow-sm border ${col.border} flex flex-col transition-opacity ${group.hidden ? "opacity-60" : ""} ${dragSnap.isDragging ? "shadow-2xl rotate-1" : ""}`}
+                          >
+                            {/* Column header */}
+                            <div className={`${col.header} px-3 py-2.5`}>
+                              <div className="flex items-center gap-1.5">
+                                {/* Drag handle for the column — only visible when "all groups" shown */}
+                                {showingAll && (
+                                  <span
+                                    {...drag.dragHandleProps}
+                                    className="text-white/50 hover:text-white/90 flex-shrink-0 cursor-grab active:cursor-grabbing select-none"
+                                    title={lang === "fr" ? "Déplacer" : "سحب لإعادة الترتيب"}
+                                  >
+                                    <GripVertical className="w-4 h-4" />
+                                  </span>
+                                )}
 
-                    {/* Droppable column body */}
-                    <Droppable droppableId={String(group.id)}>
-                      {(provided, snapshot) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.droppableProps}
-                          className={`${col.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-18rem)] transition-colors ${snapshot.isDraggingOver ? "ring-2 ring-inset ring-white/50 bg-opacity-70" : ""}`}
-                        >
-                          {gs.length === 0 && !snapshot.isDraggingOver && (
-                            <div className="h-24 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl">
-                              <p className="text-xs text-gray-400 text-center px-2">{t.noStudents}</p>
-                            </div>
-                          )}
-                          {gs.map((s, sIdx) => (
-                            <Draggable key={s.id} draggableId={`s-${s.id}`} index={sIdx}>
-                              {(drag, dragSnap) => (
-                                <div
-                                  ref={drag.innerRef}
-                                  {...drag.draggableProps}
-                                  className={dragSnap.isDragging ? "opacity-90 rotate-1 shadow-xl" : ""}
-                                >
-                                  <ScheduleStudentCard
-                                    student={s}
-                                    groups={groups}
-                                    currentGroupId={group.id}
-                                    onMove={handleMoveToGroup}
-                                    onReturnToPipeline={handleReturnToPipeline}
-                                    t={t}
-                                    dragHandleProps={drag.dragHandleProps as unknown as Record<string, unknown>}
+                                {isRenaming ? (
+                                  <RenameInput
+                                    value={group.name}
+                                    onConfirm={(v) => handleRename(group, v)}
+                                    onCancel={() => setRenamingId(null)}
                                   />
+                                ) : (
+                                  <>
+                                    <h3 className="text-white font-bold text-sm truncate flex-1">{group.name}</h3>
+                                    <div className="flex items-center gap-0.5 flex-shrink-0">
+                                      <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full mr-0.5">
+                                        {gs.length}
+                                      </span>
+
+                                      {/* Rename */}
+                                      <button
+                                        onClick={() => setRenamingId(group.id)}
+                                        title={t.renameSchedule}
+                                        className="text-white/60 hover:text-white p-0.5 rounded transition-colors"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+
+                                      {/* Color picker */}
+                                      <div className="relative">
+                                        <button
+                                          onClick={() => setColorPickerId(colorPickerId === group.id ? null : group.id)}
+                                          title={lang === "fr" ? "Couleur" : "لون الجدول"}
+                                          className="text-white/60 hover:text-white p-0.5 rounded transition-colors"
+                                        >
+                                          <Palette className="w-3 h-3" />
+                                        </button>
+                                        {colorPickerId === group.id && (
+                                          <div className="absolute top-full left-0 mt-1 bg-white rounded-xl shadow-xl border border-gray-200 p-2.5 z-50 flex flex-wrap gap-1.5 w-40">
+                                            {COLOR_OPTIONS.map(c => (
+                                              <button
+                                                key={c.key}
+                                                onClick={() => handleColorChange(group.id, c.key)}
+                                                title={c.key}
+                                                className={`w-6 h-6 rounded-full ${c.swatch} hover:scale-110 transition-transform flex-shrink-0 ${group.color === c.key ? "ring-2 ring-gray-800 ring-offset-1" : ""}`}
+                                              />
+                                            ))}
+                                            <button
+                                              onClick={() => handleColorChange(group.id, null)}
+                                              title={lang === "fr" ? "Par défaut" : "افتراضي"}
+                                              className="w-6 h-6 rounded-full bg-gray-200 hover:bg-gray-300 transition-colors flex items-center justify-center text-gray-500 text-[9px] flex-shrink-0"
+                                            >
+                                              ↩
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* More actions */}
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <button className="text-white/60 hover:text-white p-0.5 rounded transition-colors">
+                                            <MoreHorizontal className="w-3.5 h-3.5" />
+                                          </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-52">
+                                          {showingAll && (
+                                            <>
+                                              <DropdownMenuLabel className="text-xs text-gray-400">
+                                                {lang === "fr" ? "Position" : "الترتيب"}
+                                              </DropdownMenuLabel>
+                                              <DropdownMenuItem
+                                                onClick={() => handleMoveLeft(group)}
+                                                disabled={isFirst}
+                                                className={isFirst ? "opacity-40" : ""}
+                                              >
+                                                <ChevronLeft className="w-3.5 h-3.5 mr-2 text-gray-500" />
+                                                {lang === "fr" ? "Déplacer à gauche" : "تحريك لليسار"}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem
+                                                onClick={() => handleMoveRight(group)}
+                                                disabled={isLast}
+                                                className={isLast ? "opacity-40" : ""}
+                                              >
+                                                <ChevronRight className="w-3.5 h-3.5 mr-2 text-gray-500" />
+                                                {lang === "fr" ? "Déplacer à droite" : "تحريك لليمين"}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem
+                                                onClick={() => handlePinToStart(group)}
+                                                disabled={isFirst}
+                                                className={isFirst ? "opacity-40" : ""}
+                                              >
+                                                <Pin className="w-3.5 h-3.5 mr-2 text-gray-500" />
+                                                {lang === "fr" ? "Épingler au début" : "تثبيت في البداية"}
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                            </>
+                                          )}
+                                          <DropdownMenuItem onClick={() => handleToggleHidden(group)}>
+                                            {group.hidden ? (
+                                              <><Eye className="w-3.5 h-3.5 mr-2 text-gray-500" />{lang === "fr" ? "Afficher" : "إظهار الجدول"}</>
+                                            ) : (
+                                              <><EyeOff className="w-3.5 h-3.5 mr-2 text-gray-500" />{lang === "fr" ? "Masquer" : "إخفاء الجدول"}</>
+                                            )}
+                                          </DropdownMenuItem>
+                                          {isAdmin && (
+                                            <>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem
+                                                onClick={() => handleDelete(group)}
+                                                className="text-red-600"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5 mr-2" />
+                                                {t.delete}
+                                              </DropdownMenuItem>
+                                            </>
+                                          )}
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                              {!isRenaming && (
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <p className="text-white/60 text-[11px]">
+                                    {format(new Date(group.startDate || Date.now()), "dd/MM/yyyy")}
+                                  </p>
+                                  {group.hidden && (
+                                    <span className="text-[10px] bg-white/20 text-white/80 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                      <EyeOff className="w-2.5 h-2.5" />
+                                      {lang === "fr" ? "Masqué" : "مخفي"}
+                                    </span>
+                                  )}
                                 </div>
                               )}
-                            </Draggable>
-                          ))}
-                          {provided.placeholder}
-                        </div>
-                      )}
-                    </Droppable>
-                  </div>
-                );
-              })}
+                            </div>
 
-              {/* Add schedule column — only when showing all */}
-              {selectedGroupId === "all" && (
-                <div className="flex-shrink-0 w-64 self-start">
-                  <button
-                    onClick={() => setModalOpen(true)}
-                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-transparent hover:border-orange-400 hover:bg-orange-50 transition-all flex items-center justify-center gap-2 px-4 py-6 text-sm font-medium text-gray-500 hover:text-orange-600 group"
-                  >
-                    <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />{addLabel}
-                  </button>
+                            {/* Student droppable */}
+                            <Droppable droppableId={String(group.id)} type="STUDENT">
+                              {(provided, snapshot) => (
+                                <div
+                                  ref={provided.innerRef}
+                                  {...provided.droppableProps}
+                                  className={`${col.light} flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-18rem)] transition-colors ${snapshot.isDraggingOver ? "ring-2 ring-inset ring-white/50 bg-opacity-70" : ""}`}
+                                >
+                                  {gs.length === 0 && !snapshot.isDraggingOver && (
+                                    <div className="h-24 flex items-center justify-center border-2 border-dashed border-gray-200 rounded-xl">
+                                      <p className="text-xs text-gray-400 text-center px-2">{t.noStudents}</p>
+                                    </div>
+                                  )}
+                                  {gs.map((s, sIdx) => (
+                                    <Draggable key={s.id} draggableId={`s-${s.id}`} index={sIdx}>
+                                      {(sdrag, sdragSnap) => (
+                                        <div
+                                          ref={sdrag.innerRef}
+                                          {...sdrag.draggableProps}
+                                          className={sdragSnap.isDragging ? "opacity-90 rotate-1 shadow-xl" : ""}
+                                        >
+                                          <ScheduleStudentCard
+                                            student={s}
+                                            groups={groups}
+                                            currentGroupId={group.id}
+                                            onMove={handleMoveToGroup}
+                                            onReturnToPipeline={handleReturnToPipeline}
+                                            t={t}
+                                            dragHandleProps={sdrag.dragHandleProps as unknown as Record<string, unknown>}
+                                          />
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
+                                  {provided.placeholder}
+                                </div>
+                              )}
+                            </Droppable>
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {outerProvided.placeholder}
+
+                  {/* Add schedule ghost column */}
+                  {selectedGroupId === "all" && (
+                    <div className="flex-shrink-0 w-64 self-start">
+                      <button
+                        onClick={() => setModalOpen(true)}
+                        className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-transparent hover:border-orange-400 hover:bg-orange-50 transition-all flex items-center justify-center gap-2 px-4 py-6 text-sm font-medium text-gray-500 hover:text-orange-600 group"
+                      >
+                        <Plus className="w-5 h-5 group-hover:scale-110 transition-transform" />{addLabel}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
+            </Droppable>
           </DragDropContext>
         )
       )}
