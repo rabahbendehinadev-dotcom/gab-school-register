@@ -1,0 +1,125 @@
+I want to transform this CRM into a complete professional ERP and Student Management System for GAB School.
+
+IMPORTANT:
+Never remove or lose any existing student, registration, payment, group, or pipeline data.
+Create database migrations safely and automatically.
+
+MAIN OBJECTIVES:
+
+1. Real-Time Notification Center
+- Persistent notifications.
+- Notifications never disappear until marked as completed.
+- Sound alert.
+- Browser push notifications.
+- Telegram notifications.
+- WhatsApp notifications.
+- Notification badge in header.
+- Notification history.
+
+2. Smart Lead Management
+Pipeline stages:
+- New Registration
+- Contacted
+- Interested
+- Waiting Payment
+- Confirmed
+- Attended
+- Absent
+- Archived
+
+For each lead:
+- Lead score.
+- Last contact date.
+- Next follow-up date.
+- Number of contact attempts.
+- Lead source.
+- Notes timeline.
+
+3. Student ERP Profile
+Create a complete student profile including:
+- Personal data.
+- Registration history.
+- Course history.
+- Payments.
+- Remaining balance.
+- Attendance rate.
+- Absences.
+- Certificates.
+- Documents.
+- Communication history.
+
+4. Follow-Up Tasks System
+Allow staff to create tasks:
+- Call student.
+- Send WhatsApp.
+- Verify payment.
+- Group assignment.
+
+Tasks must generate persistent alerts until completed.
+
+5. Timeline System
+Every action must be logged:
+- Registration.
+- Payment.
+- Attendance.
+- Group assignment.
+- WhatsApp.
+- Notes.
+- Status changes.
+
+6. Advanced Dashboard
+Add:
+- Daily registrations.
+- Monthly registrations.
+- Conversion rate.
+- Revenue.
+- Outstanding payments.
+- Attendance analytics.
+- Best-performing campaigns.
+- Staff performance.
+
+7. Automatic Backup System
+- Daily PostgreSQL backup.
+- Weekly backup.
+- Monthly backup.
+- One-click restore.
+- Backup status dashboard.
+- Export backups.
+
+8. Student Attendance Management
+- QR attendance.
+- Manual attendance.
+- Attendance reports.
+- Absence alerts.
+
+9. Financial Management
+- Total paid.
+- Remaining balance.
+- Installments.
+- Late payment alerts.
+- Revenue reports.
+
+10. Security
+- Role permissions.
+- Audit logs.
+- Soft delete only.
+- Data recovery.
+- Activity tracking.
+
+11. Communication Center
+- WhatsApp integration.
+- SMS integration.
+- Bulk messaging.
+- Templates.
+- Communication history.
+
+12. UI/UX
+- Modern ERP design.
+- Responsive.
+- Fast loading.
+- Dark mode.
+- Professional analytics.
+- Real-time updates using websockets.
+
+MOST IMPORTANT:
+Create a reliable educational ERP system where no student or customer data can ever be lost.
