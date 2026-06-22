@@ -196,8 +196,9 @@ export function NotificationCenter() {
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-2 w-[380px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden right-0">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
+        <div className="fixed z-[300] top-16 right-4 w-[380px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card shadow-2xl flex flex-col max-h-[calc(100vh-5rem)]">
+          {/* Sticky panel header – always visible */}
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40 rounded-t-2xl flex-shrink-0">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-primary" />
               <span className="font-bold text-sm">{labels.title}</span>
@@ -225,7 +226,8 @@ export function NotificationCenter() {
             </div>
           </div>
 
-          <div className="max-h-[420px] overflow-y-auto">
+          {/* Scrollable notification list */}
+          <div className="overflow-y-auto flex-1 min-h-0">
             {notifications.length === 0 ? (
               <div className="py-12 text-center text-sm text-muted-foreground">{labels.empty}</div>
             ) : (
