@@ -3,7 +3,6 @@ import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
   Users, 
-  KanbanSquare, 
   Layers, 
   ShieldCheck, 
   Activity, 
@@ -29,7 +28,6 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const navItems = [
     { href: "/gab-c7x2p", label: t.dashboard, icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
-    { href: "/gab-c7x2p/pipeline", label: t.pipeline, icon: KanbanSquare, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/groups", label: t.schedules, icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/students", label: t.students, icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
     { href: "/gab-c7x2p/tasks", label: t.tasks, icon: ListTodo, roles: ["admin", "manager", "staff", "assistant"] },

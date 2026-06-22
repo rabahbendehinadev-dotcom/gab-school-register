@@ -196,7 +196,7 @@ export function NotificationCenter() {
       </button>
 
       {open && (
-        <div className={`absolute z-50 mt-2 w-[360px] max-w-[calc(100vw-2rem)] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden ${lang === "fr" ? "right-0" : "left-0"}`}>
+        <div className="absolute z-50 mt-2 w-[380px] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-border bg-card shadow-2xl overflow-hidden right-0">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/40">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-primary" />
@@ -205,15 +205,24 @@ export function NotificationCenter() {
                 <span className="text-[10px] font-bold bg-red-100 text-red-600 px-1.5 py-0.5 rounded-full">{unhandledCount}</span>
               )}
             </div>
-            {unhandledCount > 0 && (
+            <div className="flex items-center gap-2">
+              {unhandledCount > 0 && (
+                <button
+                  onClick={() => handleAllMutation.mutate()}
+                  disabled={handleAllMutation.isPending}
+                  className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                >
+                  <CheckCheck className="w-3.5 h-3.5" />{labels.handleAll}
+                </button>
+              )}
               <button
-                onClick={() => handleAllMutation.mutate()}
-                disabled={handleAllMutation.isPending}
-                className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline disabled:opacity-50"
+                onClick={() => setOpen(false)}
+                className="p-1 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                aria-label="Close"
               >
-                <CheckCheck className="w-3.5 h-3.5" />{labels.handleAll}
+                <X className="w-4 h-4" />
               </button>
-            )}
+            </div>
           </div>
 
           <div className="max-h-[420px] overflow-y-auto">

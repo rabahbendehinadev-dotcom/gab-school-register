@@ -46,7 +46,7 @@ import {
 import {
   MoreHorizontal, ArrowLeftCircle, GripVertical, StickyNote,
   Pencil, Trash2, Plus, Check, X, Loader2, CalendarDays, ImageIcon,
-  ChevronLeft, ChevronRight, Pin, EyeOff, Eye, Palette,
+  ChevronLeft, ChevronRight, ChevronDown, Pin, EyeOff, Eye, Palette,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/contexts/i18n-context";
@@ -61,7 +61,7 @@ interface GroupWithMeta extends Group {
   hidden: boolean;
 }
 
-// ─── Stage dot colors ─────────────────────────────────────────────────────────
+// ─── Stage configs ────────────────────────────────────────────────────────────
 
 const STAGE_COLORS: Record<string, string> = {
   new: "bg-blue-500", contacted: "bg-yellow-500", interested: "bg-green-500",
@@ -69,6 +69,24 @@ const STAGE_COLORS: Record<string, string> = {
   confirmed: "bg-indigo-500", attended: "bg-teal-500",
   no_show: "bg-red-500", completed: "bg-purple-500", archived: "bg-gray-400",
 };
+
+const STAGE_PILL: Record<string, string> = {
+  new:               "bg-blue-50 text-blue-700 border-blue-200",
+  contacted:         "bg-yellow-50 text-yellow-700 border-yellow-200",
+  interested:        "bg-green-50 text-green-700 border-green-200",
+  payment_pending:   "bg-orange-50 text-orange-700 border-orange-200",
+  payment_confirmed: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  confirmed:         "bg-indigo-50 text-indigo-700 border-indigo-200",
+  attended:          "bg-teal-50 text-teal-700 border-teal-200",
+  no_show:           "bg-red-50 text-red-700 border-red-200",
+  completed:         "bg-purple-50 text-purple-700 border-purple-200",
+  archived:          "bg-gray-100 text-gray-600 border-gray-200",
+};
+
+const ALL_STAGE_IDS = [
+  "new","contacted","interested","payment_pending","payment_confirmed",
+  "confirmed","attended","no_show","completed","archived",
+] as const;
 
 // ─── Color palette ────────────────────────────────────────────────────────────
 
@@ -143,8 +161,9 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
     mutation: { onError: () => toast({ title: t.errorUpdating, variant: "destructive" }) },
   });
 
-  const [localNote, setLocalNote] = useState(student.note ?? "");
-  const [showNote, setShowNote]   = useState(!!student.note);
+  const [localNote,  setLocalNote]  = useState(student.note ?? "");
+  const [showNote,   setShowNote]   = useState(!!student.note);
+  const [localStage, setLocalStage] = useState(student.stage);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { if (showNote && !student.note) noteRef.current?.focus(); }, [showNote]);
@@ -158,10 +177,21 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
     }
   }
 
-  const stageLabel = t.stageLabels[student.stage as keyof typeof t.stageLabels] ?? student.stage;
-  const stageDot   = STAGE_COLORS[student.stage] ?? "bg-gray-400";
-  const fullName   = `${student.firstName} ${student.lastName}`;
-  const others     = groups.filter((g) => g.id !== currentGroupId);
+  function handleStageChange(newStage: string) {
+    const prev = localStage;
+    setLocalStage(newStage);
+    fetch(`/api/students/${student.id}/stage`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ stage: newStage }),
+    })
+      .then(r => { if (!r.ok) throw new Error(); return qc.invalidateQueries({ queryKey: getListStudentsQueryKey() }); })
+      .catch(() => { setLocalStage(prev); toast({ title: t.errorUpdating, variant: "destructive" }); });
+  }
+
+  const fullName = `${student.firstName} ${student.lastName}`;
+  const others   = groups.filter((g) => g.id !== currentGroupId);
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group">
@@ -209,10 +239,40 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
         <span>📞</span><span>{student.phone}</span>
       </div>
 
+      {/* Stage dropdown */}
+      <div className="mt-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              className={`flex items-center gap-1.5 text-[11px] font-semibold px-2 py-1 rounded-full border transition-colors w-full justify-between ${STAGE_PILL[localStage] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STAGE_COLORS[localStage] ?? "bg-gray-400"}`} />
+                {t.stageLabels[localStage as keyof typeof t.stageLabels] ?? localStage}
+              </span>
+              <ChevronDown className="w-3 h-3 opacity-60 flex-shrink-0" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-48">
+            <DropdownMenuLabel className="text-[10px] text-gray-400 uppercase tracking-wide">
+              {lang === "fr" ? "Changer le statut" : "تغيير الحالة"}
+            </DropdownMenuLabel>
+            {ALL_STAGE_IDS.map(sid => (
+              <DropdownMenuItem
+                key={sid}
+                onClick={() => handleStageChange(sid)}
+                className={`text-xs ${localStage === sid ? "font-bold" : ""}`}
+              >
+                <span className={`w-2 h-2 rounded-full ${STAGE_COLORS[sid]} mr-2 flex-shrink-0`} />
+                {t.stageLabels[sid as keyof typeof t.stageLabels] ?? sid}
+                {localStage === sid && <Check className="w-3 h-3 ml-auto text-primary flex-shrink-0" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       <div className="flex items-center gap-2 mt-2 flex-wrap">
-        <span className="flex items-center gap-1 text-[11px] font-medium text-gray-600">
-          <span className={`w-1.5 h-1.5 rounded-full ${stageDot}`} />{stageLabel}
-        </span>
         <span className="text-[11px] px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
           {student.trainingType === "online" ? t.online : t.physical}
         </span>
