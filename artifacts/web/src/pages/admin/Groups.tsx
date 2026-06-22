@@ -46,7 +46,7 @@ import {
 import {
   MoreHorizontal, ArrowLeftCircle, GripVertical, StickyNote,
   Pencil, Trash2, Plus, Check, X, Loader2, CalendarDays, ImageIcon,
-  ChevronLeft, ChevronRight, ChevronDown, Pin, EyeOff, Eye, Palette,
+  ChevronLeft, ChevronRight, ChevronDown, Pin, EyeOff, Eye, Palette, UserPlus,
 } from "lucide-react";
 import { format } from "date-fns";
 import { useI18n } from "@/contexts/i18n-context";
@@ -163,7 +163,7 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
 
   const [localNote,  setLocalNote]  = useState(student.note ?? "");
   const [showNote,   setShowNote]   = useState(!!student.note);
-  const [localStage, setLocalStage] = useState(student.stage);
+  const [localStage, setLocalStage] = useState<string>(student.stage);
   const noteRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { if (showNote && !student.note) noteRef.current?.focus(); }, [showNote]);
@@ -358,6 +358,9 @@ export default function Groups() {
     return map;
   })();
 
+  // Unassigned students (no group) – shown in the pinned "تسجيل جديد" column
+  const unassignedStudents = allStudents.filter((s) => !s.groupId);
+
   // Groups to display (filtered by selection + hidden toggle)
   const visibleGroups = showHidden ? groups : groups.filter(g => !g.hidden);
   const displayedGroups = selectedGroupId === "all"
@@ -527,12 +530,21 @@ export default function Groups() {
       return;
     }
 
-    // Move student between groups
-    const studentId  = parseInt(draggableId.replace("s-", ""), 10);
-    const destGroupId = parseInt(destination.droppableId, 10);
-    if (isNaN(destGroupId)) return;
-    if (destGroupId === parseInt(source.droppableId, 10)) return;
-    assignMutation.mutate({ id: studentId, data: { groupId: destGroupId } });
+    // Move student (between groups or from/to virtual unassigned column)
+    const studentId = parseInt(draggableId.replace("s-", ""), 10);
+    const srcId     = source.droppableId;
+    const dstId     = destination.droppableId;
+    if (srcId === dstId) return;
+
+    if (dstId === "unassigned") {
+      // Dragged back to unassigned column → remove group
+      assignMutation.mutate({ id: studentId, data: { groupId: null } });
+    } else {
+      const destGroupId = parseInt(dstId, 10);
+      if (!isNaN(destGroupId)) {
+        assignMutation.mutate({ id: studentId, data: { groupId: destGroupId } });
+      }
+    }
   }
 
   const isLoading = studentsLoading || groupsLoading;
@@ -613,13 +625,74 @@ export default function Groups() {
           </div>
         ) : (
           <DragDropContext onDragEnd={handleDragEnd}>
-            {/* Outer droppable for column reordering */}
+            <div className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-14rem)] items-start">
+
+            {/* ── Virtual "تسجيل جديد" column – always pinned first ── */}
+            {selectedGroupId === "all" && (
+              <div className="flex-shrink-0 w-72 rounded-2xl overflow-hidden shadow-sm border border-orange-200 flex flex-col">
+                <div className="bg-gradient-to-br from-orange-500 to-amber-500 px-3 py-2.5">
+                  <div className="flex items-center gap-1.5">
+                    <UserPlus className="w-4 h-4 text-white/80 flex-shrink-0" />
+                    <h3 className="text-white font-bold text-sm flex-1">
+                      {lang === "fr" ? "Nouvelles inscriptions" : "تسجيل جديد"}
+                    </h3>
+                    <span className="bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      {unassignedStudents.length}
+                    </span>
+                  </div>
+                  <p className="text-white/60 text-[11px] mt-0.5">
+                    {lang === "fr" ? "En attente d'affectation" : "بانتظار التعيين لجدول"}
+                  </p>
+                </div>
+                <Droppable droppableId="unassigned" type="STUDENT">
+                  {(uprov, usnap) => (
+                    <div
+                      ref={uprov.innerRef}
+                      {...uprov.droppableProps}
+                      className={`bg-orange-50/40 flex-1 p-3 space-y-2 overflow-y-auto max-h-[calc(100vh-18rem)] transition-colors ${usnap.isDraggingOver ? "ring-2 ring-inset ring-orange-300 bg-orange-50" : ""}`}
+                    >
+                      {unassignedStudents.length === 0 && !usnap.isDraggingOver && (
+                        <div className="h-24 flex items-center justify-center border-2 border-dashed border-orange-200 rounded-xl">
+                          <p className="text-xs text-orange-400 text-center px-2">
+                            {lang === "fr" ? "Aucune inscription en attente" : "لا توجد تسجيلات جديدة"}
+                          </p>
+                        </div>
+                      )}
+                      {unassignedStudents.map((s, sIdx) => (
+                        <Draggable key={s.id} draggableId={`s-${s.id}`} index={sIdx}>
+                          {(sdrag, sdragSnap) => (
+                            <div
+                              ref={sdrag.innerRef}
+                              {...sdrag.draggableProps}
+                              className={sdragSnap.isDragging ? "opacity-90 rotate-1 shadow-xl" : ""}
+                            >
+                              <ScheduleStudentCard
+                                student={s}
+                                groups={groups}
+                                currentGroupId={0}
+                                onMove={handleMoveToGroup}
+                                onReturnToPipeline={() => {}}
+                                t={t}
+                                dragHandleProps={sdrag.dragHandleProps as unknown as Record<string, unknown>}
+                              />
+                            </div>
+                          )}
+                        </Draggable>
+                      ))}
+                      {uprov.placeholder}
+                    </div>
+                  )}
+                </Droppable>
+              </div>
+            )}
+
+            {/* ── Groups droppable (column reordering) ── */}
             <Droppable droppableId="all-groups" direction="horizontal" type="GROUP">
               {(outerProvided) => (
                 <div
                   ref={outerProvided.innerRef}
                   {...outerProvided.droppableProps}
-                  className="flex gap-4 overflow-x-auto pb-6 min-h-[calc(100vh-14rem)] items-start"
+                  className="flex gap-4 items-start flex-shrink-0"
                 >
                   {displayedGroups.map((group, idx) => {
                     const col        = colForGroup(group, idx);
@@ -848,6 +921,7 @@ export default function Groups() {
                 </div>
               )}
             </Droppable>
+            </div>
           </DragDropContext>
         )
       )}
