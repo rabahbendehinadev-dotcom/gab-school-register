@@ -94,7 +94,8 @@ router.post("/groups", requireRole("admin", "manager"), async (req, res): Promis
   }
 
   // Place new group at the end
-  const [{ maxPos }] = await db.execute(sql`SELECT COALESCE(MAX(position), -1) AS "maxPos" FROM groups WHERE deleted_at IS NULL`) as unknown as [{ maxPos: number }];
+  const posResult = await db.execute(sql`SELECT COALESCE(MAX(position), -1) AS "maxPos" FROM groups WHERE deleted_at IS NULL`);
+  const maxPos = Number((posResult.rows[0] as { maxPos: number }).maxPos ?? -1);
 
   const [group] = await db
     .insert(groupsTable)
