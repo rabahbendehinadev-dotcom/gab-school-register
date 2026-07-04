@@ -4,12 +4,15 @@ import { Bell, BellOff, BellRing, Loader2, X, Share, Home } from "lucide-react";
 
 function IOSInstallGuide({ onClose }: { onClose: () => void }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center" dir="rtl">
+    <div
+      dir="rtl"
+      style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}
+    >
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.55)" }} onClick={onClose} />
 
-      {/* Sheet */}
-      <div className="relative w-full max-w-sm mx-auto bg-white rounded-t-2xl shadow-2xl p-5 pb-8 space-y-4">
+      {/* Card — centered, not bottom sheet */}
+      <div style={{ position: "relative", width: "100%", maxWidth: "360px", background: "#fff", borderRadius: "20px", padding: "20px", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }} className="space-y-4">
         {/* Close */}
         <button onClick={onClose} className="absolute top-3 left-3 p-1.5 rounded-full hover:bg-gray-100">
           <X className="w-4 h-4 text-gray-500" />
