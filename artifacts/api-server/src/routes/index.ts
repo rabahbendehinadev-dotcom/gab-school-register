@@ -13,6 +13,7 @@ import coursesRouter from "./courses";
 import paymentsRouter from "./payments";
 import tasksRouter from "./tasks";
 import notificationsRouter from "./notifications";
+import pushRouter from "./push";
 import studentExtrasRouter from "./student-extras";
 
 const router: IRouter = Router();
@@ -31,6 +32,7 @@ router.use(coursesRouter);
 router.use(paymentsRouter);
 router.use(tasksRouter);
 router.use(notificationsRouter);
+router.use(pushRouter);
 router.use(studentExtrasRouter);
 
 export default router;

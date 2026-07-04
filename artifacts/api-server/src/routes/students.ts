@@ -124,6 +124,16 @@ router.post("/students", async (req, res): Promise<void> => {
     student.id
   ).catch(() => {});
 
+  // Web Push to all subscribed admins
+  import("../lib/webPush").then(({ sendPushToAdmins }) =>
+    sendPushToAdmins({
+      title: "🎓 تسجيل جديد!",
+      body:  `${student.firstName} ${student.lastName} — ${student.city} — ${student.phone}`,
+      url:   `/gab-c7x2p/students/${student.id}`,
+      icon:  "/gab-favicon.png",
+    })
+  ).catch(() => {});
+
   const trainingLabel = student.trainingType === "physical" ? "حضوري" : "أونلاين";
 
   function toIntlPhone(phone: string): string {

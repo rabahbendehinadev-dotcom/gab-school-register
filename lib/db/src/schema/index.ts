@@ -11,3 +11,4 @@ export * from "./student-notes";
 export * from "./attendance";
 export * from "./tasks";
 export * from "./notifications";
+export * from "./push-subscriptions";

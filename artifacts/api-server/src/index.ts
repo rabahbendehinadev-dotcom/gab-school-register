@@ -16,6 +16,24 @@ if (Number.isNaN(port) || port <= 0) {
   throw new Error(`Invalid PORT value: "${rawPort}"`);
 }
 
+async function ensurePushSubscriptionsTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "push_subscriptions" (
+        "id"         serial PRIMARY KEY,
+        "endpoint"   text NOT NULL UNIQUE,
+        "p256dh"     text NOT NULL,
+        "auth"       text NOT NULL,
+        "role"       text NOT NULL DEFAULT 'admin',
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+  } finally {
+    client.release();
+  }
+}
+
 async function ensureSessionTable(): Promise<void> {
   const client = await pool.connect();
   try {
@@ -38,6 +56,11 @@ async function ensureSessionTable(): Promise<void> {
 ensureSessionTable()
   .catch((err) => {
     console.error("FATAL: Could not ensure user_sessions table:", err);
+    process.exit(1);
+  })
+  .then(() => ensurePushSubscriptionsTable())
+  .catch((err) => {
+    console.error("FATAL: Could not ensure push_subscriptions table:", err);
     process.exit(1);
   })
   .then(() => seedAdmin())

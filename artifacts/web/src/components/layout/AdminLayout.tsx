@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useI18n } from "@/contexts/i18n-context";
 import { NotificationCenter } from "@/components/admin/NotificationCenter";
+import { PushToggleButton } from "@/components/admin/PushToggleButton";
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -161,6 +162,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               {filteredNav.find(n => n.exact ? location === n.href : location.startsWith(n.href))?.label || t.dashboard}
             </h1>
             <div className="flex items-center gap-2 sm:gap-4">
+              <PushToggleButton />
               <NotificationCenter />
               <Button variant="outline" size="sm" asChild className="hidden sm:flex rounded-full">
                 <Link href="/">{t.viewSite}</Link>
