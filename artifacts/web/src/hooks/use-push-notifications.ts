@@ -49,12 +49,33 @@ async function deleteSubscription(sub: PushSubscription): Promise<void> {
   await sub.unsubscribe();
 }
 
-export type PushStatus = "unsupported" | "denied" | "subscribed" | "unsubscribed" | "loading";
+/** iOS Safari in browser mode doesn't support Push — user must install PWA first */
+function detectIOSBrowser(): boolean {
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) && !(window as { MSStream?: unknown }).MSStream;
+  if (!isIOS) return false;
+  const isStandalone =
+    (navigator as { standalone?: boolean }).standalone === true ||
+    window.matchMedia("(display-mode: standalone)").matches;
+  return !isStandalone;
+}
+
+export type PushStatus =
+  | "unsupported"
+  | "ios-needs-pwa"   // iOS Safari browser — must add to home screen first
+  | "denied"
+  | "subscribed"
+  | "unsubscribed"
+  | "loading";
 
 export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>("loading");
 
   const refresh = useCallback(async () => {
+    // iOS in browser: show install guide instead of failing silently
+    if (detectIOSBrowser()) {
+      setStatus("ios-needs-pwa"); return;
+    }
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
       setStatus("unsupported"); return;
     }
