@@ -124,14 +124,14 @@ router.post("/students", async (req, res): Promise<void> => {
     student.id
   ).catch(() => {});
 
-  // Web Push to all subscribed admins
+  // Web Push to all subscribed admins (rings 3 times, 8 s apart)
   import("../lib/webPush").then(({ sendPushToAdmins }) =>
     sendPushToAdmins({
-      title: "🎓 تسجيل جديد!",
-      body:  `${student.firstName} ${student.lastName} — ${student.city} — ${student.phone}`,
+      title: "🎓 تسجيل جديد في GAB SCHOOL!",
+      body:  `👤 الاسم: ${student.firstName} ${student.lastName}\n📞 الهاتف: ${student.phone}\n📍 ${student.city}`,
       url:   `/gab-c7x2p/students/${student.id}`,
-      icon:  "/gab-favicon.png",
-    })
+      tag:   `new-reg-${student.id}`,
+    }, 3)
   ).catch(() => {});
 
   const trainingLabel = student.trainingType === "physical" ? "حضوري" : "أونلاين";

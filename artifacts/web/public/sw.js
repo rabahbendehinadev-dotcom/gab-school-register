@@ -4,15 +4,17 @@ self.addEventListener("install",  () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
 self.addEventListener("push", (event) => {
-  let data = { title: "GAB SCHOOL", body: "إشعار جديد" };
-  try { if (event.data) data = event.data.json(); } catch {}
+  let data = { title: "GAB SCHOOL", body: "إشعار جديد", url: "/gab-c7x2p/students", tag: "gab-push" };
+  try { if (event.data) Object.assign(data, event.data.json()); } catch {}
 
   const options = {
     body:               data.body,
     icon:               "/gab-favicon.png",
     badge:              "/gab-favicon.png",
-    data:               { url: data.url ?? "/gab-c7x2p/students" },
-    vibrate:            [200, 100, 200],
+    tag:                data.tag ?? "gab-push",   // same tag → replaces banner but re-rings sound
+    renotify:           true,                      // re-plays sound & vibration on each update
+    data:               { url: data.url },
+    vibrate:            [300, 100, 300, 100, 300, 100, 300, 100, 300, 100, 300],
     silent:             false,
     requireInteraction: true,
     dir:                "rtl",

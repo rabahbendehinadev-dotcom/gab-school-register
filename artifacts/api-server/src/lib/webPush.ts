@@ -15,19 +15,10 @@ export interface PushPayload {
   body:    string;
   url?:    string;
   icon?:   string;
-  badge?:  string;
+  tag?:    string;
 }
 
-export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
-  const subs = await db
-    .select()
-    .from(pushSubscriptionsTable)
-    .where(eq(pushSubscriptionsTable.role, "admin"));
-
-  if (subs.length === 0) return;
-
-  const data = JSON.stringify(payload);
-
+async function deliverOnce(subs: typeof pushSubscriptionsTable.$inferSelect[], data: string): Promise<void> {
   await Promise.allSettled(
     subs.map(async (sub) => {
       try {
@@ -46,4 +37,30 @@ export async function sendPushToAdmins(payload: PushPayload): Promise<void> {
       }
     })
   );
+}
+
+/**
+ * Send push to all admin subscribers.
+ * repeatTimes: total number of times to ring (default 3), each 8 s apart.
+ * Uses same `tag` + renotify=true in the SW so only ONE banner stays on screen
+ * while the alert sound plays repeatTimes times.
+ */
+export async function sendPushToAdmins(payload: PushPayload, repeatTimes = 3): Promise<void> {
+  const subs = await db
+    .select()
+    .from(pushSubscriptionsTable)
+    .where(eq(pushSubscriptionsTable.role, "admin"));
+
+  if (subs.length === 0) return;
+
+  const data = JSON.stringify(payload);
+
+  // First delivery immediately
+  await deliverOnce(subs, data);
+
+  // Subsequent deliveries (sound repeats) — fire-and-forget after delays
+  for (let i = 1; i < repeatTimes; i++) {
+    const delay = i * 8_000;
+    setTimeout(() => deliverOnce(subs, data).catch(() => {}), delay);
+  }
 }
