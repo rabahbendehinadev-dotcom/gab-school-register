@@ -22,13 +22,14 @@ router.post("/push/subscribe", requireAuth, async (req, res): Promise<void> => {
     .insert(pushSubscriptionsTable)
     .values({
       endpoint,
-      p256dh: keys.p256dh,
-      auth:   keys.auth,
-      role:   req.session.role ?? "staff",
+      p256dh:  keys.p256dh,
+      auth:    keys.auth,
+      role:    req.session.role ?? "staff",
+      staffId: req.session.staffId ?? null,
     })
     .onConflictDoUpdate({
       target: pushSubscriptionsTable.endpoint,
-      set: { p256dh: keys.p256dh, auth: keys.auth, role: req.session.role ?? "staff" },
+      set: { p256dh: keys.p256dh, auth: keys.auth, role: req.session.role ?? "staff", staffId: req.session.staffId ?? null },
     });
 
   res.sendStatus(201);

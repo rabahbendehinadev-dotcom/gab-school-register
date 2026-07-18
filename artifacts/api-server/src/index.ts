@@ -44,6 +44,7 @@ async function ensurePushSubscriptionsTable(): Promise<void> {
         "created_at" timestamptz NOT NULL DEFAULT now()
       )
     `);
+    await client.query(`ALTER TABLE "push_subscriptions" ADD COLUMN IF NOT EXISTS "staff_id" integer REFERENCES "staff"("id") ON DELETE CASCADE`);
   } finally {
     client.release();
   }
@@ -147,6 +148,10 @@ async function ensureChecklistTables(): Promise<void> {
         "updated_at"           timestamptz NOT NULL DEFAULT now()
       )
     `);
+    // Idempotent column additions for checklist_templates
+    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "valid_from"  timestamptz`);
+    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "valid_until" timestamptz`);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS "checklist_items" (
         "id"             serial PRIMARY KEY,
@@ -161,6 +166,9 @@ async function ensureChecklistTables(): Promise<void> {
         "created_at"     timestamptz NOT NULL DEFAULT now()
       )
     `);
+    // Idempotent column additions for checklist_items
+    await client.query(`ALTER TABLE "checklist_items" ADD COLUMN IF NOT EXISTS "result_required" boolean NOT NULL DEFAULT false`);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS "checklist_assignments" (
         "id"               serial PRIMARY KEY,
@@ -191,6 +199,9 @@ async function ensureChecklistTables(): Promise<void> {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS "idx_checklist_assignments_staff_date" ON "checklist_assignments" ("staff_id", "date_key")`);
     await client.query(`CREATE INDEX IF NOT EXISTS "idx_checklist_assignments_status" ON "checklist_assignments" ("status")`);
+    // Idempotent column additions for checklist_assignments
+    await client.query(`ALTER TABLE "checklist_assignments" ADD COLUMN IF NOT EXISTS "result_required" boolean NOT NULL DEFAULT false`);
+
     await client.query(`
       CREATE TABLE IF NOT EXISTS "escalation_log" (
         "id"                serial PRIMARY KEY,
@@ -201,6 +212,8 @@ async function ensureChecklistTables(): Promise<void> {
         "notified_at"       timestamptz NOT NULL DEFAULT now()
       )
     `);
+    // Idempotent column additions for notifications
+    await client.query(`ALTER TABLE "notifications" ADD COLUMN IF NOT EXISTS "recipient_staff_id" integer REFERENCES "staff"("id") ON DELETE CASCADE`);
   } finally {
     client.release();
   }

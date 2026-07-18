@@ -27,17 +27,23 @@ const CHECKLIST_SETTING_KEYS = [
   "checklist_snooze_options",
   "checklist_max_snooze_count",
   "checklist_base_hour",
+  "checklist_shift_start_hour",
+  "checklist_shift_end_hour",
+  "checklist_repeat_interval_min",
 ] as const;
 
 const CHECKLIST_SETTING_DEFAULTS: Record<string, string> = {
-  checklist_reminder2_min:    "15",
-  checklist_important_min:    "30",
-  checklist_overdue_min:      "60",
-  checklist_tl_notify_min:    "90",
-  checklist_ai_alert_min:     "120",
-  checklist_snooze_options:   "10,30,60",
-  checklist_max_snooze_count: "3",
-  checklist_base_hour:        "9",
+  checklist_reminder2_min:      "15",
+  checklist_important_min:      "30",
+  checklist_overdue_min:        "60",
+  checklist_tl_notify_min:      "90",
+  checklist_ai_alert_min:       "120",
+  checklist_snooze_options:     "10,30,60",
+  checklist_max_snooze_count:   "3",
+  checklist_base_hour:          "9",
+  checklist_shift_start_hour:   "9",
+  checklist_shift_end_hour:     "20",
+  checklist_repeat_interval_min:"15",
 };
 
 router.get("/checklists/settings", requirePermission("view_dashboard"), async (_req, res): Promise<void> => {
@@ -344,9 +350,41 @@ router.post("/checklists/assignments/:id/postpone-request", requireAuth, async (
   const [existing] = await db.select().from(checklistAssignmentsTable).where(eq(checklistAssignmentsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Assignment not found" }); return; }
   if (existing.staffId !== req.session.staffId) { res.status(403).json({ error: "غير مصرح" }); return; }
-  await db.update(checklistAssignmentsTable).set({ status: "postponed" }).where(eq(checklistAssignmentsTable.id, id));
+  if (existing.status === "completed" || existing.cancelledAt) { res.status(409).json({ error: "لا يمكن طلب تأجيل مهمة منتهية" }); return; }
+  // Set to pending_postpone — awaits Admin/TL approval
+  await db.update(checklistAssignmentsTable).set({ status: "pending_postpone" }).where(eq(checklistAssignmentsTable.id, id));
   await logActivity("checklist_postpone_requested", `📤 طلب تأجيل: ${existing.title}`, req.session.fullName, null, { actionType: "postpone_request", entityType: "checklist_assignment", entityId: id });
   res.json({ success: true });
+});
+
+router.post("/checklists/assignments/:id/approve-postpone", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [existing] = await db.select().from(checklistAssignmentsTable).where(eq(checklistAssignmentsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Assignment not found" }); return; }
+  if (existing.status !== "pending_postpone") { res.status(409).json({ error: "المهمة ليست في حالة انتظار التأجيل" }); return; }
+  const [updated] = await db.update(checklistAssignmentsTable)
+    .set({ status: "postponed" })
+    .where(eq(checklistAssignmentsTable.id, id))
+    .returning();
+  await logActivity("checklist_postpone_approved", `✅ تأجيل موافق عليه: ${existing.title}`, req.session.fullName, null, { actionType: "postpone_approve", entityType: "checklist_assignment", entityId: id });
+  res.json(updated);
+});
+
+router.post("/checklists/assignments/:id/reject-postpone", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+  const id = parseInt(String(req.params.id), 10);
+  if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  const [existing] = await db.select().from(checklistAssignmentsTable).where(eq(checklistAssignmentsTable.id, id));
+  if (!existing) { res.status(404).json({ error: "Assignment not found" }); return; }
+  if (existing.status !== "pending_postpone") { res.status(409).json({ error: "المهمة ليست في حالة انتظار التأجيل" }); return; }
+  // Return to in_progress if previously started, otherwise not_started
+  const revertStatus = existing.startedAt ? "in_progress" : "not_started";
+  const [updated] = await db.update(checklistAssignmentsTable)
+    .set({ status: revertStatus })
+    .where(eq(checklistAssignmentsTable.id, id))
+    .returning();
+  await logActivity("checklist_postpone_rejected", `❌ رُفض طلب التأجيل: ${existing.title}`, req.session.fullName, null, { actionType: "postpone_reject", entityType: "checklist_assignment", entityId: id });
+  res.json(updated);
 });
 
 router.post("/checklists/assignments/:id/cancel", requirePermission("manage_tasks"), async (req, res): Promise<void> => {

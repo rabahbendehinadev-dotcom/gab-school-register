@@ -70,3 +70,19 @@ export async function sendPushToRole(role: string, payload: PushPayload, repeatT
     setTimeout(() => deliverOnce(subs, data).catch(() => {}), delay);
   }
 }
+
+/**
+ * Send push to a specific staff member by their staffId.
+ * Targets only the push subscriptions belonging to that staff member.
+ */
+export async function sendPushToStaff(staffId: number, payload: PushPayload): Promise<void> {
+  const subs = await db
+    .select()
+    .from(pushSubscriptionsTable)
+    .where(eq(pushSubscriptionsTable.staffId, staffId));
+
+  if (subs.length === 0) return;
+
+  const data = JSON.stringify(payload);
+  await deliverOnce(subs, data);
+}
