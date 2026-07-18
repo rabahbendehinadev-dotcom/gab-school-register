@@ -2,6 +2,7 @@ import app from "./app";
 import { seedAdmin } from "./seed";
 import { pool } from "@workspace/db";
 import { startChecklistScheduler } from "./lib/checklistScheduler";
+import { startAiScheduler } from "./lib/aiScheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -223,6 +224,28 @@ async function ensureChecklistTables(): Promise<void> {
   }
 }
 
+async function ensureAiTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "ai_reports" (
+        "id"           serial PRIMARY KEY,
+        "report_type"  text NOT NULL DEFAULT 'manual',
+        "severity"     text NOT NULL DEFAULT 'info',
+        "findings"     jsonb NOT NULL DEFAULT '[]',
+        "is_read"      boolean NOT NULL DEFAULT false,
+        "generated_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS "idx_ai_reports_severity"     ON "ai_reports" ("severity")`);
+    await client.query(`CREATE INDEX IF NOT EXISTS "idx_ai_reports_generated_at" ON "ai_reports" ("generated_at" DESC)`);
+    // notification preference column on staff
+    await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "notification_pref" text DEFAULT 'during_shift'`);
+  } finally {
+    client.release();
+  }
+}
+
 ensureSessionTable()
   .then(() => ensurePushSubscriptionsTable())
   .then(() => ensureRolesTable())
@@ -230,9 +253,11 @@ ensureSessionTable()
   .then(() => ensureActivityLogsExtended())
   .then(() => ensureStaffRoleIdColumn())
   .then(() => ensureChecklistTables())
+  .then(() => ensureAiTables())
   .then(() => seedAdmin())
   .then(() => {
     startChecklistScheduler();
+    startAiScheduler();
     app.listen(port, () => {
       console.log(`Server listening on port ${port}`);
     });

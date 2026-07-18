@@ -17,6 +17,8 @@ import {
   Lock,
   CheckSquare,
   ClipboardList,
+  BarChart2,
+  Cpu,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermission } from "@/hooks/use-permission";
@@ -93,6 +95,20 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const canManageStaff      = perms.includes("manage_staff");
   const canManageRoles      = perms.includes("manage_roles");
   const canManageNotifications = perms.includes("manage_notifications");
+  const canViewAiControl    = perms.includes("view_ai_control");
+  const canViewReports      = perms.includes("view_reports") || perms.includes("view_ai_control");
+
+  const { data: aiUnreadData } = useQuery<{ count: number }>({
+    queryKey: ["ai-unread-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/ai/alerts/unread-count", { credentials: "include" });
+      if (!res.ok) return { count: 0 };
+      return res.json();
+    },
+    refetchInterval: 60_000,
+    enabled: canViewAiControl,
+  });
+  const aiUnreadCount = aiUnreadData?.count ?? 0;
 
   const { data: myChecklists } = useQuery<{ id: number; status: string }[]>({
     queryKey: ["my-checklists-badge"],
@@ -120,6 +136,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",    icon: RadioTower,      exact: false, show: canManageStaff },
     { href: "/gab-c7x2p/roles",         label: "الأدوار",        icon: Lock,            exact: false, show: canManageRoles },
     { href: "/gab-c7x2p/activity",      label: t.activityLog,    icon: Activity,        exact: false, show: canViewAuditLogs },
+    { href: "/gab-c7x2p/reports",      label: "تقارير الأداء",  icon: BarChart2,       exact: false, show: canViewReports },
+    { href: "/gab-c7x2p/ai-control",   label: "لوحة التحكم المتقدمة", icon: Cpu,      exact: false, show: canViewAiControl, badge: aiUnreadCount > 0 ? String(aiUnreadCount) : undefined },
   ];
 
   if (isLoading) {

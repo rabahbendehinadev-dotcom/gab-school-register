@@ -19,6 +19,7 @@ import rolesRouter from "./roles";
 import sessionsRouter from "./sessions";
 import studentCollabRouter from "./student-collab";
 import checklistsRouter from "./checklists";
+import aiRouter from "./ai";
 
 const router: IRouter = Router();
 
@@ -42,5 +43,6 @@ router.use(rolesRouter);
 router.use(sessionsRouter);
 router.use(studentCollabRouter);
 router.use(checklistsRouter);
+router.use(aiRouter);
 
 export default router;

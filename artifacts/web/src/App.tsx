@@ -23,6 +23,8 @@ import StaffActivity from "@/pages/admin/StaffActivity";
 import RolesSettings from "@/pages/admin/RolesSettings";
 import Checklists from "@/pages/admin/Checklists";
 import ChecklistAdmin from "@/pages/admin/ChecklistAdmin";
+import AiControl from "@/pages/admin/AiControl";
+import Reports from "@/pages/admin/Reports";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -59,6 +61,8 @@ function Router() {
       <Route path="/gab-c7x2p/courses" component={Courses} />
       <Route path="/gab-c7x2p/checklists" component={Checklists} />
       <Route path="/gab-c7x2p/checklist-admin" component={ChecklistAdmin} />
+      <Route path="/gab-c7x2p/ai-control" component={AiControl} />
+      <Route path="/gab-c7x2p/reports" component={Reports} />
       
       {/* 404 */}
       <Route component={NotFound} />
