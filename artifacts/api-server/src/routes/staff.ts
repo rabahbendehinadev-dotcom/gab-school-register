@@ -9,14 +9,14 @@ import {
   UpdateStaffResponse,
   DeleteStaffParams,
 } from "@workspace/api-zod";
-import { requirePermission } from "../middlewares/auth";
+import { requirePermission, requireAnyPermission } from "../middlewares/auth";
 import { hashPassword } from "../lib/password";
 import { logActivity } from "../lib/activityLogger";
 import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/staff", requirePermission("manage_staff"), async (_req, res): Promise<void> => {
+router.get("/staff", requireAnyPermission("manage_staff", "manage_tasks"), async (_req, res): Promise<void> => {
   const staff = await db.select().from(staffTable).orderBy(staffTable.createdAt);
   const safeStaff = staff.map((s) => ({
     id: s.id,
@@ -24,6 +24,7 @@ router.get("/staff", requirePermission("manage_staff"), async (_req, res): Promi
     fullName: s.fullName,
     role: s.role,
     roleId: s.roleId,
+    shiftType: s.shiftType,
     createdAt: s.createdAt,
   }));
   res.json(ListStaffResponse.parse(safeStaff));

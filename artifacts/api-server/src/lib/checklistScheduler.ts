@@ -66,7 +66,8 @@ export async function runChecklistEscalationTick(): Promise<void> {
 
     const withinShift = await isWithinShiftHours(now);
 
-    const activeStatuses = ["not_started", "in_progress", "overdue"];
+    // pending_postpone stays in active reminder flow until supervisor approves/rejects
+    const activeStatuses = ["not_started", "in_progress", "overdue", "pending_postpone"];
     const active = await db
       .select({
         id:          checklistAssignmentsTable.id,

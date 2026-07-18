@@ -104,7 +104,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     refetchInterval: 30_000,
     enabled: !!user,
   });
-  const overdueChecklistCount = (myChecklists ?? []).filter(a => ["overdue", "not_started", "in_progress"].includes(a.status) && true).length;
+  const overdueChecklistCount = (myChecklists ?? []).filter(a => a.status === "overdue").length;
 
   const navItems = [
     { href: "/gab-c7x2p",               label: t.dashboard,      icon: LayoutDashboard, exact: true,  show: canViewDashboard },
