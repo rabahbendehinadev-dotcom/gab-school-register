@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, and, desc, gte, inArray } from "drizzle-orm";
 import { db, studentsTable, staffTable, staffSessionsTable, studentOwnersTable, callResultsTable } from "@workspace/db";
 import { z } from "zod/v4";
-import { requirePermission, requireAuth } from "../middlewares/auth";
+import { requirePermission, requireAnyPermission, requireAuth } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import "../types/session";
 
@@ -18,7 +18,7 @@ router.get("/staff/assignable", requirePermission("assign_students"), async (_re
 });
 
 // ---------- CONCURRENT VIEWERS ----------
-router.get("/students/:id/viewers", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id/viewers", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const studentId = parseInt(String(req.params.id), 10);
   if (Number.isNaN(studentId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -50,7 +50,7 @@ router.get("/students/:id/viewers", requirePermission("view_students"), async (r
 // ---------- PRIMARY OWNER ----------
 const AssignOwnerBody = z.object({ staffId: z.coerce.number().int().positive() });
 
-router.get("/students/:id/owner", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id/owner", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const studentId = parseInt(String(req.params.id), 10);
   if (Number.isNaN(studentId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -131,7 +131,7 @@ router.post("/students/:id/call-attempt", requirePermission("call_students"), as
     clickedAt: new Date(),
   }).returning();
 
-  await logActivity("call_click", `📞 نقر على الاتصال`, staffName, studentId, {
+  await logActivity("call_click", `📞 نقر على الاتصال (نقر الزر فقط — لا نتيجة بعد)`, staffName, studentId, {
     employeeId: staffId,
     actionType: "call_click",
     entityType: "student",
@@ -175,7 +175,7 @@ router.post("/students/:id/call-result/:callId", requirePermission("call_student
     await db.update(studentsTable).set({ nextFollowupAt: parsed.data.nextFollowupAt }).where(eq(studentsTable.id, studentId)).catch(() => {});
   }
 
-  await logActivity("call_result", `📞 نتيجة المكالمة: ${resultLabels[parsed.data.result] ?? parsed.data.result}${parsed.data.note ? " — " + parsed.data.note : ""}`, staffName, studentId, {
+  await logActivity("call_result", `📞 نتيجة المكالمة [تأكيد يدوي]: ${resultLabels[parsed.data.result] ?? parsed.data.result}${parsed.data.note ? " — " + parsed.data.note : ""}`, staffName, studentId, {
     employeeId: req.session.staffId,
     actionType: "call_result",
     entityType: "student",
@@ -187,7 +187,7 @@ router.post("/students/:id/call-result/:callId", requirePermission("call_student
   res.json(row);
 });
 
-router.get("/students/:id/call-results", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id/call-results", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const studentId = parseInt(String(req.params.id), 10);
   if (Number.isNaN(studentId)) { res.status(400).json({ error: "Invalid id" }); return; }
 

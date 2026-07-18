@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, or, and, sql, desc, isNull, gte, lt } from "drizzle-orm";
+import { eq, ilike, or, and, sql, desc, isNull, gte, lt, isNotNull } from "drizzle-orm";
 import { db, studentsTable, groupsTable, studentOwnersTable, staffTable, activityLogsTable } from "@workspace/db";
 import {
   CreateStudentBody,
@@ -229,12 +229,23 @@ router.get("/students/:id", requirePermission("view_students"), async (req, res)
     .orderBy(desc(studentOwnersTable.assignedAt))
     .limit(1);
 
-  const [lastAction] = await db
-    .select({ details: activityLogsTable.details, performedBy: activityLogsTable.performedBy, createdAt: activityLogsTable.createdAt })
+  const recentLogs = await db
+    .select({ details: activityLogsTable.details, performedBy: activityLogsTable.performedBy, createdAt: activityLogsTable.createdAt, actionType: activityLogsTable.actionType })
     .from(activityLogsTable)
-    .where(eq(activityLogsTable.studentId, params.data.id))
+    .where(and(eq(activityLogsTable.studentId, params.data.id), isNotNull(activityLogsTable.performedBy)))
     .orderBy(desc(activityLogsTable.createdAt))
-    .limit(1);
+    .limit(50);
+
+  const lastAction = recentLogs[0] ?? null;
+
+  const seenStaff = new Set<string>();
+  const interactedStaff: string[] = [];
+  for (const log of recentLogs) {
+    if (log.performedBy && !seenStaff.has(log.performedBy)) {
+      seenStaff.add(log.performedBy);
+      interactedStaff.push(log.performedBy);
+    }
+  }
 
   await logActivity(
     "student_viewed",
@@ -253,7 +264,8 @@ router.get("/students/:id", requirePermission("view_students"), async (req, res)
   res.json({
     ...student,
     owner: ownerRow ? { staffId: ownerRow.staffId, fullName: ownerRow.fullName, assignedAt: ownerRow.assignedAt } : null,
-    lastAction: lastAction ? { text: lastAction.details, by: lastAction.performedBy, at: lastAction.createdAt } : null,
+    lastAction: lastAction ? { text: lastAction.details, by: lastAction.performedBy, at: lastAction.createdAt, actionType: lastAction.actionType } : null,
+    interactedStaff,
   });
 });
 

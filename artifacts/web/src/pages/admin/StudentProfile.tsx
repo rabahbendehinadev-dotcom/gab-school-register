@@ -22,7 +22,8 @@ interface Student {
   source: string; agreedPrice: number | null; nextFollowupAt: string | null;
   lastContactedAt: string | null; contactAttempts: number; createdAt: string;
   owner: { staffId: number; fullName: string | null; assignedAt: string } | null;
-  lastAction: { text: string; by: string | null; at: string } | null;
+  lastAction: { text: string; by: string | null; at: string; actionType: string | null } | null;
+  interactedStaff: string[];
 }
 interface Note { id: number; content: string; createdBy: string | null; createdAt: string }
 interface AttendanceRow { id: number; dayNumber: number; present: boolean; markedBy: string | null }
@@ -142,6 +143,7 @@ export default function StudentProfile() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: studentKey }); qc.invalidateQueries({ queryKey: ["timeline", id] }); invalidateErp(); toast({ title: isFr ? "Contact enregistré" : "تم تسجيل التواصل" }); },
   });
 
+  const phoneRef = useRef<string>("");
   const callAttemptMutation = useMutation({
     mutationFn: () => apiFetch(`/students/${id}/call-attempt`, { method: "POST" }),
     onSuccess: (data: CallResult) => {
@@ -154,6 +156,10 @@ export default function StudentProfile() {
       setCallNextFollowup("");
       qc.invalidateQueries({ queryKey: ["timeline", id] });
       qc.invalidateQueries({ queryKey: studentKey });
+      // Only open dialer after attempt is successfully recorded
+      if (phoneRef.current) {
+        window.location.href = `tel:${phoneRef.current}`;
+      }
     },
     onError: () => toast({ title: isFr ? "Erreur" : "خطأ", variant: "destructive" }),
   });
@@ -216,9 +222,10 @@ export default function StudentProfile() {
   }, [pendingCallId]);
 
   const handleCallClick = () => {
-    if (!id) return;
+    if (!id || !student) return;
+    phoneRef.current = student.phone;
     callAttemptMutation.mutate();
-    window.location.href = `tel:${student?.phone}`;
+    // tel: navigation happens in onSuccess after attempt is recorded
   };
 
   const handleWaClick = () => {
@@ -327,6 +334,15 @@ export default function StudentProfile() {
                     </p>
                   );
                 })()}
+                {/* Interacted staff chips */}
+                {student.interactedStaff?.length > 0 && (
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    <span className="text-xs text-muted-foreground">{isFr ? "Intervenants:" : "تفاعل معه:"}</span>
+                    {student.interactedStaff.slice(0, 5).map((name) => (
+                      <span key={name} className="text-xs px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground">{name}</span>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
