@@ -460,7 +460,7 @@ export default function ChecklistAdmin() {
 
   const staffQ = useQuery<StaffMember[]>({
     queryKey: ["staff-list"],
-    queryFn: () => apiFetch("/staff"),
+    queryFn: () => apiFetch("/staff/assignable"),
   });
 
   const assignmentsQ = useQuery<Assignment[]>({

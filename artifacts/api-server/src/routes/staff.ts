@@ -16,7 +16,7 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-router.get("/staff", requireAnyPermission("manage_staff", "manage_tasks"), async (_req, res): Promise<void> => {
+router.get("/staff", requirePermission("manage_staff"), async (_req, res): Promise<void> => {
   const staff = await db.select().from(staffTable).orderBy(staffTable.createdAt);
   const safeStaff = staff.map((s) => ({
     id: s.id,
@@ -28,6 +28,12 @@ router.get("/staff", requireAnyPermission("manage_staff", "manage_tasks"), async
     createdAt: s.createdAt,
   }));
   res.json(ListStaffResponse.parse(safeStaff));
+});
+
+/** Minimal staff list (id + name only) for assignee dropdowns — accessible by TLs with manage_tasks. */
+router.get("/staff/assignable", requireAnyPermission("manage_staff", "manage_tasks"), async (_req, res): Promise<void> => {
+  const staff = await db.select({ id: staffTable.id, fullName: staffTable.fullName }).from(staffTable).orderBy(staffTable.fullName);
+  res.json(staff);
 });
 
 router.post("/staff", requirePermission("manage_staff"), async (req, res): Promise<void> => {

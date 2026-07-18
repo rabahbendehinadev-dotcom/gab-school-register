@@ -119,6 +119,20 @@ export async function runChecklistEscalationTick(): Promise<void> {
       const employeeShiftType = staffShifts.get(a.staffId) ?? null;
       const withinShift = await isWithinEmployeeShift(now, employeeShiftType);
 
+      // Out-of-shift warning: if employee is outside their shift and task is overdue,
+      // notify supervisors once (level 0) so admins know a task is silently blocked
+      if (!withinShift && minutesLate >= overdueMin) {
+        const lastOutOfShift = await getLastEscalationFireTime(a.id, 0);
+        if (!lastOutOfShift) {
+          await notifySupervisors(
+            `⏰ تنبيه: مهمة متأخرة خارج وقت عمل الموظف`,
+            `المهمة "${a.title}" متأخرة ${Math.round(minutesLate)} دقيقة — الموظف خارج نطاق وردية عمله`,
+            "checklist_out_of_shift"
+          );
+          await logEscalation(a.id, 0, `تنبيه خارج وقت العمل — الموظف بوردية ${employeeShiftType ?? "غير محدد"}`, a.staffId);
+        }
+      }
+
       // ── Level 1: initial due reminder to assignee ────────────────────────
       if (minutesLate < reminder2Min) {
         const lastFire = await getLastEscalationFireTime(a.id, 1);

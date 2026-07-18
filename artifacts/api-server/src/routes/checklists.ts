@@ -86,7 +86,7 @@ const TemplateBody = z.object({
   enabled: z.boolean().optional(),
 });
 
-router.get("/checklists/templates", requirePermission("manage_tasks"), async (_req, res): Promise<void> => {
+router.get("/checklists/templates", requirePermission("manage_staff"), async (_req, res): Promise<void> => {
   const templates = await db.select().from(checklistTemplatesTable).orderBy(desc(checklistTemplatesTable.createdAt));
   const result = await Promise.all(templates.map(async (t) => {
     const items = await db.select().from(checklistItemsTable).where(eq(checklistItemsTable.templateId, t.id)).orderBy(checklistItemsTable.sortOrder);
@@ -104,7 +104,7 @@ function coerceDateFields(data: Record<string, unknown>): Record<string, unknown
   return out;
 }
 
-router.post("/checklists/templates", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.post("/checklists/templates", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const parsed = TemplateBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const values = coerceDateFields(parsed.data as Record<string, unknown>);
@@ -116,7 +116,7 @@ router.post("/checklists/templates", requirePermission("manage_tasks"), async (r
   res.status(201).json(tmpl);
 });
 
-router.patch("/checklists/templates/:id", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.patch("/checklists/templates/:id", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const parsed = TemplateBody.partial().safeParse(req.body);
@@ -127,7 +127,7 @@ router.patch("/checklists/templates/:id", requirePermission("manage_tasks"), asy
   res.json(tmpl);
 });
 
-router.delete("/checklists/templates/:id", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.delete("/checklists/templates/:id", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(checklistTemplatesTable).where(eq(checklistTemplatesTable.id, id));
@@ -147,7 +147,7 @@ const ItemBody = z.object({
   sortOrder: z.coerce.number().int().optional(),
 });
 
-router.post("/checklists/templates/:templateId/items", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.post("/checklists/templates/:templateId/items", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const templateId = parseInt(String(req.params.templateId), 10);
   if (Number.isNaN(templateId)) { res.status(400).json({ error: "Invalid templateId" }); return; }
   const parsed = ItemBody.safeParse(req.body);
@@ -156,7 +156,7 @@ router.post("/checklists/templates/:templateId/items", requirePermission("manage
   res.status(201).json(item);
 });
 
-router.patch("/checklists/items/:id", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.patch("/checklists/items/:id", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const parsed = ItemBody.partial().safeParse(req.body);
@@ -166,7 +166,7 @@ router.patch("/checklists/items/:id", requirePermission("manage_tasks"), async (
   res.json(item);
 });
 
-router.delete("/checklists/items/:id", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.delete("/checklists/items/:id", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(checklistItemsTable).where(eq(checklistItemsTable.id, id));
@@ -377,7 +377,7 @@ router.post("/checklists/assignments/:id/postpone-request", requireAuth, async (
   res.json({ success: true });
 });
 
-router.post("/checklists/assignments/:id/approve-postpone", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.post("/checklists/assignments/:id/approve-postpone", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(checklistAssignmentsTable).where(eq(checklistAssignmentsTable.id, id));
@@ -391,7 +391,7 @@ router.post("/checklists/assignments/:id/approve-postpone", requirePermission("m
   res.json(updated);
 });
 
-router.post("/checklists/assignments/:id/reject-postpone", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.post("/checklists/assignments/:id/reject-postpone", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const [existing] = await db.select().from(checklistAssignmentsTable).where(eq(checklistAssignmentsTable.id, id));
@@ -407,7 +407,7 @@ router.post("/checklists/assignments/:id/reject-postpone", requirePermission("ma
   res.json(updated);
 });
 
-router.post("/checklists/assignments/:id/cancel", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.post("/checklists/assignments/:id/cancel", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const [updated] = await db.update(checklistAssignmentsTable)
@@ -419,7 +419,7 @@ router.post("/checklists/assignments/:id/cancel", requirePermission("manage_task
 });
 
 /** Handover / transfer log — reassigned assignments with origin staff info. */
-router.get("/checklists/handover-log", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.get("/checklists/handover-log", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const fromStaff = staffTable;
   const toStaff   = { ...staffTable } as typeof staffTable;
   // Simple: fetch all assignments that have been reassigned (reassignedFrom IS NOT NULL)
@@ -459,7 +459,7 @@ router.get("/checklists/handover-log", requirePermission("manage_tasks"), async 
   res.json(result);
 });
 
-router.post("/checklists/assignments/:id/reassign", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.post("/checklists/assignments/:id/reassign", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const { staffId: newStaffId } = req.body as { staffId: number };
@@ -474,7 +474,7 @@ router.post("/checklists/assignments/:id/reassign", requirePermission("manage_ta
   res.json(updated);
 });
 
-router.get("/checklists/assignments/:id/escalations", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+router.get("/checklists/assignments/:id/escalations", requirePermission("manage_staff"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const logs = await db.select().from(escalationLogTable).where(eq(escalationLogTable.assignmentId, id)).orderBy(escalationLogTable.notifiedAt);
