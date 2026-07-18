@@ -13,7 +13,7 @@ import {
   AssignStudentToGroupBody,
   GetDashboardStatsResponse,
 } from "@workspace/api-zod";
-import { requirePermission, requireAuth } from "../middlewares/auth";
+import { requirePermission, requireAnyPermission, requireAuth } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import { createNotification } from "../lib/notifications";
 import { sendTelegramNotification } from "../lib/telegram";
@@ -37,7 +37,7 @@ function parseStoragePath(path: string): { bucketName: string; objectName: strin
 
 const router: IRouter = Router();
 
-router.get("/students", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const rq = req.query as Record<string, string | undefined>;
   const conditions = [isNull(studentsTable.deletedAt)];
 
@@ -159,7 +159,7 @@ router.post("/students", async (req, res): Promise<void> => {
   res.status(201).json(student);
 });
 
-router.get("/students/stage-counts", requirePermission("view_students"), async (_req, res): Promise<void> => {
+router.get("/students/stage-counts", requireAnyPermission("view_students", "view_all_students"), async (_req, res): Promise<void> => {
   const rows = await db
     .select({ stage: studentsTable.stage, cnt: sql<number>`count(*)::int` })
     .from(studentsTable)
@@ -210,7 +210,7 @@ router.patch("/students/bulk/stage", requirePermission("edit_students"), async (
   res.json({ updated: updated.length });
 });
 
-router.get("/students/:id", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const params = GetStudentParams.safeParse(req.params);
   if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 

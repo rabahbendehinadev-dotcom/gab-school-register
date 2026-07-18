@@ -153,6 +153,14 @@ router.post("/students/:id/call-result/:callId", requirePermission("call_student
   const [existing] = await db.select().from(callResultsTable).where(and(eq(callResultsTable.id, callId), eq(callResultsTable.studentId, studentId)));
   if (!existing) { res.status(404).json({ error: "Call attempt not found" }); return; }
 
+  // Only the staff who originated the call OR staff with assign_students (team leader+) can confirm
+  const confirmerPerms: string[] = req.session.permissions ?? [];
+  const canOverride = confirmerPerms.includes("assign_students") || confirmerPerms.includes("manage_staff");
+  if (existing.staffId !== req.session.staffId && !canOverride) {
+    res.status(403).json({ error: "يمكنك فقط تسجيل نتيجة مكالمتك الخاصة" });
+    return;
+  }
+
   const [row] = await db.update(callResultsTable).set({
     result: parsed.data.result,
     durationSeconds: parsed.data.durationSeconds ?? null,
