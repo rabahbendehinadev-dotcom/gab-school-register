@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: getGetMeQueryKey(),
     queryFn: fetchMe,
     retry: false,
-    staleTime: Infinity,
+    staleTime: 5 * 60 * 1000,
   });
 
   const logoutMutation = useLogout({

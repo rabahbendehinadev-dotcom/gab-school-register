@@ -135,7 +135,20 @@ router.get("/auth/me", async (req, res): Promise<void> => {
     return;
   }
 
-  const permissions: string[] = req.session.permissions ?? getPermissionsForRole(staff.role);
+  let permissions: string[] = [];
+  if (staff.roleId) {
+    const [roleRecord] = await db
+      .select()
+      .from(rolesTable)
+      .where(eq(rolesTable.id, staff.roleId));
+    if (roleRecord && Array.isArray(roleRecord.permissions)) {
+      permissions = roleRecord.permissions as string[];
+    }
+  }
+  if (permissions.length === 0) {
+    permissions = getPermissionsForRole(staff.role);
+  }
+  req.session.permissions = permissions;
 
   res.json({
     ...GetMeResponse.parse({

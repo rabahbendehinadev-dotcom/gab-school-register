@@ -27,6 +27,19 @@ import { PushToggleButton } from "@/components/admin/PushToggleButton";
 function useHeartbeat(page: string) {
   const { user } = useAuth();
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastActivityRef = useRef<number>(Date.now());
+
+  useEffect(() => {
+    const onActivity = () => { lastActivityRef.current = Date.now(); };
+    window.addEventListener("mousemove", onActivity, { passive: true });
+    window.addEventListener("keydown", onActivity, { passive: true });
+    window.addEventListener("click", onActivity, { passive: true });
+    return () => {
+      window.removeEventListener("mousemove", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("click", onActivity);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -41,6 +54,14 @@ function useHeartbeat(page: string) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ page, ...(studentId ? { studentId } : {}) }),
       }).catch(() => {});
+
+      const idleMs = Date.now() - lastActivityRef.current;
+      if (idleMs < 5 * 60 * 1000) {
+        fetch("/api/sessions/action", {
+          method: "POST",
+          credentials: "include",
+        }).catch(() => {});
+      }
     };
 
     send();
