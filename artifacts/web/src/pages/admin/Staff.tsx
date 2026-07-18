@@ -4,9 +4,8 @@ import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { 
   useListStaff, useCreateStaff, useUpdateStaff, useDeleteStaff, getListStaffQueryKey,
   type CreateStaffBody, type UpdateStaffBody, type StaffMember,
-  type CreateStaffBodyRole, type UpdateStaffBodyRole
 } from "@workspace/api-client-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -17,7 +16,7 @@ import { Plus, Trash2, Shield, Edit } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { useToast } from "@/hooks/use-toast";
 
-const ROLES = ["admin", "manager", "assistant", "staff"] as const;
+type DbRole = { id: number; name: string; displayName: string; permissions: string[]; isSystem: boolean };
 
 export default function Staff() {
   const queryClient = useQueryClient();
@@ -25,12 +24,24 @@ export default function Staff() {
   const { data: staff, isLoading } = useListStaff();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editMember, setEditMember] = useState<StaffMember | null>(null);
+  const [createRoleId, setCreateRoleId] = useState<number | undefined>(undefined);
+  const [editRoleId, setEditRoleId] = useState<number | undefined>(undefined);
+
+  const { data: dbRoles = [] } = useQuery<DbRole[]>({
+    queryKey: ["roles"],
+    queryFn: async () => {
+      const res = await fetch("/api/roles", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+  });
 
   const createMutation = useCreateStaff({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListStaffQueryKey() });
         setIsCreateOpen(false);
+        setCreateRoleId(undefined);
         createForm.reset();
         toast({ title: "Staff member created" });
       }
@@ -42,6 +53,7 @@ export default function Staff() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListStaffQueryKey() });
         setEditMember(null);
+        setEditRoleId(undefined);
         toast({ title: "Staff member updated" });
       }
     }
@@ -63,21 +75,51 @@ export default function Staff() {
   const editForm = useForm<UpdateStaffBody>();
 
   const onCreateSubmit = (data: CreateStaffBody) => {
-    createMutation.mutate({ data });
+    const body: CreateStaffBody & { roleId?: number } = { ...data };
+    if (createRoleId !== undefined) body.roleId = createRoleId;
+    createMutation.mutate({ data: body });
   };
 
   const onEditSubmit = (data: UpdateStaffBody) => {
     if (!editMember) return;
-    updateMutation.mutate({ id: editMember.id, data });
+    const body: UpdateStaffBody & { roleId?: number } = { ...data };
+    if (editRoleId !== undefined) body.roleId = editRoleId;
+    updateMutation.mutate({ id: editMember.id, data: body });
+  };
+
+  const handleCreateRoleSelect = (value: string) => {
+    const role = dbRoles.find((r) => String(r.id) === value);
+    if (role) {
+      createForm.setValue("role", role.name);
+      setCreateRoleId(role.id);
+    }
+  };
+
+  const handleEditRoleSelect = (value: string) => {
+    const role = dbRoles.find((r) => String(r.id) === value);
+    if (role) {
+      editForm.setValue("role", role.name);
+      setEditRoleId(role.id);
+    }
   };
 
   const openEdit = (member: StaffMember) => {
     setEditMember(member);
+    setEditRoleId((member as StaffMember & { roleId?: number }).roleId);
     editForm.reset({
       fullName: member.fullName,
       role: member.role,
       password: "",
     });
+  };
+
+  const getRoleDisplayName = (member: StaffMember) => {
+    const rid = (member as StaffMember & { roleId?: number }).roleId;
+    if (rid) {
+      const dbRole = dbRoles.find((r) => r.id === rid);
+      if (dbRole) return dbRole.displayName;
+    }
+    return member.role;
   };
 
   if (isLoading) return <AdminLayout><div className="animate-pulse">Loading staff...</div></AdminLayout>;
@@ -113,12 +155,21 @@ export default function Staff() {
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select onValueChange={(v) => createForm.setValue("role", v as CreateStaffBodyRole)} defaultValue="staff">
-                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map(r => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {dbRoles.length > 0 ? (
+                  <Select
+                    onValueChange={handleCreateRoleSelect}
+                    defaultValue={createRoleId !== undefined ? String(createRoleId) : undefined}
+                  >
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="اختر الدور" /></SelectTrigger>
+                    <SelectContent>
+                      {dbRoles.map((r) => (
+                        <SelectItem key={r.id} value={String(r.id)}>{r.displayName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input {...createForm.register("role")} defaultValue="staff" className="rounded-xl" />
+                )}
               </div>
               <Button type="submit" className="w-full rounded-xl" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create Member"}
@@ -151,7 +202,7 @@ export default function Staff() {
                 <TableCell>
                   <div className="flex items-center gap-1.5">
                     <Shield className={`w-4 h-4 ${member.role === 'admin' ? 'text-destructive' : 'text-primary'}`} />
-                    <span className="capitalize text-sm font-medium">{member.role}</span>
+                    <span className="capitalize text-sm font-medium">{getRoleDisplayName(member)}</span>
                   </div>
                 </TableCell>
                 <TableCell className="text-right">
@@ -191,12 +242,21 @@ export default function Staff() {
               </div>
               <div className="space-y-2">
                 <Label>Role</Label>
-                <Select onValueChange={(v) => editForm.setValue("role", v as UpdateStaffBodyRole)} defaultValue={editMember.role}>
-                  <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ROLES.map(r => <SelectItem key={r} value={r} className="capitalize">{r}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                {dbRoles.length > 0 ? (
+                  <Select
+                    onValueChange={handleEditRoleSelect}
+                    defaultValue={editRoleId !== undefined ? String(editRoleId) : undefined}
+                  >
+                    <SelectTrigger className="rounded-xl"><SelectValue placeholder={editMember.role} /></SelectTrigger>
+                    <SelectContent>
+                      {dbRoles.map((r) => (
+                        <SelectItem key={r.id} value={String(r.id)}>{r.displayName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input {...editForm.register("role")} className="rounded-xl" />
+                )}
               </div>
               <div className="space-y-2">
                 <Label>New Password (leave blank to keep current)</Label>

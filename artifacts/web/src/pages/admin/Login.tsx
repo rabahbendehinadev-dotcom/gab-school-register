@@ -27,7 +27,13 @@ export default function Login() {
   const onSubmit = async (data: z.infer<typeof loginSchema>) => {
     try {
       const user = await loginMutation.mutateAsync({ data });
-      queryClient.setQueryData(getGetMeQueryKey(), user);
+      // Fetch full user with permissions immediately after login
+      const meRes = await fetch("/api/auth/me", { credentials: "include" });
+      const meData = meRes.ok ? await meRes.json() : user;
+      queryClient.setQueryData(getGetMeQueryKey(), {
+        ...meData,
+        permissions: Array.isArray(meData.permissions) ? meData.permissions : [],
+      });
       toast({ title: "Welcome back", description: `Logged in as ${user.fullName}` });
       setLocation("/gab-c7x2p");
     } catch (error) {

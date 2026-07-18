@@ -50,7 +50,7 @@ router.post("/roles", requirePermission("manage_roles"), async (req, res): Promi
 });
 
 router.patch("/roles/:id", requirePermission("manage_roles"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [existing] = await db.select().from(rolesTable).where(eq(rolesTable.id, id));
@@ -80,7 +80,7 @@ router.patch("/roles/:id", requirePermission("manage_roles"), async (req, res): 
 });
 
 router.delete("/roles/:id", requirePermission("manage_roles"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const [existing] = await db.select().from(rolesTable).where(eq(rolesTable.id, id));
@@ -101,7 +101,7 @@ router.delete("/roles/:id", requirePermission("manage_roles"), async (req, res):
 });
 
 router.patch("/staff/:id/role", requirePermission("manage_staff"), async (req, res): Promise<void> => {
-  const staffId = parseInt(req.params.id, 10);
+  const staffId = parseInt(String(req.params.id), 10);
   if (isNaN(staffId)) { res.status(400).json({ error: "Invalid id" }); return; }
 
   const { roleId, role } = req.body as { roleId?: number; role?: string };

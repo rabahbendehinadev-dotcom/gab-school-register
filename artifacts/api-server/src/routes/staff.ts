@@ -36,6 +36,8 @@ router.post("/staff", requirePermission("manage_staff"), async (req, res): Promi
   const existing = await db.select().from(staffTable).where(eq(staffTable.username, parsed.data.username));
   if (existing.length > 0) { res.status(400).json({ error: "Username already exists" }); return; }
 
+  const roleId = req.body.roleId !== undefined ? Number(req.body.roleId) : undefined;
+
   const [staff] = await db
     .insert(staffTable)
     .values({
@@ -43,6 +45,7 @@ router.post("/staff", requirePermission("manage_staff"), async (req, res): Promi
       passwordHash: hashPassword(parsed.data.password),
       fullName: parsed.data.fullName,
       role: parsed.data.role,
+      ...(roleId ? { roleId } : {}),
     })
     .returning();
 
@@ -67,10 +70,11 @@ router.patch("/staff/:id", requirePermission("manage_staff"), async (req, res): 
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   const [before] = await db.select().from(staffTable).where(eq(staffTable.id, params.data.id));
-  const updateData: Record<string, string> = {};
+  const updateData: Record<string, unknown> = {};
   if (parsed.data.fullName) updateData.fullName = parsed.data.fullName;
   if (parsed.data.role) updateData.role = parsed.data.role;
   if (parsed.data.password) updateData.passwordHash = hashPassword(parsed.data.password);
+  if (req.body.roleId !== undefined) updateData.roleId = Number(req.body.roleId);
 
   const [staff] = await db.update(staffTable).set(updateData).where(eq(staffTable.id, params.data.id)).returning();
   if (!staff) { res.status(404).json({ error: "Staff not found" }); return; }
