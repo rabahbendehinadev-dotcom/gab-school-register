@@ -22,6 +22,7 @@ interface StaffActivityItem {
     callClicks: number;
     notesAdded: number;
     stageChanges: number;
+    tasksCompleted: number;
     totalActions: number;
   };
 }
@@ -162,7 +163,7 @@ function StaffActivityContent() {
                   </div>
                 )}
 
-                <div className="grid grid-cols-4 gap-1 border-t border-border/30 pt-3">
+                <div className="grid grid-cols-5 gap-1 border-t border-border/30 pt-3">
                   <div className="text-center">
                     <p className="text-base font-bold text-emerald-600">{member.todayStats.whatsappClicks}</p>
                     <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">واتساب</p>
@@ -174,6 +175,10 @@ function StaffActivityContent() {
                   <div className="text-center">
                     <p className="text-base font-bold text-purple-600">{member.todayStats.notesAdded}</p>
                     <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">ملاحظات</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-bold text-amber-600">{member.todayStats.tasksCompleted}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">مهام</p>
                   </div>
                   <div className="text-center">
                     <p className="text-base font-bold text-foreground">{member.todayStats.totalActions}</p>
@@ -192,7 +197,7 @@ function StaffActivityContent() {
 export default function StaffActivity() {
   return (
     <AdminLayout>
-      <PermissionGuard permission="view_team_activity">
+      <PermissionGuard permission="manage_staff">
         <StaffActivityContent />
       </PermissionGuard>
     </AdminLayout>

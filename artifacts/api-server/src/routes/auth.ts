@@ -51,11 +51,28 @@ router.post("/auth/login", async (req, res): Promise<void> => {
   req.session.permissions = permissions;
   req.session.sessionToken = sessionToken;
 
+  const loginUa = req.headers["user-agent"] ?? "";
+  const loginDevice = /mobile|android|iphone|ipad/i.test(loginUa) ? "mobile" : "desktop";
+  let loginOs = "Unknown";
+  if (/iPhone|iPad/.test(loginUa)) loginOs = "iOS";
+  else if (/Android/.test(loginUa)) loginOs = "Android";
+  else if (/Win/.test(loginUa)) loginOs = "Windows";
+  else if (/Mac/.test(loginUa)) loginOs = "macOS";
+  else if (/Linux/.test(loginUa)) loginOs = "Linux";
+  let loginBrowser = "Unknown";
+  if (/Firefox\//.test(loginUa)) loginBrowser = "Firefox";
+  else if (/Edg\//.test(loginUa)) loginBrowser = "Edge";
+  else if (/Chrome\//.test(loginUa)) loginBrowser = "Chrome";
+  else if (/Safari\//.test(loginUa)) loginBrowser = "Safari";
+
   await logActivity("login", `${staff.fullName} سجّل الدخول`, staff.fullName, null, {
     employeeId: staff.id,
     actionType: "login",
     entityType: "session",
     sessionId: sessionToken,
+    deviceType: loginDevice,
+    os: loginOs,
+    browser: loginBrowser,
   });
 
   res.json(

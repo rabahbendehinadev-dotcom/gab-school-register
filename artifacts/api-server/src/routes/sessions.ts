@@ -117,7 +117,7 @@ router.post("/sessions/end", requireAuth, async (req, res): Promise<void> => {
   res.json({ ok: true });
 });
 
-router.get("/sessions/active", requirePermission("view_team_activity"), async (_req, res): Promise<void> => {
+router.get("/sessions/active", requirePermission("manage_staff"), async (_req, res): Promise<void> => {
   const now = new Date();
   const { hour, dayOfWeek, startOfDay } = getAlgeriaDate();
   const withinWorkingHours = isWithinWorkingHours(hour, dayOfWeek);
@@ -239,6 +239,7 @@ router.get("/sessions/active", requirePermission("view_team_activity"), async (_
         callClicks: stats["call_click"] ?? 0,
         notesAdded: (stats["note_added"] ?? 0) + (stats["note_edited"] ?? 0),
         stageChanges: stats["stage_changed"] ?? 0,
+        tasksCompleted: stats["task_completed"] ?? 0,
         totalActions: Object.values(stats).reduce((a, b) => a + b, 0),
       },
     };
