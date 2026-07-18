@@ -29,6 +29,10 @@ interface StaffPerf {
   callsWithResult: number;
   callsWithoutResult: number;
   notesAdded: number;
+  followupTasksTotal: number;
+  followupTasksDone: number;
+  followupTasksLate: number;
+  followupTaskRate: number | null;
   tasksTotal: number;
   tasksCompleted: number;
   tasksLate: number;
@@ -36,6 +40,7 @@ interface StaffPerf {
   confirmedStudents: number;
   payingStudents: number;
   conversionCount: number;
+  conversionRate: number | null;
   checklistDone: number;
   checklistTotal: number;
   checklistRate: number | null;
@@ -99,6 +104,7 @@ const COLUMNS: ColDef[] = [
   { key: "taskCompletionRate",   label: "إنجاز مهام", render: r => <RateBar value={r.taskCompletionRate} /> },
   { key: "confirmedStudents",    label: "مؤكدون",  render: r => <Num v={r.confirmedStudents} className="text-violet-600" /> },
   { key: "payingStudents",       label: "مدفوعون",  render: r => <Num v={r.payingStudents} className="text-violet-700 font-semibold" /> },
+  { key: "conversionRate",       label: "معدل التحويل%", render: r => <RateBar value={r.conversionRate} /> },
   { key: "checklistRate",        label: "قوائم",    render: r => <RateBar value={r.checklistRate} /> },
   {
     key: "avgFirstResponseHours", label: "وقت الاستجابة",
@@ -150,12 +156,30 @@ export default function Reports() {
 
   function exportCsv() {
     if (!sorted.length) return;
-    const headers = ["الاسم","الدور","تسجيلات الدخول","ساعات الدخول","النشاط","طلاب مفتوحون","واتساب","اتصالات","مكالمة+نتيجة","بدون نتيجة","ملاحظات","مهام","مكتملة","متأخرة","إنجاز مهام%","مؤكدون","مدفوعون","قوائم%","وقت استجابة(h)"];
+    const headers = [
+      "الاسم","الدور","نوع الوردية",
+      "ساعات مجدولة","ساعات دخول","خمول(h)",
+      "تسجيلات دخول","النشاط","طلاب مفتوحون",
+      "واتساب","اتصالات","مكالمة+نتيجة","بدون نتيجة",
+      "ملاحظات",
+      "متابعات(كل)","متابعات مكتملة","متابعات متأخرة","إنجاز متابعات%",
+      "مؤكدون","مدفوعون","معدل التحويل%",
+      "قوائم%","وقت استجابة(h)"
+    ];
     const rows = sorted.map(r => [
-      r.fullName, r.role, r.shiftType, r.scheduledHours, r.actualLoginHours, r.idleHours, r.loginCount, r.totalActions, r.studentsOpened,
+      r.fullName, r.role, r.shiftType,
+      r.scheduledHours, r.actualLoginHours, r.idleHours,
+      r.loginCount, r.totalActions, r.studentsOpened,
       r.whatsappClicks, r.callClicks, r.callsWithResult, r.callsWithoutResult,
-      r.notesAdded, r.tasksTotal, r.tasksCompleted, r.tasksLate, r.taskCompletionRate ?? "—",
-      r.confirmedStudents, r.payingStudents, r.checklistRate ?? "—", r.avgFirstResponseHours ?? "—",
+      r.notesAdded,
+      r.followupTasksTotal ?? r.tasksTotal,
+      r.followupTasksDone ?? r.tasksCompleted,
+      r.followupTasksLate ?? r.tasksLate,
+      r.followupTaskRate ?? r.taskCompletionRate ?? "—",
+      r.confirmedStudents, r.payingStudents,
+      r.conversionRate != null ? `${r.conversionRate}%` : "—",
+      r.checklistRate != null ? `${r.checklistRate}%` : "—",
+      r.avgFirstResponseHours ?? "—",
     ]);
     const csv = [headers, ...rows].map(row => row.join(",")).join("\n");
     const a = document.createElement("a");

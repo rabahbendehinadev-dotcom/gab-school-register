@@ -96,7 +96,7 @@ export async function analyzeIdleStaff(idleMin = 20): Promise<AiFinding[]> {
       affectedStudentIds: [],
       suggestedActionAr: "تحقق من حضور الموظف أو اتصل به للتأكد من انخراطه في العمل.",
       period: "الآن",
-      linkPath: `/gab-c7x2p/staff-activity`,
+      linkPath: `/gab-c7x2p/staff-activity?staff=${r.staffId}`,
     };
   });
 }
@@ -130,6 +130,7 @@ export async function analyzeCallsWithoutResult(threshold = 3, lookbackHours = 4
     .filter(([, calls]) => calls.length >= threshold)
     .map(([sid, calls]) => {
       const name = calls[0]?.staffName ?? `#${sid}`;
+      const studentIds = calls.map(c => c.studentId).filter(Boolean) as number[];
       return {
         type: "calls_without_result",
         severity: (calls.length >= threshold * 2 ? "important" : "warning") as Severity,
@@ -138,10 +139,13 @@ export async function analyzeCallsWithoutResult(threshold = 3, lookbackHours = 4
         triggerCondition: `≥ ${threshold} مكالمات بدون نتيجة خلال ${lookbackHours} ساعة`,
         evidence: calls.slice(0, 5).map(c => `طالب #${c.studentId} — ${c.clickedAt.toLocaleString("ar-EG")}`),
         affectedStaffIds: [Number(sid)],
-        affectedStudentIds: calls.map(c => c.studentId).filter(Boolean) as number[],
+        affectedStudentIds: studentIds,
         suggestedActionAr: "اطلب من الموظف تأكيد نتائج المكالمات المفتوحة.",
         period: `آخر ${lookbackHours} ساعة`,
-        linkPath: `/gab-c7x2p/staff-activity`,
+        // Link to specific student if only one affected, else to staff activity
+        linkPath: studentIds.length === 1
+          ? `/gab-c7x2p/students/${studentIds[0]}`
+          : `/gab-c7x2p/staff-activity?staff=${sid}`,
       };
     });
 
@@ -230,7 +234,7 @@ export async function analyzeChecklistCompletion(): Promise<AiFinding[]> {
         affectedStudentIds: [],
         suggestedActionAr: "راجع قائمة مهام الموظف وتأكد من تسليم أو إعادة تعيين المهام المتأخرة.",
         period: "اليوم",
-        linkPath: `/gab-c7x2p/checklist-admin`,
+        linkPath: `/gab-c7x2p/checklist-admin?staff=${sid}`,
       });
     }
   }
@@ -407,6 +411,7 @@ export async function analyzeStatusChangesWithoutNotes(lookbackHours = 24): Prom
 
   return Object.entries(byStaff).map(([sid, changes]) => {
     const name = names[Number(sid)] ?? changes[0]?.performed_by ?? `#${sid}`;
+    const studentIds = changes.map(c => c.student_id).filter(Boolean);
     return {
       type: "stage_change_without_note",
       severity: "warning" as Severity,
@@ -417,10 +422,12 @@ export async function analyzeStatusChangesWithoutNotes(lookbackHours = 24): Prom
         `طالب #${c.student_id}: ${c.old_value ?? "؟"} → ${c.new_value ?? "؟"} — ${new Date(c.created_at).toLocaleString("ar-EG")}`
       ),
       affectedStaffIds: [Number(sid)],
-      affectedStudentIds: changes.map(c => c.student_id).filter(Boolean),
+      affectedStudentIds: studentIds,
       suggestedActionAr: "أضف ملاحظة لكل تغيير مرحلة لتوثيق سبب التحول.",
       period: `آخر ${lookbackHours} ساعة`,
-      linkPath: `/gab-c7x2p/activity`,
+      linkPath: studentIds.length === 1
+        ? `/gab-c7x2p/students/${studentIds[0]}`
+        : `/gab-c7x2p/staff-activity?staff=${sid}`,
     };
   });
 }
@@ -478,6 +485,7 @@ export async function analyzeLateTasks(): Promise<AiFinding[]> {
   return Object.entries(byStaff).map(([sid, tasks]) => {
     const name = names[Number(sid)] ?? `#${sid}`;
     const maxDays = Math.max(...tasks.map(t => Math.round((now.getTime() - (t.dueAt?.getTime() ?? 0)) / 86400_000)));
+    const studentIds = tasks.map(t => t.studentId).filter(Boolean) as number[];
     return {
       type: "late_tasks",
       severity: (tasks.length >= 3 || maxDays >= 3 ? "important" : "warning") as Severity,
@@ -486,10 +494,13 @@ export async function analyzeLateTasks(): Promise<AiFinding[]> {
       triggerCondition: `followup_task.completed = false + due_at < الآن`,
       evidence: tasks.slice(0, 5).map(t => `"${t.title}" — تأخر ${Math.round((now.getTime() - (t.dueAt?.getTime() ?? 0)) / 86400_000)} يوم`),
       affectedStaffIds: [Number(sid)],
-      affectedStudentIds: tasks.map(t => t.studentId).filter(Boolean) as number[],
+      affectedStudentIds: studentIds,
       suggestedActionAr: "راجع المهام المتأخرة وحددها أو أعد تعيينها.",
       period: "الكلي",
-      linkPath: `/gab-c7x2p/tasks`,
+      // Link to specific student if single task with student, else to staff tasks
+      linkPath: studentIds.length === 1
+        ? `/gab-c7x2p/students/${studentIds[0]}`
+        : `/gab-c7x2p/tasks?staff=${sid}`,
     };
   });
 }
@@ -587,7 +598,7 @@ export async function analyzeAbnormalActivity(): Promise<AiFinding[]> {
         affectedStudentIds: [],
         suggestedActionAr: "راجع حالة الموظف وتأكد من انخراطه في العمل.",
         period: "آخر أسبوعين",
-        linkPath: `/gab-c7x2p/staff-activity`,
+        linkPath: `/gab-c7x2p/staff-activity?staff=${staffId}`,
       });
     }
   }
@@ -764,6 +775,10 @@ export async function getStaffPerformance(fromDate: Date, toDate: Date): Promise
     const scheduledHours = Math.round(hoursPerDay * days * 10) / 10;
     const idleHours = Math.max(0, Math.round((scheduledHours - loginH) * 10) / 10);
 
+    // Owned students total (confirmed + paying + others) for conversion rate
+    const ownedTotal = confirmed + paying;  // denominator from same owned-students query
+    const conversionRate = ownedTotal > 0 ? Math.round((confirmed / ownedTotal) * 100) : null;
+
     return {
       staffId:              r.staff_id,
       fullName:             r.full_name,
@@ -782,6 +797,12 @@ export async function getStaffPerformance(fromDate: Date, toDate: Date): Promise
       callsWithResult:      parseInt(r.calls_with_result, 10),
       callsWithoutResult:   parseInt(r.calls_without_result, 10),
       notesAdded:           parseInt(r.notes_added, 10),
+      // Follow-up task metrics — date-range constrained
+      followupTasksTotal:   tTotal,
+      followupTasksDone:    tComp,
+      followupTasksLate:    parseInt(r.tasks_late, 10),
+      followupTaskRate:     tTotal > 0 ? Math.round((tComp / tTotal) * 100) : null,
+      // Kept for backwards compat
       tasksTotal:           tTotal,
       tasksCompleted:       tComp,
       tasksLate:            parseInt(r.tasks_late, 10),
@@ -789,6 +810,7 @@ export async function getStaffPerformance(fromDate: Date, toDate: Date): Promise
       confirmedStudents:    confirmed,
       payingStudents:       paying,
       conversionCount:      confirmed + paying,
+      conversionRate,
       checklistDone:        clDone,
       checklistTotal:       clTotal,
       checklistRate:        clTotal > 0 ? Math.round((clDone / clTotal) * 100) : null,
