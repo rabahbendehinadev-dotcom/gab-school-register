@@ -94,18 +94,34 @@ const STATUS_LABELS: Record<string, string> = {
   overdue: "متأخرة", postponed: "مؤجلة", cancelled: "ملغاة",
 };
 
-function TemplateForm({ initial, onSave, onCancel }: {
+const SHIFT_TYPES = [
+  { value: "", label: "الكل (بدون تصفية)" },
+  { value: "morning", label: "صباحي" },
+  { value: "evening", label: "مسائي" },
+  { value: "split", label: "مقسّم" },
+];
+
+function TemplateForm({ initial, staffList, onSave, onCancel }: {
   initial?: Partial<Template>;
+  staffList?: { id: number; fullName: string }[];
   onSave: (data: Partial<Template>) => void;
   onCancel: () => void;
 }) {
-  const [title, setTitle] = useState(initial?.title ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
+  const [title, setTitle]               = useState(initial?.title ?? "");
+  const [description, setDescription]   = useState(initial?.description ?? "");
   const [assignedToRole, setAssignedToRole] = useState(initial?.assignedToRole ?? "");
-  const [daysOfWeek, setDaysOfWeek] = useState<number[]>(initial?.daysOfWeek ?? [0,1,2,3,4,5,6]);
-  const [enabled, setEnabled] = useState(initial?.enabled ?? true);
+  const [assignedToStaffId, setAssignedToStaffId] = useState<number | null>(
+    (initial as { assignedToStaffId?: number | null })?.assignedToStaffId ?? null
+  );
+  const [shiftType, setShiftType]       = useState((initial as { shiftType?: string })?.shiftType ?? "");
+  const [validFrom, setValidFrom]       = useState((initial as { validFrom?: string })?.validFrom?.slice(0, 10) ?? "");
+  const [validUntil, setValidUntil]     = useState((initial as { validUntil?: string })?.validUntil?.slice(0, 10) ?? "");
+  const [daysOfWeek, setDaysOfWeek]     = useState<number[]>(initial?.daysOfWeek ?? [0,1,2,3,4,5,6]);
+  const [enabled, setEnabled]           = useState(initial?.enabled ?? true);
 
   const toggleDay = (d: number) => setDaysOfWeek(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+
+  const targetMode = assignedToStaffId ? "staff" : assignedToRole ? "role" : "all";
 
   return (
     <div className="bg-card border border-border rounded-2xl p-5 space-y-4">
@@ -117,13 +133,73 @@ function TemplateForm({ initial, onSave, onCancel }: {
         <label className="text-xs font-semibold text-muted-foreground">الوصف</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)} className="mt-1 w-full border border-border rounded-xl p-2 text-sm resize-none bg-background" rows={2} placeholder="وصف اختياري..." />
       </div>
-      <div>
-        <label className="text-xs font-semibold text-muted-foreground">تعيين للدور</label>
-        <select value={assignedToRole} onChange={e => setAssignedToRole(e.target.value)} className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background">
-          <option value="">الكل</option>
-          {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
+
+      {/* Targeting */}
+      <div className="grid grid-cols-1 gap-3 bg-muted/30 rounded-xl p-3 border border-border">
+        <p className="text-xs font-bold text-foreground">🎯 نطاق التعيين</p>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">تعيين للدور</label>
+          <select
+            value={assignedToRole}
+            onChange={e => { setAssignedToRole(e.target.value); if (e.target.value) setAssignedToStaffId(null); }}
+            className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+            disabled={!!assignedToStaffId}
+          >
+            <option value="">الكل (بدون تصفية بالدور)</option>
+            {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">أو تعيين لموظف محدد</label>
+          <select
+            value={assignedToStaffId ?? ""}
+            onChange={e => {
+              const v = parseInt(e.target.value, 10);
+              setAssignedToStaffId(isNaN(v) ? null : v);
+              if (!isNaN(v)) setAssignedToRole("");
+            }}
+            className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+          >
+            <option value="">— لا يوجد تعيين لموظف بعينه —</option>
+            {(staffList ?? []).map(s => <option key={s.id} value={s.id}>{s.fullName}</option>)}
+          </select>
+          {targetMode === "staff" && <p className="text-[10px] text-amber-600 mt-1">⚠️ التعيين لموظف محدد يلغي تصفية الدور</p>}
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">نوع الوردية</label>
+          <select
+            value={shiftType}
+            onChange={e => setShiftType(e.target.value)}
+            className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+          >
+            {SHIFT_TYPES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
+          </select>
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">صالح من</label>
+            <input
+              type="date"
+              value={validFrom}
+              onChange={e => setValidFrom(e.target.value)}
+              className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+              dir="ltr"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-semibold text-muted-foreground">صالح حتى</label>
+            <input
+              type="date"
+              value={validUntil}
+              onChange={e => setValidUntil(e.target.value)}
+              className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+              dir="ltr"
+            />
+          </div>
+        </div>
+        {(validFrom || validUntil) && <p className="text-[10px] text-blue-600">📅 ينشط القالب فقط في النطاق الزمني المحدد (دورة تدريبية / موسم)</p>}
       </div>
+
       <div>
         <label className="text-xs font-semibold text-muted-foreground mb-2 block">أيام الأسبوع</label>
         <div className="flex gap-1.5 flex-wrap">
@@ -144,9 +220,21 @@ function TemplateForm({ initial, onSave, onCancel }: {
         <label htmlFor="tmpl-enabled" className="text-sm font-medium">تفعيل القالب</label>
       </div>
       <div className="flex gap-2 pt-1">
-        <button onClick={() => onSave({ title, description: description || null, assignedToRole: assignedToRole || null, daysOfWeek, enabled })}
+        <button
+          onClick={() => onSave({
+            title,
+            description: description || null,
+            assignedToRole: assignedToStaffId ? null : (assignedToRole || null),
+            assignedToStaffId: assignedToStaffId || null,
+            shiftType: shiftType || null,
+            validFrom: validFrom || null,
+            validUntil: validUntil || null,
+            daysOfWeek,
+            enabled,
+          } as Partial<Template>)}
           disabled={!title.trim()}
-          className="flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-bold rounded-xl px-4 py-2 hover:bg-primary/90 disabled:opacity-50">
+          className="flex items-center gap-1.5 bg-primary text-primary-foreground text-sm font-bold rounded-xl px-4 py-2 hover:bg-primary/90 disabled:opacity-50"
+        >
           <Save className="w-3.5 h-3.5" /> حفظ
         </button>
         <button onClick={onCancel} className="flex items-center gap-1.5 border border-border text-sm font-medium rounded-xl px-4 py-2 hover:bg-muted text-muted-foreground">
@@ -253,6 +341,7 @@ function TemplateCard({ template, staffList, onRefresh }: { template: Template; 
   if (editing) return (
     <TemplateForm
       initial={template}
+      staffList={staffList}
       onSave={data => updateTmpl.mutate(data)}
       onCancel={() => setEditing(false)}
     />
@@ -469,6 +558,7 @@ export default function ChecklistAdmin() {
 
               {showNewTemplate && (
                 <TemplateForm
+                  staffList={staffQ.data ?? []}
                   onSave={data => createTemplate.mutate(data)}
                   onCancel={() => setShowNewTemplate(false)}
                 />

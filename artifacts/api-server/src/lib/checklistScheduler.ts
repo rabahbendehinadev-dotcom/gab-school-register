@@ -137,16 +137,33 @@ export async function runChecklistEscalationTick(): Promise<void> {
         }
       }
 
-      // ── Level 4: mark overdue only (no supervisor alert yet) ─────────────
-      if (minutesLate >= overdueMin && minutesLate < tlNotifyMin) {
+      // ── Level 4: mark overdue + continue reminding assignee ──────────────
+      if (minutesLate >= overdueMin) {
+        // Mark overdue status (idempotent)
         if (a.status !== "overdue") {
           await db.update(checklistAssignmentsTable).set({ status: "overdue" }).where(eq(checklistAssignmentsTable.id, a.id));
           await logEscalation(a.id, 4, `تم تصنيف المهمة متأخرة`, a.staffId);
         }
-      }
-      // Mark overdue for levels 5/6 too (in case scheduler missed the L4 window)
-      if (minutesLate >= overdueMin && a.status !== "overdue") {
-        await db.update(checklistAssignmentsTable).set({ status: "overdue" }).where(eq(checklistAssignmentsTable.id, a.id));
+        // Continue repeating reminders to the assignee at repeat_interval_min
+        // until the task is completed/cancelled — even after overdue threshold
+        if (minutesLate < tlNotifyMin) {
+          const lastAssigneeReminder = await getLastEscalationFireTime(a.id, 4);
+          const shouldRemind = !lastAssigneeReminder ||
+            (now.getTime() - lastAssigneeReminder.getTime()) / 60000 >= repeatIntervalMin;
+          if (shouldRemind && withinShift) {
+            await notifyStaff(a.staffId,
+              `🔴 مهمة متأخرة: ${a.title}`,
+              `تأخر ${Math.round(minutesLate)} دقيقة — المهمة لم تُنجز`,
+              "checklist_overdue"
+            );
+            await sendPushToStaff(a.staffId, {
+              title: `🔴 مهمة متأخرة`,
+              body: `${a.title} — تأخر ${Math.round(minutesLate)} دقيقة`,
+              tag: `checklist-overdue-${a.id}`,
+            }).catch(() => {});
+            await logEscalation(a.id, 4, `تذكير متأخر للموظف — ${Math.round(minutesLate)} دقيقة`, a.staffId);
+          }
+        }
       }
 
       // ── Level 5: escalate to supervisors with push ────────────────────────
@@ -221,10 +238,15 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
       const days: number[] = (tmpl.daysOfWeek as number[]) ?? [0,1,2,3,4,5,6];
       if (!days.includes(dayOfWeek)) continue;
 
-      const roleMatch  = !tmpl.assignedToRole     || tmpl.assignedToRole     === staffRole;
-      const staffMatch = !tmpl.assignedToStaffId  || tmpl.assignedToStaffId  === staffId;
-      if (!roleMatch && !staffMatch) continue;
-      if (tmpl.assignedToStaffId && tmpl.assignedToStaffId !== staffId) continue;
+      // Targeting: specific staff wins over role; role wins over "all"
+      if (tmpl.assignedToStaffId !== null && tmpl.assignedToStaffId !== undefined) {
+        // Template is for a specific employee only
+        if (tmpl.assignedToStaffId !== staffId) continue;
+      } else if (tmpl.assignedToRole) {
+        // Template is for a role — skip staff that don't match
+        if (tmpl.assignedToRole !== staffRole) continue;
+      }
+      // else: no targeting → generate for all active staff
 
       const items = await db
         .select()
