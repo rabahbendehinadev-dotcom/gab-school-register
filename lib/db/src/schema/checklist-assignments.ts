@@ -13,6 +13,7 @@ export const checklistAssignmentsTable = pgTable("checklist_assignments", {
   priority: text("priority").notNull().default("normal"),
   proofRequired: boolean("proof_required").notNull().default(false),
   noteRequired: boolean("note_required").notNull().default(false),
+  resultRequired: boolean("result_required").notNull().default(false),
   staffId: integer("staff_id").notNull().references(() => staffTable.id, { onDelete: "cascade" }),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("not_started"),

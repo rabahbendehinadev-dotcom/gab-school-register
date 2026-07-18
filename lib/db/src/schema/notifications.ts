@@ -2,6 +2,7 @@ import { pgTable, text, serial, timestamp, integer, boolean } from "drizzle-orm/
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { studentsTable } from "./students";
+import { staffTable } from "./staff";
 
 export const notificationsTable = pgTable("notifications", {
   id: serial("id").primaryKey(),
@@ -9,6 +10,7 @@ export const notificationsTable = pgTable("notifications", {
   title: text("title").notNull(),
   message: text("message").notNull(),
   studentId: integer("student_id").references(() => studentsTable.id, { onDelete: "cascade" }),
+  recipientStaffId: integer("recipient_staff_id").references(() => staffTable.id, { onDelete: "cascade" }),
   handled: boolean("handled").notNull().default(false),
   handledAt: timestamp("handled_at", { withTimezone: true }),
   handledBy: text("handled_by"),

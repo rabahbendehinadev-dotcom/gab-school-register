@@ -9,6 +9,7 @@ export const checklistItemsTable = pgTable("checklist_items", {
   priority: text("priority").notNull().default("normal"),
   proofRequired: boolean("proof_required").notNull().default(false),
   noteRequired: boolean("note_required").notNull().default(false),
+  resultRequired: boolean("result_required").notNull().default(false),
   offsetMinutes: integer("offset_minutes").notNull().default(0),
   sortOrder: integer("sort_order").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

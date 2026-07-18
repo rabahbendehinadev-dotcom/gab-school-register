@@ -26,6 +26,7 @@ const CHECKLIST_SETTING_KEYS = [
   "checklist_ai_alert_min",
   "checklist_snooze_options",
   "checklist_max_snooze_count",
+  "checklist_base_hour",
 ] as const;
 
 const CHECKLIST_SETTING_DEFAULTS: Record<string, string> = {
@@ -36,6 +37,7 @@ const CHECKLIST_SETTING_DEFAULTS: Record<string, string> = {
   checklist_ai_alert_min:     "120",
   checklist_snooze_options:   "10,30,60",
   checklist_max_snooze_count: "3",
+  checklist_base_hour:        "9",
 };
 
 router.get("/checklists/settings", requirePermission("view_dashboard"), async (_req, res): Promise<void> => {
@@ -67,6 +69,8 @@ const TemplateBody = z.object({
   daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
   shiftType: z.string().optional().nullable(),
   recurrence: z.string().optional(),
+  validFrom: z.string().datetime().optional().nullable(),
+  validUntil: z.string().datetime().optional().nullable(),
   enabled: z.boolean().optional(),
 });
 
@@ -79,11 +83,21 @@ router.get("/checklists/templates", requirePermission("manage_tasks"), async (_r
   res.json(result);
 });
 
+function coerceDateFields(data: Record<string, unknown>): Record<string, unknown> {
+  const out = { ...data };
+  if (typeof out.validFrom === "string") out.validFrom = new Date(out.validFrom);
+  if (typeof out.validUntil === "string") out.validUntil = new Date(out.validUntil);
+  if (out.validFrom === null) out.validFrom = null;
+  if (out.validUntil === null) out.validUntil = null;
+  return out;
+}
+
 router.post("/checklists/templates", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
   const parsed = TemplateBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const values = coerceDateFields(parsed.data as Record<string, unknown>);
   const [tmpl] = await db.insert(checklistTemplatesTable).values({
-    ...parsed.data,
+    ...(values as typeof parsed.data),
     createdBy: req.session.staffId,
   }).returning();
   await logActivity("checklist_template_created", `📋 قالب جديد: ${tmpl.title}`, req.session.fullName, null, { actionType: "create", entityType: "checklist_template", entityId: tmpl.id });
@@ -95,7 +109,8 @@ router.patch("/checklists/templates/:id", requirePermission("manage_tasks"), asy
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const parsed = TemplateBody.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
-  const [tmpl] = await db.update(checklistTemplatesTable).set({ ...parsed.data, updatedAt: new Date() }).where(eq(checklistTemplatesTable.id, id)).returning();
+  const values = coerceDateFields(parsed.data as Record<string, unknown>);
+  const [tmpl] = await db.update(checklistTemplatesTable).set({ ...(values as typeof parsed.data), updatedAt: new Date() }).where(eq(checklistTemplatesTable.id, id)).returning();
   if (!tmpl) { res.status(404).json({ error: "Template not found" }); return; }
   res.json(tmpl);
 });
@@ -114,6 +129,7 @@ const ItemBody = z.object({
   priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
   proofRequired: z.boolean().optional(),
   noteRequired: z.boolean().optional(),
+  resultRequired: z.boolean().optional(),
   offsetMinutes: z.coerce.number().int().min(0).optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
@@ -248,6 +264,8 @@ router.post("/checklists/assignments/:id/complete", requireAuth, async (req, res
   const validationErrors: string[] = [];
   if (existing.noteRequired && !parsed.data.note?.trim()) validationErrors.push("الملاحظة مطلوبة لهذه المهمة");
   if (existing.proofRequired && !parsed.data.proofUrl?.trim()) validationErrors.push("رفع إثبات الإنجاز مطلوب لهذه المهمة");
+  if (existing.resultRequired && !parsed.data.result?.trim()) validationErrors.push("يجب تحديد نتيجة المهمة");
+  if (existing.studentId && !parsed.data.studentId) validationErrors.push("يجب تحديد الطالب المرتبط بهذه المهمة");
 
   if (validationErrors.length > 0) {
     res.status(422).json({ error: "يرجى استيفاء جميع الشروط", details: validationErrors }); return;

@@ -46,19 +46,25 @@ async function deliverOnce(subs: typeof pushSubscriptionsTable.$inferSelect[], d
  * while the alert sound plays repeatTimes times.
  */
 export async function sendPushToAdmins(payload: PushPayload, repeatTimes = 3): Promise<void> {
+  return sendPushToRole("admin", payload, repeatTimes);
+}
+
+/**
+ * Send push to all subscribers of a given role.
+ * role: "admin" | "team_leader" | "staff" | etc.
+ */
+export async function sendPushToRole(role: string, payload: PushPayload, repeatTimes = 1): Promise<void> {
   const subs = await db
     .select()
     .from(pushSubscriptionsTable)
-    .where(eq(pushSubscriptionsTable.role, "admin"));
+    .where(eq(pushSubscriptionsTable.role, role));
 
   if (subs.length === 0) return;
 
   const data = JSON.stringify(payload);
 
-  // First delivery immediately
   await deliverOnce(subs, data);
 
-  // Subsequent deliveries (sound repeats) — fire-and-forget after delays
   for (let i = 1; i < repeatTimes; i++) {
     const delay = i * 8_000;
     setTimeout(() => deliverOnce(subs, data).catch(() => {}), delay);
