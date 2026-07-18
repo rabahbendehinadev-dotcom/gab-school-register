@@ -8,6 +8,15 @@ import "../types/session";
 
 const router: IRouter = Router();
 
+// ---------- ASSIGNABLE STAFF (for owner dialog — gated by assign_students) ----------
+router.get("/staff/assignable", requirePermission("assign_students"), async (_req, res): Promise<void> => {
+  const staff = await db
+    .select({ id: staffTable.id, fullName: staffTable.fullName, role: staffTable.role, username: staffTable.username })
+    .from(staffTable)
+    .orderBy(staffTable.fullName);
+  res.json(staff);
+});
+
 // ---------- CONCURRENT VIEWERS ----------
 router.get("/students/:id/viewers", requirePermission("view_students"), async (req, res): Promise<void> => {
   const studentId = parseInt(String(req.params.id), 10);
@@ -143,6 +152,7 @@ router.post("/students/:id/call-result/:callId", requirePermission("call_student
     durationSeconds: parsed.data.durationSeconds ?? null,
     note: parsed.data.note ?? null,
     nextFollowupAt: parsed.data.nextFollowupAt ?? null,
+    source: "confirmed",
   }).where(eq(callResultsTable.id, callId)).returning();
 
   const staffName = req.session.fullName ?? "Unknown";

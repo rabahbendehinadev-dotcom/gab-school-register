@@ -130,8 +130,8 @@ export default function StudentProfile() {
   });
 
   const { data: staffList = [] } = useQuery<StaffMember[]>({
-    queryKey: ["staff-list"],
-    queryFn: () => apiFetch("/staff"),
+    queryKey: ["staff-assignable"],
+    queryFn: () => apiFetch("/staff/assignable"),
     enabled: showOwnerDialog,
   });
 
@@ -188,10 +188,39 @@ export default function StudentProfile() {
     onError: () => toast({ title: isFr ? "Erreur" : "خطأ", variant: "destructive" }),
   });
 
+  // Open call result modal when user returns to the tab/app after a call
+  useEffect(() => {
+    if (pendingCallId === null) return;
+
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const openModal = () => {
+      if (pendingCallId !== null) {
+        setCallResultValue("");
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        if (fallbackTimer) clearTimeout(fallbackTimer);
+        openModal();
+      }
+    };
+
+    // 5-second fallback in case visibilitychange doesn't fire (e.g., native dialer stays in same app)
+    fallbackTimer = setTimeout(openModal, 5000);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [pendingCallId]);
+
   const handleCallClick = () => {
     if (!id) return;
     callAttemptMutation.mutate();
-    window.open(`tel:${student?.phone}`, "_self");
+    window.location.href = `tel:${student?.phone}`;
   };
 
   const handleWaClick = () => {
