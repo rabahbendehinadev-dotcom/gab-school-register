@@ -2,7 +2,7 @@ import { Router, type IRouter } from "express";
 import { eq, desc, asc, and } from "drizzle-orm";
 import { db, studentsTable, studentNotesTable, attendanceTable, activityLogsTable, paymentsTable, groupsTable } from "@workspace/db";
 import { z } from "zod/v4";
-import { requirePermission, requireAuth } from "../middlewares/auth";
+import { requirePermission, requireAnyPermission, requireAuth } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import "../types/session";
 
@@ -11,7 +11,7 @@ const router: IRouter = Router();
 // ---------- NOTES ----------
 const CreateNoteBody = z.object({ content: z.string().min(1) });
 
-router.get("/students/:id/notes", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id/notes", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const notes = await db.select().from(studentNotesTable).where(eq(studentNotesTable.studentId, id)).orderBy(desc(studentNotesTable.createdAt));
@@ -46,7 +46,7 @@ const SetAttendanceBody = z.object({
   present: z.boolean(),
 });
 
-router.get("/students/:id/attendance", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id/attendance", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const rows = await db.select().from(attendanceTable).where(eq(attendanceTable.studentId, id)).orderBy(asc(attendanceTable.dayNumber));
@@ -100,7 +100,7 @@ router.get("/groups/:id/attendance", requirePermission("view_groups"), async (re
 });
 
 // ---------- TIMELINE ----------
-router.get("/students/:id/timeline", requirePermission("view_students"), async (req, res): Promise<void> => {
+router.get("/students/:id/timeline", requireAnyPermission("view_students", "view_all_students"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 

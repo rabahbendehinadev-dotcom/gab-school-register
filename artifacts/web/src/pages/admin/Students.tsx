@@ -221,7 +221,7 @@ export default function Students() {
 
   return (
     <AdminLayout>
-      <PermissionGuard permission="view_students">
+      <PermissionGuard anyOf={["view_students", "view_all_students"]}>
       <div dir="rtl" className="flex flex-col h-[calc(100vh-8rem)] bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
 
         {/* Header */}

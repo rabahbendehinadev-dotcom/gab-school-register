@@ -3,17 +3,27 @@ import { useAuth } from "@/hooks/use-auth";
 import { ShieldOff } from "lucide-react";
 
 interface PermissionGuardProps {
-  permission: string;
+  /** Require this single permission. */
+  permission?: string;
+  /** Require ANY one of these permissions (OR logic). */
+  anyOf?: string[];
   children: ReactNode;
   fallback?: ReactNode;
 }
 
-export function PermissionGuard({ permission, children, fallback }: PermissionGuardProps) {
+export function PermissionGuard({ permission, anyOf, children, fallback }: PermissionGuardProps) {
   const { user, isLoading } = useAuth();
 
   if (isLoading) return null;
 
-  if (!user?.permissions?.includes(permission)) {
+  const perms: string[] = user?.permissions ?? [];
+  const allowed = anyOf
+    ? anyOf.some((p) => perms.includes(p))
+    : permission
+      ? perms.includes(permission)
+      : true;
+
+  if (!allowed) {
     return fallback ?? (
       <div dir="rtl" className="flex flex-col items-center justify-center min-h-[40vh] text-center gap-4">
         <div className="w-16 h-16 rounded-2xl bg-destructive/10 flex items-center justify-center">

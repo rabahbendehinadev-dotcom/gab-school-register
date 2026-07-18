@@ -273,7 +273,7 @@ export default function StudentProfile() {
 
   return (
     <AdminLayout>
-      <PermissionGuard permission="view_students">
+      <PermissionGuard anyOf={["view_students", "view_all_students"]}>
       <div dir={isFr ? "ltr" : "rtl"} className="space-y-5 max-w-4xl mx-auto">
 
         {/* Back button */}

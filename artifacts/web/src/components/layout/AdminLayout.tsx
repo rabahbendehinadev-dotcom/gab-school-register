@@ -83,7 +83,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   const perms                = user?.permissions ?? [];
   const canViewDashboard    = perms.includes("view_dashboard");
-  const canViewStudents     = perms.includes("view_students");
+  const canViewStudents     = perms.includes("view_students") || perms.includes("view_all_students");
   const canViewGroups       = perms.includes("view_groups");
   const canManageTasks      = perms.includes("manage_tasks");
   const canViewAuditLogs    = perms.includes("view_audit_logs");
