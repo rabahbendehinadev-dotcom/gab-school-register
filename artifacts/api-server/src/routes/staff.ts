@@ -30,8 +30,8 @@ router.get("/staff", requirePermission("manage_staff"), async (_req, res): Promi
   res.json(ListStaffResponse.parse(safeStaff));
 });
 
-/** Minimal staff list (id + name only) for assignee dropdowns — accessible by TLs with manage_tasks. */
-router.get("/staff/assignable", requireAnyPermission("manage_staff", "manage_tasks"), async (_req, res): Promise<void> => {
+/** Minimal staff list (id + name only) for assignee dropdowns — accessible by Admin/TL with manage_checklist_templates. */
+router.get("/staff/assignable", requireAnyPermission("manage_staff", "manage_checklist_templates"), async (_req, res): Promise<void> => {
   const staff = await db.select({ id: staffTable.id, fullName: staffTable.fullName }).from(staffTable).orderBy(staffTable.fullName);
   res.json(staff);
 });

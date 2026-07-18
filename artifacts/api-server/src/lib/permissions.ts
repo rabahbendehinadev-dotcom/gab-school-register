@@ -13,6 +13,7 @@ export const ALL_PERMISSIONS = [
   "assign_students",
   "view_team_activity",
   "manage_tasks",
+  "manage_checklist_templates",
   "view_reports",
   "view_ai_control",
   "manage_ai_control",
@@ -40,7 +41,7 @@ const TEAM_LEADER_PERMS: Permission[] = [
   "view_dashboard", "view_students", "edit_students", "contact_students",
   "call_students", "open_whatsapp", "add_notes", "edit_notes",
   "view_all_students", "assign_students",
-  "manage_tasks", "view_reports",
+  "manage_tasks", "manage_checklist_templates", "view_reports",
   "view_groups", "manage_groups", "view_payments",
 ];
 

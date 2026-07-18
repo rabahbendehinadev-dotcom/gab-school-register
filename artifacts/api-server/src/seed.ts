@@ -42,7 +42,11 @@ async function seedDefaultRoles() {
         permissions: role.permissions as string[],
         isSystem: role.isSystem,
       })
-      .onConflictDoNothing();
+      .onConflictDoUpdate({
+        target: rolesTable.name,
+        // Always sync permissions from code so new permissions are picked up
+        set: { permissions: role.permissions as string[], displayName: role.displayName },
+      });
   }
   console.log("Default roles seeded");
 }
