@@ -79,7 +79,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { href: "/gab-c7x2p/courses",       label: t.courses,      icon: BookOpen,        exact: false, show: isAdmin },
     { href: "/gab-c7x2p/gallery",       label: t.gallery,      icon: ImageIcon,       exact: false, show: isAdmin },
     { href: "/gab-c7x2p/staff",         label: t.staff,        icon: ShieldCheck,     exact: false, show: canManageStaff || isAdmin },
-    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",  icon: RadioTower,      exact: false, show: canViewTeamActivity || isAdmin },
+    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",  icon: RadioTower,      exact: false, show: canManageStaff || isAdmin },
     { href: "/gab-c7x2p/roles",         label: "الأدوار",      icon: Lock,            exact: false, show: canManageRoles || isAdmin },
     { href: "/gab-c7x2p/activity",      label: t.activityLog,  icon: Activity,        exact: false, show: canViewAuditLogs || isAdmin },
   ];
