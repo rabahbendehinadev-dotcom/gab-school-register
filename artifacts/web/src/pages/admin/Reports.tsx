@@ -15,8 +15,11 @@ interface StaffPerf {
   staffId: number;
   fullName: string;
   role: string;
-  loginCount: number;
+  shiftType: string;
+  scheduledHours: number;
   actualLoginHours: number;
+  idleHours: number;
+  loginCount: number;
   lastActive: string | null;
   totalActions: number;
   studentsOpened: number;
@@ -69,8 +72,10 @@ function SortIndicator({ active, dir }: { active: boolean; dir: "asc" | "desc" }
 type ColDef = { key: SortKey; label: string; render?: (r: StaffPerf) => React.ReactNode };
 
 const COLUMNS: ColDef[] = [
+  { key: "scheduledHours",       label: "ساعات مجدولة", render: r => <span className="text-muted-foreground">{r.scheduledHours}h</span> },
+  { key: "actualLoginHours",     label: "ساعات الدخول",  render: r => r.actualLoginHours > 0 ? <span className="text-blue-600 font-medium">{r.actualLoginHours}h</span> : <span className="text-muted-foreground">—</span> },
+  { key: "idleHours",            label: "خمول",          render: r => r.idleHours > 0 ? <span className={r.idleHours > 4 ? "text-orange-600" : "text-muted-foreground"}>{r.idleHours}h</span> : <span className="text-green-600">0h</span> },
   { key: "loginCount",           label: "دخول" },
-  { key: "actualLoginHours",     label: "ساعات الدخول", render: r => r.actualLoginHours > 0 ? `${r.actualLoginHours}h` : "—" },
   { key: "totalActions",         label: "النشاط" },
   { key: "studentsOpened",       label: "طلاب مفتوحون" },
   { key: "whatsappClicks",       label: "واتساب",  render: r => <Num v={r.whatsappClicks} className="text-green-600" /> },
@@ -147,7 +152,7 @@ export default function Reports() {
     if (!sorted.length) return;
     const headers = ["الاسم","الدور","تسجيلات الدخول","ساعات الدخول","النشاط","طلاب مفتوحون","واتساب","اتصالات","مكالمة+نتيجة","بدون نتيجة","ملاحظات","مهام","مكتملة","متأخرة","إنجاز مهام%","مؤكدون","مدفوعون","قوائم%","وقت استجابة(h)"];
     const rows = sorted.map(r => [
-      r.fullName, r.role, r.loginCount, r.actualLoginHours, r.totalActions, r.studentsOpened,
+      r.fullName, r.role, r.shiftType, r.scheduledHours, r.actualLoginHours, r.idleHours, r.loginCount, r.totalActions, r.studentsOpened,
       r.whatsappClicks, r.callClicks, r.callsWithResult, r.callsWithoutResult,
       r.notesAdded, r.tasksTotal, r.tasksCompleted, r.tasksLate, r.taskCompletionRate ?? "—",
       r.confirmedStudents, r.payingStudents, r.checklistRate ?? "—", r.avgFirstResponseHours ?? "—",

@@ -22,6 +22,7 @@ interface AiFinding {
   severity: Severity;
   titleAr: string;
   descriptionAr: string;
+  triggerCondition: string;
   evidence: string[];
   affectedStaffIds: number[];
   affectedStudentIds: number[];
@@ -95,6 +96,18 @@ function FindingCard({ finding }: { finding: AiFinding }) {
 
       {expanded && (
         <div className="mt-3 space-y-3">
+          {finding.triggerCondition && (
+            <div className="bg-white/50 rounded-lg px-3 py-2 border border-current/10">
+              <p className="text-xs font-semibold text-muted-foreground mb-0.5">شرط التفعيل</p>
+              <p className="text-xs text-foreground/70 font-mono">{finding.triggerCondition}</p>
+            </div>
+          )}
+          {finding.affectedStaffIds.length > 0 && (
+            <p className="text-xs text-muted-foreground">الموظفون المتأثرون: #{finding.affectedStaffIds.join(", #")}</p>
+          )}
+          {finding.affectedStudentIds.length > 0 && (
+            <p className="text-xs text-muted-foreground">الطلاب المتأثرون: {finding.affectedStudentIds.length} طالب</p>
+          )}
           {finding.evidence.length > 0 && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground mb-1.5">الأدلة</p>
