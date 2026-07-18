@@ -60,28 +60,28 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   useHeartbeat(location);
 
-  const canViewStudents     = user?.permissions?.includes("view_students") ?? false;
-  const canViewGroups       = user?.permissions?.includes("view_groups") ?? false;
-  const canManageTasks      = user?.permissions?.includes("manage_tasks") ?? false;
-  const canViewDashboard    = user?.permissions?.includes("view_dashboard") ?? false;
-  const canViewAuditLogs    = user?.permissions?.includes("view_audit_logs") ?? false;
-  const canManageStaff      = user?.permissions?.includes("manage_staff") ?? false;
-  const canManageRoles      = user?.permissions?.includes("manage_roles") ?? false;
-  const canViewTeamActivity = user?.permissions?.includes("view_team_activity") ?? false;
-  const isAdmin             = user?.role === "admin" || user?.role === "owner";
+  const perms                = user?.permissions ?? [];
+  const canViewDashboard    = perms.includes("view_dashboard");
+  const canViewStudents     = perms.includes("view_students");
+  const canViewGroups       = perms.includes("view_groups");
+  const canManageTasks      = perms.includes("manage_tasks");
+  const canViewAuditLogs    = perms.includes("view_audit_logs");
+  const canManageStaff      = perms.includes("manage_staff");
+  const canManageRoles      = perms.includes("manage_roles");
+  const canViewTeamActivity = perms.includes("view_team_activity");
 
   const navItems = [
-    { href: "/gab-c7x2p",               label: t.dashboard,    icon: LayoutDashboard, exact: true, show: canViewDashboard || isAdmin },
-    { href: "/gab-c7x2p/groups",        label: t.schedules,    icon: Layers,          exact: false, show: canViewGroups || isAdmin },
-    { href: "/gab-c7x2p/students",      label: t.students,     icon: Users,           exact: false, show: canViewStudents || isAdmin },
-    { href: "/gab-c7x2p/tasks",         label: t.tasks,        icon: ListTodo,        exact: false, show: canManageTasks || isAdmin },
-    { href: "/gab-c7x2p/open-day",      label: t.openDay,      icon: Ticket,          exact: false, show: isAdmin },
-    { href: "/gab-c7x2p/courses",       label: t.courses,      icon: BookOpen,        exact: false, show: isAdmin },
-    { href: "/gab-c7x2p/gallery",       label: t.gallery,      icon: ImageIcon,       exact: false, show: isAdmin },
-    { href: "/gab-c7x2p/staff",         label: t.staff,        icon: ShieldCheck,     exact: false, show: canManageStaff || isAdmin },
-    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",  icon: RadioTower,      exact: false, show: canViewTeamActivity || isAdmin },
-    { href: "/gab-c7x2p/roles",         label: "الأدوار",      icon: Lock,            exact: false, show: canManageRoles || isAdmin },
-    { href: "/gab-c7x2p/activity",      label: t.activityLog,  icon: Activity,        exact: false, show: canViewAuditLogs || isAdmin },
+    { href: "/gab-c7x2p",               label: t.dashboard,    icon: LayoutDashboard, exact: true, show: canViewDashboard },
+    { href: "/gab-c7x2p/groups",        label: t.schedules,    icon: Layers,          exact: false, show: canViewGroups },
+    { href: "/gab-c7x2p/students",      label: t.students,     icon: Users,           exact: false, show: canViewStudents },
+    { href: "/gab-c7x2p/tasks",         label: t.tasks,        icon: ListTodo,        exact: false, show: canManageTasks },
+    { href: "/gab-c7x2p/open-day",      label: t.openDay,      icon: Ticket,          exact: false, show: canManageStaff },
+    { href: "/gab-c7x2p/courses",       label: t.courses,      icon: BookOpen,        exact: false, show: canManageStaff },
+    { href: "/gab-c7x2p/gallery",       label: t.gallery,      icon: ImageIcon,       exact: false, show: canManageStaff },
+    { href: "/gab-c7x2p/staff",         label: t.staff,        icon: ShieldCheck,     exact: false, show: canManageStaff },
+    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",  icon: RadioTower,      exact: false, show: canViewTeamActivity },
+    { href: "/gab-c7x2p/roles",         label: "الأدوار",      icon: Lock,            exact: false, show: canManageRoles },
+    { href: "/gab-c7x2p/activity",      label: t.activityLog,  icon: Activity,        exact: false, show: canViewAuditLogs },
   ];
 
   if (isLoading) {
