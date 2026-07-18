@@ -21,13 +21,14 @@ interface Student {
   paymentStatus: string; receiptUrl: string | null; stage: string; groupId: number | null;
   source: string; agreedPrice: number | null; nextFollowupAt: string | null;
   lastContactedAt: string | null; contactAttempts: number; createdAt: string;
+  owner: { staffId: number; fullName: string | null; assignedAt: string } | null;
+  lastAction: { text: string; by: string | null; at: string } | null;
 }
 interface Note { id: number; content: string; createdBy: string | null; createdAt: string }
 interface AttendanceRow { id: number; dayNumber: number; present: boolean; markedBy: string | null }
 interface TimelineItem { kind: string; icon: string; text: string; by: string | null; at: string }
 interface Payment { id: number; amount: number; method: string; type: string; note: string | null; recordedBy: string | null; createdAt: string }
 interface PaymentsResponse { payments: Payment[]; totalPaid: number; agreedPrice: number | null; remaining: number | null }
-interface Owner { staffId: number; fullName: string; assignedAt: string }
 interface Viewer { staffId: number; fullName: string }
 interface StaffMember { id: number; fullName: string; role: string; username: string }
 interface CallResult { id: number; studentId: number; staffId: number; staffName: string | null; clickedAt: string; result: string | null; durationSeconds: number | null; note: string | null; nextFollowupAt: string | null; source: string; createdAt: string }
@@ -53,6 +54,7 @@ const CALL_RESULTS: { value: string; ar: string; fr: string; icon: string; color
   { value: "wrong_number", ar: "رقم خاطئ", fr: "Mauvais n°", icon: "🚫", color: "bg-gray-50 border-gray-400 text-gray-700" },
   { value: "callback", ar: "طلب معاودة", fr: "Rappel demandé", icon: "🔄", color: "bg-blue-50 border-blue-400 text-blue-700" },
   { value: "not_attempted", ar: "لم تتم", fr: "Non tentée", icon: "—", color: "bg-gray-50 border-gray-300 text-gray-500" },
+  { value: "cancel", ar: "إلغاء المكالمة", fr: "Annulée", icon: "✖️", color: "bg-rose-50 border-rose-400 text-rose-700" },
 ];
 
 async function apiFetch(path: string, options?: RequestInit) {
@@ -92,8 +94,9 @@ export default function StudentProfile() {
   const canPayments = perms.includes("view_payments");
   const canAssign = perms.includes("assign_students");
 
-  // Call result modal state
+  // Call result modal state — pendingCallId stores the attempt ID; showCallResultModal controls visibility
   const [pendingCallId, setPendingCallId] = useState<number | null>(null);
+  const [showCallResultModal, setShowCallResultModal] = useState(false);
   const [callResultValue, setCallResultValue] = useState<string>("");
   const [callDuration, setCallDuration] = useState<string>("");
   const [callNote, setCallNote] = useState<string>("");
@@ -123,12 +126,6 @@ export default function StudentProfile() {
     refetchInterval: 20_000,
   });
 
-  const { data: owner, refetch: refetchOwner } = useQuery<Owner | null>({
-    queryKey: ["owner", id],
-    queryFn: () => apiFetch(`/students/${id}/owner`),
-    enabled: !!id,
-  });
-
   const { data: staffList = [] } = useQuery<StaffMember[]>({
     queryKey: ["staff-assignable"],
     queryFn: () => apiFetch("/staff/assignable"),
@@ -150,11 +147,13 @@ export default function StudentProfile() {
     onSuccess: (data: CallResult) => {
       callStartRef.current = Date.now();
       setPendingCallId(data.id);
+      setShowCallResultModal(false);
       setCallResultValue("");
       setCallDuration("");
       setCallNote("");
       setCallNextFollowup("");
       qc.invalidateQueries({ queryKey: ["timeline", id] });
+      qc.invalidateQueries({ queryKey: studentKey });
     },
     onError: () => toast({ title: isFr ? "Erreur" : "خطأ", variant: "destructive" }),
   });
@@ -168,6 +167,7 @@ export default function StudentProfile() {
     }),
     onSuccess: () => {
       setPendingCallId(null);
+      setShowCallResultModal(false);
       qc.invalidateQueries({ queryKey: ["timeline", id] });
       qc.invalidateQueries({ queryKey: ["call-results", id] });
       qc.invalidateQueries({ queryKey: studentKey });
@@ -181,7 +181,7 @@ export default function StudentProfile() {
     mutationFn: (staffId: number) => apiFetch(`/students/${id}/owner`, { method: "POST", body: JSON.stringify({ staffId }) }),
     onSuccess: () => {
       setShowOwnerDialog(false);
-      refetchOwner();
+      qc.invalidateQueries({ queryKey: studentKey });
       qc.invalidateQueries({ queryKey: ["timeline", id] });
       toast({ title: isFr ? "Responsable assigné" : "تم تعيين المسؤول" });
     },
@@ -195,9 +195,7 @@ export default function StudentProfile() {
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
 
     const openModal = () => {
-      if (pendingCallId !== null) {
-        setCallResultValue("");
-      }
+      setShowCallResultModal(true);
     };
 
     const onVisibility = () => {
@@ -303,10 +301,10 @@ export default function StudentProfile() {
                   <span className="text-xs text-muted-foreground">{student.contactAttempts} {isFr ? "tentatives" : "محاولة تواصل"}</span>
                 </div>
                 {/* Primary Owner chip */}
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  {owner ? (
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {student.owner ? (
                     <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
-                      👤 {isFr ? "Responsable:" : "المسؤول:"} {owner.fullName}
+                      👤 {isFr ? "Responsable:" : "المسؤول:"} {student.owner.fullName}
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
@@ -319,6 +317,16 @@ export default function StudentProfile() {
                     </button>
                   )}
                 </div>
+                {/* Last activity summary */}
+                {student.lastAction && (() => {
+                  const minAgo = Math.round((Date.now() - new Date(student.lastAction!.at).getTime()) / 60000);
+                  const timeLabel = minAgo < 1 ? (isFr ? "à l'instant" : "الآن") : minAgo < 60 ? `${minAgo} ${isFr ? "min" : "د"}` : `${Math.round(minAgo / 60)}${isFr ? "h" : "س"}`;
+                  return (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {isFr ? "Dernière action" : "آخر إجراء"}: {student.lastAction!.by && `${student.lastAction!.by} — `}{timeLabel} {isFr ? "ago" : "مضت"}
+                    </p>
+                  );
+                })()}
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
@@ -398,11 +406,11 @@ export default function StudentProfile() {
                   key={s.id}
                   onClick={() => assignOwnerMutation.mutate(s.id)}
                   disabled={assignOwnerMutation.isPending}
-                  className={`w-full text-start px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${owner?.staffId === s.id ? "bg-violet-100 text-violet-700" : "hover:bg-muted"}`}
+                  className={`w-full text-start px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${student.owner?.staffId === s.id ? "bg-violet-100 text-violet-700" : "hover:bg-muted"}`}
                 >
                   <span className="font-semibold">{s.fullName}</span>
                   <span className="text-xs text-muted-foreground ms-2">{s.role}</span>
-                  {owner?.staffId === s.id && <span className="text-xs ms-1">{isFr ? "(actuel)" : "(الحالي)"}</span>}
+                  {student.owner?.staffId === s.id && <span className="text-xs ms-1">{isFr ? "(actuel)" : "(الحالي)"}</span>}
                 </button>
               ))}
             </div>
@@ -411,8 +419,8 @@ export default function StudentProfile() {
         </div>
       )}
 
-      {/* Call result modal — mandatory after call click */}
-      {pendingCallId !== null && (
+      {/* Call result modal — shown only on return from call (visibilitychange / 5s fallback) */}
+      {showCallResultModal && pendingCallId !== null && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center p-4">
           <div dir={isFr ? "ltr" : "rtl"} className="bg-card rounded-2xl border border-border shadow-xl p-5 w-full max-w-sm space-y-4">
             <div>

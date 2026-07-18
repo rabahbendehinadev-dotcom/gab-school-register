@@ -104,7 +104,7 @@ const CallAttemptBody = z.object({
 });
 
 const CallResultBody = z.object({
-  result: z.enum(["answered", "no_answer", "busy", "wrong_number", "callback", "not_attempted"]),
+  result: z.enum(["answered", "no_answer", "busy", "wrong_number", "callback", "not_attempted", "cancel"]),
   durationSeconds: z.coerce.number().int().min(0).optional().nullable(),
   note: z.string().max(1000).optional().nullable(),
   nextFollowupAt: z.coerce.date().optional().nullable(),
@@ -116,6 +116,12 @@ router.post("/students/:id/call-attempt", requirePermission("call_students"), as
 
   const staffId = req.session.staffId!;
   const staffName = req.session.fullName ?? "Unknown";
+
+  const [studentRow] = await db.select({ contactAttempts: studentsTable.contactAttempts }).from(studentsTable).where(eq(studentsTable.id, studentId));
+  await db.update(studentsTable).set({
+    contactAttempts: (studentRow?.contactAttempts ?? 0) + 1,
+    lastContactedAt: new Date(),
+  }).where(eq(studentsTable.id, studentId));
 
   const [row] = await db.insert(callResultsTable).values({
     studentId,

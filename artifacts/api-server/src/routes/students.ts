@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, or, and, sql, desc, isNull, gte, lt } from "drizzle-orm";
-import { db, studentsTable, groupsTable } from "@workspace/db";
+import { db, studentsTable, groupsTable, studentOwnersTable, staffTable, activityLogsTable } from "@workspace/db";
 import {
   CreateStudentBody,
   GetStudentParams,
@@ -221,6 +221,21 @@ router.get("/students/:id", requirePermission("view_students"), async (req, res)
 
   if (!student) { res.status(404).json({ error: "Student not found" }); return; }
 
+  const [ownerRow] = await db
+    .select({ staffId: studentOwnersTable.staffId, fullName: staffTable.fullName, assignedAt: studentOwnersTable.assignedAt })
+    .from(studentOwnersTable)
+    .leftJoin(staffTable, eq(studentOwnersTable.staffId, staffTable.id))
+    .where(eq(studentOwnersTable.studentId, params.data.id))
+    .orderBy(desc(studentOwnersTable.assignedAt))
+    .limit(1);
+
+  const [lastAction] = await db
+    .select({ details: activityLogsTable.details, performedBy: activityLogsTable.performedBy, createdAt: activityLogsTable.createdAt })
+    .from(activityLogsTable)
+    .where(eq(activityLogsTable.studentId, params.data.id))
+    .orderBy(desc(activityLogsTable.createdAt))
+    .limit(1);
+
   await logActivity(
     "student_viewed",
     `${student.firstName} ${student.lastName} — فتح ملف الطالب`,
@@ -235,7 +250,11 @@ router.get("/students/:id", requirePermission("view_students"), async (req, res)
     }
   ).catch(() => {});
 
-  res.json(student);
+  res.json({
+    ...student,
+    owner: ownerRow ? { staffId: ownerRow.staffId, fullName: ownerRow.fullName, assignedAt: ownerRow.assignedAt } : null,
+    lastAction: lastAction ? { text: lastAction.details, by: lastAction.performedBy, at: lastAction.createdAt } : null,
+  });
 });
 
 router.patch("/students/:id", requirePermission("edit_students"), async (req, res): Promise<void> => {
