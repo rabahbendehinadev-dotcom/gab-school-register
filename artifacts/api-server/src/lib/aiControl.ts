@@ -741,6 +741,7 @@ export async function getStaffPerformance(fromDate: Date, toDate: Date): Promise
       -- Confirmed/paying students owned by this staff
       COUNT(DISTINCT CASE WHEN stu.stage = 'confirmed' AND so_q.staff_id = s.id THEN stu.id END) AS confirmed_students,
       COUNT(DISTINCT CASE WHEN stu.stage = 'paid'      AND so_q.staff_id = s.id THEN stu.id END) AS paying_students,
+      COUNT(DISTINCT CASE WHEN so_q.staff_id = s.id AND stu.deleted_at IS NULL THEN stu.id END) AS owned_students_total,
       COUNT(DISTINCT CASE WHEN ca.status IN ('done','completed') THEN ca.id END) AS checklist_done,
       COUNT(DISTINCT ca.id) AS checklist_total
     FROM staff s
@@ -775,9 +776,9 @@ export async function getStaffPerformance(fromDate: Date, toDate: Date): Promise
     const scheduledHours = Math.round(hoursPerDay * days * 10) / 10;
     const idleHours = Math.max(0, Math.round((scheduledHours - loginH) * 10) / 10);
 
-    // Owned students total (confirmed + paying + others) for conversion rate
-    const ownedTotal = confirmed + paying;  // denominator from same owned-students query
-    const conversionRate = ownedTotal > 0 ? Math.round((confirmed / ownedTotal) * 100) : null;
+    // True conversion rate = confirmed / all owned active leads
+    const ownedTotal = parseInt((r as any).owned_students_total ?? "0", 10);
+    const conversionRate = ownedTotal > 0 ? Math.round(((confirmed + paying) / ownedTotal) * 100) : null;
 
     return {
       staffId:              r.staff_id,

@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, CheckCircle, Info, Zap, RefreshCw, Settings, ChevronDown, ChevronUp, Eye, Bell } from "lucide-react";
+import { AlertTriangle, CheckCircle, Info, Zap, RefreshCw, Settings, ChevronDown, ChevronUp, Eye, Bell, BarChart2 } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -412,6 +412,99 @@ function NotifPrefsPanel() {
   );
 }
 
+interface PerfRow {
+  staffId: number; fullName: string; role: string;
+  totalActions: number; whatsappClicks: number; callClicks: number;
+  confirmedStudents: number; conversionRate: number | null;
+  checklistRate: number | null; avgFirstResponseHours: number | null;
+  tasksLate: number;
+}
+
+function StaffPerfSummary() {
+  const to   = new Date().toISOString().slice(0, 10);
+  const from = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+  const { data, isLoading } = useQuery<PerfRow[]>({
+    queryKey: ["ai-staff-perf-summary"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/ai/staff-performance?from=${from}&to=${to}`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 5 * 60_000,
+  });
+
+  const rows = data ?? [];
+  return (
+    <Card className="border-border/50">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <BarChart2 className="w-4 h-4" />
+          مقارنة أداء الموظفين — آخر 30 يوم
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 pt-2">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">جاري التحميل...</p>
+        ) : rows.length === 0 ? (
+          <p className="text-xs text-muted-foreground">لا توجد بيانات.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-muted-foreground">
+                  <th className="text-right py-1.5 pr-2 font-medium">الموظف</th>
+                  <th className="text-center py-1.5 font-medium">النشاط</th>
+                  <th className="text-center py-1.5 font-medium">واتساب</th>
+                  <th className="text-center py-1.5 font-medium">اتصالات</th>
+                  <th className="text-center py-1.5 font-medium">مؤكدون</th>
+                  <th className="text-center py-1.5 font-medium">تحويل%</th>
+                  <th className="text-center py-1.5 font-medium">قوائم%</th>
+                  <th className="text-center py-1.5 font-medium">استجابة</th>
+                  <th className="text-center py-1.5 font-medium">متأخرة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(r => (
+                  <tr key={r.staffId} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="py-1.5 pr-2">
+                      <p className="font-medium">{r.fullName}</p>
+                      <p className="text-muted-foreground text-[10px]">{r.role}</p>
+                    </td>
+                    <td className="text-center py-1.5">{r.totalActions}</td>
+                    <td className="text-center py-1.5 text-green-600">{r.whatsappClicks}</td>
+                    <td className="text-center py-1.5 text-blue-600">{r.callClicks}</td>
+                    <td className="text-center py-1.5 text-violet-600 font-semibold">{r.confirmedStudents}</td>
+                    <td className="text-center py-1.5">
+                      {r.conversionRate != null
+                        ? <span className={r.conversionRate >= 50 ? "text-green-600 font-medium" : "text-orange-600"}>{r.conversionRate}%</span>
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="text-center py-1.5">
+                      {r.checklistRate != null
+                        ? <span className={r.checklistRate >= 70 ? "text-green-600" : "text-orange-600"}>{r.checklistRate}%</span>
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="text-center py-1.5">
+                      {r.avgFirstResponseHours != null
+                        ? <span className={r.avgFirstResponseHours > 4 ? "text-orange-600" : "text-green-600"}>{r.avgFirstResponseHours}h</span>
+                        : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    <td className="text-center py-1.5">
+                      {r.tasksLate > 0
+                        ? <span className="text-red-600 font-medium">{r.tasksLate}</span>
+                        : <span className="text-muted-foreground">0</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AiControl() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -558,6 +651,9 @@ export default function AiControl() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Staff Performance Summary — required on AI Control page */}
+        <StaffPerfSummary />
 
         {/* Active Alerts Section */}
         {alerts.length > 0 && (

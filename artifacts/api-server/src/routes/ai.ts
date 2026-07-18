@@ -178,8 +178,8 @@ router.get("/ai/notification-prefs", requirePermission("manage_ai_control"), asy
   res.json(result.rows);
 });
 
-/** PUT /ai/notification-prefs/:staffId — admin sets another staff member's preference */
-router.put("/ai/notification-prefs/:staffId", requirePermission("manage_ai_control"), async (req, res): Promise<void> => {
+/** PUT /ai/notification-prefs/:staffId — owner or admin override per employee */
+router.put("/ai/notification-prefs/:staffId", requireAnyPermission("manage_ai_control", "manage_staff"), async (req, res): Promise<void> => {
   const staffId = parseInt(req.params.staffId, 10);
   const { pref } = req.body as { pref: string };
   if (!VALID_PREFS.includes(pref as typeof VALID_PREFS[number])) {
