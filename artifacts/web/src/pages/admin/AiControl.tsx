@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { AlertTriangle, CheckCircle, Info, Zap, RefreshCw, Settings, ChevronDown, ChevronUp, Eye } from "lucide-react";
+import { AlertTriangle, CheckCircle, Info, Zap, RefreshCw, Settings, ChevronDown, ChevronUp, Eye, Bell } from "lucide-react";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
@@ -263,6 +263,92 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+const NOTIF_PREF_LABELS: Record<string, string> = {
+  always: "دائماً",
+  during_shift: "أثناء الوردية",
+  critical_only: "الحرجة فقط",
+  off: "إيقاف",
+};
+
+interface StaffPref {
+  id: number;
+  full_name: string;
+  role: string;
+  notification_pref: string;
+}
+
+function NotifPrefsPanel() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const { data: prefs, isLoading } = useQuery<StaffPref[]>({
+    queryKey: ["ai-notif-prefs"],
+    queryFn: async () => {
+      const res = await fetch(`${BASE}/api/ai/notification-prefs`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+  });
+
+  const update = useMutation({
+    mutationFn: async ({ staffId, pref }: { staffId: number; pref: string }) => {
+      const res = await fetch(`${BASE}/api/ai/notification-prefs/${staffId}`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pref }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "تم تحديث تفضيل الإشعار" });
+      qc.invalidateQueries({ queryKey: ["ai-notif-prefs"] });
+    },
+    onError: () => toast({ title: "فشل التحديث", variant: "destructive" }),
+  });
+
+  return (
+    <Card className="border-primary/20">
+      <CardHeader className="p-4 pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Bell className="w-4 h-4" />
+          تفضيلات الإشعارات لكل موظف
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="p-4 pt-2">
+        {isLoading ? (
+          <p className="text-sm text-muted-foreground">جاري التحميل...</p>
+        ) : (
+          <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+            {(prefs ?? []).map(s => (
+              <div key={s.id} className="flex items-center justify-between gap-3 py-1.5 border-b last:border-0">
+                <div>
+                  <p className="text-sm font-medium">{s.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{s.role}</p>
+                </div>
+                <Select
+                  value={s.notification_pref ?? "during_shift"}
+                  onValueChange={pref => update.mutate({ staffId: s.id, pref })}
+                  disabled={update.isPending}
+                >
+                  <SelectTrigger className="h-7 w-36 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(NOTIF_PREF_LABELS).map(([v, label]) => (
+                      <SelectItem key={v} value={v} className="text-xs">{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AiControl() {
   const { user } = useAuth();
   const [, navigate] = useLocation();
@@ -374,9 +460,12 @@ export default function AiControl() {
           </div>
         </div>
 
-        {/* Settings Panel */}
+        {/* Settings Panel + Notification Prefs */}
         {showSettings && canManage && (
-          <SettingsPanel onClose={() => setShowSettings(false)} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <SettingsPanel onClose={() => setShowSettings(false)} />
+            <NotifPrefsPanel />
+          </div>
         )}
 
         {/* Summary Cards */}

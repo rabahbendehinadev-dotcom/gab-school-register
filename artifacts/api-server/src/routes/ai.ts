@@ -1,14 +1,15 @@
 import { Router, type IRouter } from "express";
-import { pool } from "@workspace/db";
+import { pool, db, staffTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 import { requirePermission, requireAnyPermission } from "../middlewares/auth";
-import { runAllAnalyses, getStaffPerformance } from "../lib/aiControl";
+import { runAllAnalyses, getStaffPerformance, DEFAULT_SETTINGS } from "../lib/aiControl";
 import "../types/session";
 
 const router: IRouter = Router();
 
 // ── AI REPORTS ─────────────────────────────────────────────────────────────
 
-/** GET /ai/reports — paginated list, filterable by severity/type/date */
+/** GET /ai/reports — paginated list, filterable */
 router.get("/ai/reports", requirePermission("view_ai_control"), async (req, res): Promise<void> => {
   const limit  = Math.min(parseInt(String(req.query.limit  ?? "50"), 10), 200);
   const offset = parseInt(String(req.query.offset ?? "0"), 10);
@@ -28,46 +29,52 @@ router.get("/ai/reports", requirePermission("view_ai_control"), async (req, res)
   const where = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
 
   params.push(limit, offset);
-  const result = await pool.query(
+  const rows = await pool.query(
     `SELECT id, report_type, severity, findings, is_read, generated_at
-     FROM ai_reports
-     ${where}
+     FROM ai_reports ${where}
      ORDER BY generated_at DESC
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
-
-  const countResult = await pool.query(`SELECT COUNT(*) FROM ai_reports ${where}`, params.slice(0, -2));
-  res.json({ total: parseInt(countResult.rows[0].count, 10), rows: result.rows });
+  const countResult = await pool.query(
+    `SELECT COUNT(*) FROM ai_reports ${where}`,
+    params.slice(0, -2)
+  );
+  res.json({ total: parseInt(countResult.rows[0].count, 10), rows: rows.rows });
 });
 
-/** GET /ai/reports/:id — single report detail */
+/** GET /ai/reports/:id — single report, marks as read */
 router.get("/ai/reports/:id", requirePermission("view_ai_control"), async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
-
   const result = await pool.query(
     `UPDATE ai_reports SET is_read = true WHERE id = $1
      RETURNING id, report_type, severity, findings, is_read, generated_at`,
     [id]
   );
-  if (result.rows.length === 0) { res.status(404).json({ error: "Not found" }); return; }
+  if (!result.rows.length) { res.status(404).json({ error: "Not found" }); return; }
   res.json(result.rows[0]);
 });
 
-/** GET /ai/alerts/active — unread alerts with severity warning/important/critical */
+/**
+ * GET /ai/alerts/active — unread warning+/important/critical alerts
+ * from the last 48 h, or any unread. Ordered by severity then date.
+ */
 router.get("/ai/alerts/active", requirePermission("view_ai_control"), async (_req, res): Promise<void> => {
   const result = await pool.query(`
     SELECT id, report_type, severity, findings, is_read, generated_at
     FROM ai_reports
     WHERE severity IN ('warning','important','critical')
-    ORDER BY generated_at DESC
+      AND (is_read = false OR generated_at > NOW() - INTERVAL '48 hours')
+    ORDER BY
+      CASE severity WHEN 'critical' THEN 1 WHEN 'important' THEN 2 WHEN 'warning' THEN 3 ELSE 4 END,
+      generated_at DESC
     LIMIT 50
   `);
   res.json(result.rows);
 });
 
-/** GET /ai/alerts/unread-count — badge count for nav */
+/** GET /ai/alerts/unread-count — badge count (only important/critical unread) */
 router.get("/ai/alerts/unread-count", requirePermission("view_ai_control"), async (_req, res): Promise<void> => {
   const result = await pool.query(`
     SELECT COUNT(*) FROM ai_reports
@@ -76,24 +83,28 @@ router.get("/ai/alerts/unread-count", requirePermission("view_ai_control"), asyn
   res.json({ count: parseInt(result.rows[0].count, 10) });
 });
 
-/** POST /ai/reports/run — manual trigger (admin/owner) */
+/** POST /ai/reports/run — manual trigger */
 router.post("/ai/reports/run", requirePermission("view_ai_control"), async (req, res): Promise<void> => {
-  const idleMin = parseInt(String(req.body?.idleMin ?? "20"), 10);
-  const findings = await runAllAnalyses(idleMin);
-
-  const sev = findings.some(f => f.severity === "critical") ? "critical"
-    : findings.some(f => f.severity === "important") ? "important"
-    : findings.some(f => f.severity === "warning") ? "warning"
-    : "info";
+  const body = req.body as Record<string, string | number> | undefined;
+  const settings = {
+    idleThresholdMin:            Number(body?.idleMin            ?? DEFAULT_SETTINGS.idleThresholdMin),
+    lateResponseThresholdH:      Number(body?.lateResponseH      ?? DEFAULT_SETTINGS.lateResponseThresholdH),
+    callsWithoutResultThreshold: Number(body?.callsThreshold     ?? DEFAULT_SETTINGS.callsWithoutResultThreshold),
+  };
+  const findings = await runAllAnalyses(settings);
+  const sev = findings.some(f => f.severity === "critical")  ? "critical"
+            : findings.some(f => f.severity === "important") ? "important"
+            : findings.some(f => f.severity === "warning")   ? "warning"
+            : "info";
 
   const result = await pool.query(
     `INSERT INTO ai_reports (report_type, severity, findings) VALUES ($1, $2, $3) RETURNING id`,
     ["manual", sev, JSON.stringify(findings)]
   );
-  res.json({ id: result.rows[0]?.id, findings, severity: sev });
+  res.json({ id: result.rows[0]?.id, findings, severity: sev, count: findings.length });
 });
 
-/** POST /ai/reports/:id/read — mark as read */
+/** POST /ai/reports/:id/read — mark one as read */
 router.post("/ai/reports/:id/read", requirePermission("view_ai_control"), async (req, res): Promise<void> => {
   const id = parseInt(req.params.id, 10);
   await pool.query(`UPDATE ai_reports SET is_read = true WHERE id = $1`, [id]);
@@ -106,9 +117,9 @@ router.post("/ai/reports/read-all", requirePermission("view_ai_control"), async 
   res.json({ success: true });
 });
 
-// ── AI SETTINGS ────────────────────────────────────────────────────────────
+// ── AI SETTINGS ─────────────────────────────────────────────────────────────
 
-const AI_SETTING_KEYS = [
+const AI_KEYS = [
   "ai_scheduler_enabled",
   "ai_idle_threshold_min",
   "ai_late_response_threshold_h",
@@ -116,27 +127,24 @@ const AI_SETTING_KEYS = [
   "ai_critical_alert_interval_min",
 ];
 
-const AI_SETTING_DEFAULTS: Record<string, string> = {
+const AI_DEFAULTS: Record<string, string> = {
   ai_scheduler_enabled: "true",
-  ai_idle_threshold_min: "20",
-  ai_late_response_threshold_h: "2",
-  ai_calls_without_result_threshold: "3",
+  ai_idle_threshold_min: String(DEFAULT_SETTINGS.idleThresholdMin),
+  ai_late_response_threshold_h: String(DEFAULT_SETTINGS.lateResponseThresholdH),
+  ai_calls_without_result_threshold: String(DEFAULT_SETTINGS.callsWithoutResultThreshold),
   ai_critical_alert_interval_min: "10",
 };
 
 router.get("/ai/settings", requireAnyPermission("view_ai_control", "manage_ai_control"), async (_req, res): Promise<void> => {
-  const result = await pool.query(
-    `SELECT key, value FROM settings WHERE key = ANY($1)`,
-    [AI_SETTING_KEYS]
-  );
-  const settings = { ...AI_SETTING_DEFAULTS };
-  for (const row of result.rows) settings[row.key] = row.value;
-  res.json(settings);
+  const result = await pool.query(`SELECT key, value FROM settings WHERE key = ANY($1)`, [AI_KEYS]);
+  const out = { ...AI_DEFAULTS };
+  for (const r of result.rows) out[r.key] = r.value;
+  res.json(out);
 });
 
 router.put("/ai/settings", requirePermission("manage_ai_control"), async (req, res): Promise<void> => {
   const body = req.body as Record<string, string>;
-  for (const key of AI_SETTING_KEYS) {
+  for (const key of AI_KEYS) {
     if (key in body) {
       await pool.query(
         `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, now())
@@ -148,12 +156,39 @@ router.put("/ai/settings", requirePermission("manage_ai_control"), async (req, r
   res.json({ success: true });
 });
 
-// ── EMPLOYEE PERFORMANCE REPORTS ───────────────────────────────────────────
+// ── NOTIFICATION PREFERENCES ────────────────────────────────────────────────
+
+const VALID_PREFS = ["always", "during_shift", "critical_only", "off"] as const;
+
+/** GET /ai/notification-prefs — list all staff with their notification_pref */
+router.get("/ai/notification-prefs", requirePermission("manage_ai_control"), async (_req, res): Promise<void> => {
+  const result = await pool.query<{ id: number; full_name: string; role: string; notification_pref: string }>(
+    `SELECT id, full_name, role, COALESCE(notification_pref, 'during_shift') AS notification_pref FROM staff ORDER BY full_name`
+  );
+  res.json(result.rows);
+});
+
+/** PUT /ai/notification-prefs/:staffId — set notification preference for a staff member */
+router.put("/ai/notification-prefs/:staffId", requirePermission("manage_ai_control"), async (req, res): Promise<void> => {
+  const staffId = parseInt(req.params.staffId, 10);
+  const { pref } = req.body as { pref: string };
+  if (!VALID_PREFS.includes(pref as typeof VALID_PREFS[number])) {
+    res.status(400).json({ error: "Invalid pref. Must be one of: " + VALID_PREFS.join(", ") });
+    return;
+  }
+  await pool.query(`UPDATE staff SET notification_pref = $1 WHERE id = $2`, [pref, staffId]);
+  res.json({ success: true });
+});
+
+// ── EMPLOYEE PERFORMANCE REPORTS ─────────────────────────────────────────────
 
 /** GET /ai/staff-performance?from=YYYY-MM-DD&to=YYYY-MM-DD */
 router.get("/ai/staff-performance", requireAnyPermission("view_ai_control", "view_reports"), async (req, res): Promise<void> => {
-  const toDate   = new Date(String(req.query.to   ?? new Date().toISOString().slice(0, 10) + "T23:59:59Z"));
-  const fromDate = new Date(String(req.query.from ?? new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10) + "T00:00:00Z"));
+  const defaultTo   = new Date().toISOString().slice(0, 10);
+  const defaultFrom = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
+
+  const fromDate = new Date(String(req.query.from ?? defaultFrom) + "T00:00:00Z");
+  const toDate   = new Date(String(req.query.to   ?? defaultTo)   + "T23:59:59Z");
 
   if (isNaN(fromDate.getTime()) || isNaN(toDate.getTime())) {
     res.status(400).json({ error: "Invalid date range" }); return;
