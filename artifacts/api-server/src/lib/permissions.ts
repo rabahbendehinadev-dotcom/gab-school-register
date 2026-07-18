@@ -40,7 +40,7 @@ const TEAM_LEADER_PERMS: Permission[] = [
   "view_dashboard", "view_students", "edit_students", "contact_students",
   "call_students", "open_whatsapp", "add_notes", "edit_notes",
   "view_all_students", "assign_students", "view_team_activity",
-  "manage_tasks", "view_reports", "view_audit_logs",
+  "manage_tasks", "view_reports",
   "view_groups", "manage_groups", "view_payments",
 ];
 

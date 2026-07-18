@@ -3,8 +3,41 @@ import { desc } from "drizzle-orm";
 import { db, activityLogsTable } from "@workspace/db";
 import { ListActivityQueryParams, ListActivityResponse } from "@workspace/api-zod";
 import { requirePermission } from "../middlewares/auth";
+import { logActivity } from "../lib/activityLogger";
+import "../types/session";
 
 const router: IRouter = Router();
+
+router.post("/activity/track", requirePermission("view_dashboard"), async (req, res): Promise<void> => {
+  const { action, studentId, studentName } = req.body as {
+    action?: string;
+    studentId?: number;
+    studentName?: string;
+  };
+
+  const allowed = ["call_clicked", "whatsapp_clicked", "student_viewed"];
+  if (!action || !allowed.includes(action)) {
+    res.status(400).json({ error: "Invalid action" });
+    return;
+  }
+
+  const performer = req.session.fullName ?? "Unknown";
+  const description = action === "call_clicked"
+    ? `${performer} نقر على اتصال${studentName ? ` مع ${studentName}` : ""}`
+    : action === "whatsapp_clicked"
+    ? `${performer} نقر على واتساب${studentName ? ` مع ${studentName}` : ""}`
+    : `${performer} فتح ملف طالب${studentName ? `: ${studentName}` : ""}`;
+
+  await logActivity(action, description, performer, null, {
+    employeeId: req.session.staffId,
+    actionType: action,
+    entityType: "student",
+    entityId: studentId,
+    sessionId: req.session.sessionToken,
+  });
+
+  res.json({ ok: true });
+});
 
 router.get("/activity", requirePermission("view_audit_logs"), async (req, res): Promise<void> => {
   const query = ListActivityQueryParams.safeParse(req.query);

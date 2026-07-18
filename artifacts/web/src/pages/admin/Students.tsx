@@ -87,7 +87,7 @@ export default function Students() {
   const { lang } = useI18n();
   const isFr = lang === "fr";
   const { user } = useAuth();
-  const canManage = user?.role === "admin" || user?.role === "manager";
+  const canManage = user?.permissions?.includes("edit_students") ?? false;
   const qc = useQueryClient();
   const { toast } = useToast();
 

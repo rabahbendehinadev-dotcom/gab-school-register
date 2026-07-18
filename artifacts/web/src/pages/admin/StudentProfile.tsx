@@ -135,8 +135,8 @@ export default function StudentProfile() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <a href={`tel:${student.phone}`} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors"><Phone className="w-4 h-4" />{isFr ? "Appeler" : "اتصال"}</a>
-              <a href={waLink(student.whatsapp)} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors"><MessageCircle className="w-4 h-4" />WhatsApp</a>
+              <a href={`tel:${student.phone}`} onClick={() => fetch("/api/activity/track", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "call_clicked", studentId: student.id, studentName: `${student.firstName} ${student.lastName}` }) })} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors"><Phone className="w-4 h-4" />{isFr ? "Appeler" : "اتصال"}</a>
+              <a href={waLink(student.whatsapp)} target="_blank" rel="noreferrer" onClick={() => fetch("/api/activity/track", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "whatsapp_clicked", studentId: student.id, studentName: `${student.firstName} ${student.lastName}` }) })} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors"><MessageCircle className="w-4 h-4" />WhatsApp</a>
               <Button onClick={() => contactMutation.mutate()} disabled={contactMutation.isPending} variant="outline" className="rounded-xl">
                 <PhoneCall className="w-4 h-4 mr-1" />{isFr ? "Suivi" : "تسجيل تواصل"}
               </Button>
