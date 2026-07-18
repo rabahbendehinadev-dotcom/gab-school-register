@@ -167,7 +167,8 @@ async function ensureChecklistTables(): Promise<void> {
       )
     `);
     // Idempotent column additions for checklist_items
-    await client.query(`ALTER TABLE "checklist_items" ADD COLUMN IF NOT EXISTS "result_required" boolean NOT NULL DEFAULT false`);
+    await client.query(`ALTER TABLE "checklist_items" ADD COLUMN IF NOT EXISTS "result_required"  boolean NOT NULL DEFAULT false`);
+    await client.query(`ALTER TABLE "checklist_items" ADD COLUMN IF NOT EXISTS "student_required" boolean NOT NULL DEFAULT false`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS "checklist_assignments" (
@@ -200,7 +201,8 @@ async function ensureChecklistTables(): Promise<void> {
     await client.query(`CREATE INDEX IF NOT EXISTS "idx_checklist_assignments_staff_date" ON "checklist_assignments" ("staff_id", "date_key")`);
     await client.query(`CREATE INDEX IF NOT EXISTS "idx_checklist_assignments_status" ON "checklist_assignments" ("status")`);
     // Idempotent column additions for checklist_assignments
-    await client.query(`ALTER TABLE "checklist_assignments" ADD COLUMN IF NOT EXISTS "result_required" boolean NOT NULL DEFAULT false`);
+    await client.query(`ALTER TABLE "checklist_assignments" ADD COLUMN IF NOT EXISTS "result_required"  boolean NOT NULL DEFAULT false`);
+    await client.query(`ALTER TABLE "checklist_assignments" ADD COLUMN IF NOT EXISTS "student_required" boolean NOT NULL DEFAULT false`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS "escalation_log" (

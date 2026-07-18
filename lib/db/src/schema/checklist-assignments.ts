@@ -14,6 +14,7 @@ export const checklistAssignmentsTable = pgTable("checklist_assignments", {
   proofRequired: boolean("proof_required").notNull().default(false),
   noteRequired: boolean("note_required").notNull().default(false),
   resultRequired: boolean("result_required").notNull().default(false),
+  studentRequired: boolean("student_required").notNull().default(false),
   staffId: integer("staff_id").notNull().references(() => staffTable.id, { onDelete: "cascade" }),
   dueAt: timestamp("due_at", { withTimezone: true }).notNull(),
   status: text("status").notNull().default("not_started"),

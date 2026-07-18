@@ -260,14 +260,15 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
         if (existing) continue;
 
         await db.insert(checklistAssignmentsTable).values({
-          templateId:     tmpl.id,
-          itemId:         item.id,
-          title:          item.title,
-          description:    item.description,
-          priority:       item.priority,
-          proofRequired:  item.proofRequired,
-          noteRequired:   item.noteRequired,
-          resultRequired: item.resultRequired,
+          templateId:      tmpl.id,
+          itemId:          item.id,
+          title:           item.title,
+          description:     item.description,
+          priority:        item.priority,
+          proofRequired:   item.proofRequired,
+          noteRequired:    item.noteRequired,
+          resultRequired:  item.resultRequired,
+          studentRequired: (item as { studentRequired?: boolean }).studentRequired ?? false,
           staffId,
           dueAt,
           status: "not_started",
@@ -280,8 +281,36 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
   }
 }
 
+/** Track last auto-generation date to trigger once per calendar day. */
+let lastGeneratedDateKey = "";
+
+async function runDailyAutoGeneration(): Promise<void> {
+  const today = new Date();
+  const dateKey = today.toISOString().slice(0, 10);
+  if (dateKey === lastGeneratedDateKey) return;
+  lastGeneratedDateKey = dateKey;
+
+  try {
+    const activeStaff = await db
+      .select({ id: staffTable.id, role: staffTable.role })
+      .from(staffTable);
+
+    for (const s of activeStaff) {
+      await generateDailyAssignments(s.id, s.role ?? "");
+    }
+    console.log(`[checklistScheduler] Auto-generated assignments for ${activeStaff.length} staff on ${dateKey}`);
+  } catch (err) {
+    console.error("[checklistScheduler] Auto-generation error:", err);
+  }
+}
+
 export function startChecklistScheduler(): void {
+  // Run immediately on startup (catches first-of-day)
+  runDailyAutoGeneration().catch(() => {});
+
   setInterval(() => {
+    // Check every minute if we need to generate for a new day
+    runDailyAutoGeneration().catch(() => {});
     runChecklistEscalationTick().catch(() => {});
   }, 60 * 1000);
   console.log("Checklist escalation scheduler started (60s interval)");

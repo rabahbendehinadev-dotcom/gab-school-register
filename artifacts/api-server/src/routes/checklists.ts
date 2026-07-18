@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, or, gte, lte } from "drizzle-orm";
+import { eq, and, desc, or, gte, lte, inArray, isNotNull } from "drizzle-orm";
 import {
   db,
   checklistTemplatesTable,
@@ -136,6 +136,7 @@ const ItemBody = z.object({
   proofRequired: z.boolean().optional(),
   noteRequired: z.boolean().optional(),
   resultRequired: z.boolean().optional(),
+  studentRequired: z.boolean().optional(),
   offsetMinutes: z.coerce.number().int().min(0).optional(),
   sortOrder: z.coerce.number().int().optional(),
 });
@@ -175,17 +176,28 @@ router.post("/checklists/generate", requireAuth, async (req, res): Promise<void>
   res.json({ success: true });
 });
 
-/** Get today's assignments for the calling staff member. */
+/** Get assignments for the calling staff member:
+ *  - ALL incomplete assignments from any day (persistent accountability)
+ *  - Plus today's completed/cancelled/postponed assignments
+ */
 router.get("/checklists/my", requireAuth, async (req, res): Promise<void> => {
+  const { ne, notInArray } = await import("drizzle-orm");
   const staffId = req.session.staffId!;
   const today = new Date();
   const dateKey = today.toISOString().slice(0, 10);
+  const terminalStatuses = ["completed", "cancelled", "postponed"];
+
   const assignments = await db
     .select()
     .from(checklistAssignmentsTable)
     .where(and(
       eq(checklistAssignmentsTable.staffId, staffId),
-      eq(checklistAssignmentsTable.dateKey, dateKey),
+      or(
+        // All non-terminal from any date (persistent carry-over)
+        notInArray(checklistAssignmentsTable.status, terminalStatuses),
+        // Today's terminal ones (completed/cancelled/postponed today)
+        eq(checklistAssignmentsTable.dateKey, dateKey),
+      ),
     ))
     .orderBy(checklistAssignmentsTable.dueAt);
   res.json(assignments);
@@ -271,7 +283,7 @@ router.post("/checklists/assignments/:id/complete", requireAuth, async (req, res
   if (existing.noteRequired && !parsed.data.note?.trim()) validationErrors.push("الملاحظة مطلوبة لهذه المهمة");
   if (existing.proofRequired && !parsed.data.proofUrl?.trim()) validationErrors.push("رفع إثبات الإنجاز مطلوب لهذه المهمة");
   if (existing.resultRequired && !parsed.data.result?.trim()) validationErrors.push("يجب تحديد نتيجة المهمة");
-  if (existing.studentId && !parsed.data.studentId) validationErrors.push("يجب تحديد الطالب المرتبط بهذه المهمة");
+  if (existing.studentRequired && !parsed.data.studentId) validationErrors.push("يجب تحديد الطالب المرتبط بهذه المهمة");
 
   if (validationErrors.length > 0) {
     res.status(422).json({ error: "يرجى استيفاء جميع الشروط", details: validationErrors }); return;
@@ -396,6 +408,47 @@ router.post("/checklists/assignments/:id/cancel", requirePermission("manage_task
     .returning();
   if (!updated) { res.status(404).json({ error: "Assignment not found" }); return; }
   res.json(updated);
+});
+
+/** Handover / transfer log — reassigned assignments with origin staff info. */
+router.get("/checklists/handover-log", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
+  const fromStaff = staffTable;
+  const toStaff   = { ...staffTable } as typeof staffTable;
+  // Simple: fetch all assignments that have been reassigned (reassignedFrom IS NOT NULL)
+  const rows = await db
+    .select({
+      id: checklistAssignmentsTable.id,
+      title: checklistAssignmentsTable.title,
+      dateKey: checklistAssignmentsTable.dateKey,
+      status: checklistAssignmentsTable.status,
+      priority: checklistAssignmentsTable.priority,
+      dueAt: checklistAssignmentsTable.dueAt,
+      reassignedFrom: checklistAssignmentsTable.reassignedFrom,
+      staffId: checklistAssignmentsTable.staffId,
+      completedAt: checklistAssignmentsTable.completedAt,
+      toStaffName: fromStaff.fullName,
+    })
+    .from(checklistAssignmentsTable)
+    .leftJoin(fromStaff, eq(checklistAssignmentsTable.staffId, fromStaff.id))
+    .where(isNotNull(checklistAssignmentsTable.reassignedFrom))
+    .orderBy(desc(checklistAssignmentsTable.createdAt))
+    .limit(200);
+
+  // Resolve original staff names separately
+  const fromIds = [...new Set(rows.map(r => r.reassignedFrom).filter(Boolean) as number[])];
+  const fromMap: Record<number, string> = {};
+  if (fromIds.length > 0) {
+    const fromRows = await db.select({ id: staffTable.id, fullName: staffTable.fullName })
+      .from(staffTable)
+      .where(inArray(staffTable.id, fromIds));
+    for (const r of fromRows) fromMap[r.id] = r.fullName;
+  }
+
+  const result = rows.map(r => ({
+    ...r,
+    fromStaffName: r.reassignedFrom ? (fromMap[r.reassignedFrom] ?? `#${r.reassignedFrom}`) : null,
+  }));
+  res.json(result);
 });
 
 router.post("/checklists/assignments/:id/reassign", requirePermission("manage_tasks"), async (req, res): Promise<void> => {

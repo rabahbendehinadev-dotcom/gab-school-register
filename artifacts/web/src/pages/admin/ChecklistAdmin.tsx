@@ -323,7 +323,21 @@ function TemplateCard({ template, staffList, onRefresh }: { template: Template; 
   );
 }
 
-type Tab = "templates" | "assignments" | "settings";
+interface HandoverEntry {
+  id: number;
+  title: string;
+  dateKey: string | null;
+  status: string;
+  priority: string;
+  dueAt: string;
+  reassignedFrom: number | null;
+  staffId: number;
+  completedAt: string | null;
+  toStaffName: string | null;
+  fromStaffName: string | null;
+}
+
+type Tab = "templates" | "assignments" | "settings" | "handover";
 
 export default function ChecklistAdmin() {
   const { toast } = useToast();
@@ -373,11 +387,18 @@ export default function ChecklistAdmin() {
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  const handoverQ = useQuery<HandoverEntry[]>({
+    queryKey: ["checklist-handover-log"],
+    queryFn: () => apiFetch("/checklists/handover-log"),
+    enabled: tab === "handover",
+  });
+
   const settings = settingsDraft ?? settingsQ.data;
 
   const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
     { id: "templates",   label: "القوالب",      icon: CalendarDays },
     { id: "assignments", label: "المهام اليوم",  icon: BarChart3 },
+    { id: "handover",    label: "سجل التسليم",   icon: Users },
     { id: "settings",   label: "إعدادات",       icon: Settings },
   ];
 
@@ -511,6 +532,56 @@ export default function ChecklistAdmin() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Handover / Transfer Log Tab */}
+          {tab === "handover" && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-muted-foreground">
+                  سجل المهام المحوّلة بين الموظفين — {handoverQ.data?.length ?? 0} تحويل
+                </p>
+                <button
+                  onClick={() => handoverQ.refetch()}
+                  className="text-xs border border-border rounded-lg px-3 py-1.5 text-muted-foreground hover:bg-muted"
+                >
+                  تحديث
+                </button>
+              </div>
+
+              {handoverQ.isLoading ? (
+                <div className="text-center py-10 text-muted-foreground">جاري التحميل...</div>
+              ) : (handoverQ.data?.length === 0) ? (
+                <div className="text-center py-10 text-muted-foreground">
+                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                  <p className="font-medium">لا توجد مهام محوّلة بعد</p>
+                  <p className="text-xs mt-1">عند إعادة تعيين مهمة من موظف لآخر تظهر هنا</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {(handoverQ.data ?? []).map(h => (
+                    <div key={h.id} className="bg-card border border-border rounded-2xl p-4 flex items-start justify-between gap-3">
+                      <div className="space-y-1 min-w-0">
+                        <p className="font-medium text-sm text-foreground truncate">{h.title}</p>
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span>📅 {h.dateKey}</span>
+                          <span>من: <span className="text-red-600 font-medium">{h.fromStaffName ?? "—"}</span></span>
+                          <span>← إلى: <span className="text-green-600 font-medium">{h.toStaffName ?? "—"}</span></span>
+                        </div>
+                      </div>
+                      <div className="flex-shrink-0 text-right space-y-1">
+                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[h.status] ?? "bg-gray-100 text-gray-600"}`}>
+                          {STATUS_LABELS[h.status] ?? h.status}
+                        </span>
+                        {h.completedAt && (
+                          <p className="text-[10px] text-green-600">✅ منجزة</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
