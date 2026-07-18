@@ -182,12 +182,33 @@ export default function Tasks() {
           </Button>
         </div>
 
+        {/* Summary stats row */}
+        {!isLoading && tasks.length > 0 && (
+          <div className="grid grid-cols-4 gap-3 mb-2">
+            {[
+              { label: isFr ? "En retard" : "متأخرة",    value: overdue.length,   bg: "bg-red-50 border-red-200",    num: "text-red-600", icon: AlertTriangle },
+              { label: isFr ? "Aujourd'hui" : "اليوم",   value: today.length,     bg: "bg-orange-50 border-orange-200", num: "text-orange-600", icon: CalendarCheck2 },
+              { label: isFr ? "À venir" : "قادمة",       value: upcoming.length,  bg: "bg-blue-50 border-blue-200",  num: "text-blue-600", icon: CalendarClock },
+              { label: isFr ? "Terminées" : "مكتملة",    value: done.length,      bg: "bg-green-50 border-green-200",num: "text-green-600", icon: Check },
+            ].map((s, i) => (
+              <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border ${s.bg}`}>
+                <s.icon className={`w-4 h-4 ${s.num} flex-shrink-0`} />
+                <div>
+                  <p className={`text-xl font-bold ${s.num}`}>{s.value}</p>
+                  <p className="text-[10px] text-muted-foreground leading-tight">{s.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
         {isLoading ? (
           <div className="py-16 text-center text-muted-foreground animate-pulse">{isFr ? "Chargement..." : "جاري التحميل..."}</div>
         ) : tasks.length === 0 ? (
           <div className="py-16 text-center">
             <ClipboardList className="w-12 h-12 mx-auto text-muted-foreground/40 mb-3" />
             <p className="text-muted-foreground">{isFr ? "Aucune tâche pour le moment" : "لا توجد مهام بعد"}</p>
+            <p className="text-xs text-muted-foreground/60 mt-1">{isFr ? "Créez une tâche pour commencer" : "أنشئ مهمة للبدء"}</p>
           </div>
         ) : (
           <div className="space-y-6">

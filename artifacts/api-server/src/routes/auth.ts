@@ -118,6 +118,26 @@ router.post("/auth/logout", async (req, res): Promise<void> => {
   res.json({ status: "ok" });
 });
 
+/** GET /user/language — get current user's saved UI language */
+router.get("/user/language", async (req, res): Promise<void> => {
+  const staffId = req.session.staffId;
+  if (!staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const { pool } = await import("@workspace/db");
+  const r = await pool.query("SELECT language FROM staff WHERE id = $1", [staffId]);
+  res.json({ language: r.rows[0]?.language ?? "fr" });
+});
+
+/** PUT /user/language — save current user's UI language preference */
+router.put("/user/language", async (req, res): Promise<void> => {
+  const staffId = req.session.staffId;
+  if (!staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const { language } = req.body as { language?: string };
+  if (!["ar", "fr"].includes(language ?? "")) { res.status(400).json({ error: "Invalid language" }); return; }
+  const { pool } = await import("@workspace/db");
+  await pool.query("UPDATE staff SET language = $1 WHERE id = $2", [language, staffId]);
+  res.json({ success: true });
+});
+
 router.get("/auth/me", async (req, res): Promise<void> => {
   const staffId = req.session.staffId;
   if (!staffId) {

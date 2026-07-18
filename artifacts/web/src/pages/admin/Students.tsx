@@ -64,8 +64,8 @@ function waLink(student: Student) {
 }
 
 function StageSelect({
-  student, disabled, onChange,
-}: { student: Student; disabled: boolean; onChange: (s: string) => void }) {
+  student, disabled, onChange, isFr,
+}: { student: Student; disabled: boolean; onChange: (s: string) => void; isFr: boolean }) {
   const si = stageInfo(student.stage);
   return (
     <Select value={student.stage} onValueChange={onChange} disabled={disabled}>
@@ -75,7 +75,7 @@ function StageSelect({
       <SelectContent>
         {ALL_STAGES.map(s => (
           <SelectItem key={s.value} value={s.value} className="text-xs">
-            <span className={`inline-block rounded-full px-2 py-0.5 border text-xs ${s.cls}`}>{s.ar}</span>
+            <span className={`inline-block rounded-full px-2 py-0.5 border text-xs ${s.cls}`}>{isFr ? s.fr : s.ar}</span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -439,33 +439,43 @@ export default function Students() {
                         <input type="checkbox" checked={selected} onChange={() => toggleOne(student.id)} className="rounded cursor-pointer" />
                       </TableCell>
                       <TableCell>
-                        <Link href={`/gab-c7x2p/students/${student.id}`} className="font-medium hover:text-primary hover:underline">
-                          {student.firstName} {student.lastName}
-                        </Link>
-                        <div className="flex gap-1 mt-0.5">
-                          {student.paymentStatus === "paid" && (
-                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-200">✓ {isFr ? "Payé" : "مدفوع"}</span>
-                          )}
-                          {student.paymentStatus === "deposited" && (
-                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full border border-yellow-200">💰 {isFr ? "Acompte" : "إيداع"}</span>
-                          )}
-                          {student.housingNeeded && (
-                            <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200">🏠</span>
-                          )}
+                        <div className="flex items-center gap-2.5">
+                          <Link href={`/gab-c7x2p/students/${student.id}`} className="flex-shrink-0">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary/20 to-primary/40 flex items-center justify-center text-xs font-bold text-primary hover:from-primary/30 hover:to-primary/60 transition-all">
+                              {(student.firstName?.[0] ?? "").toUpperCase()}{(student.lastName?.[0] ?? "").toUpperCase()}
+                            </div>
+                          </Link>
+                          <div className="min-w-0">
+                            <Link href={`/gab-c7x2p/students/${student.id}`} className="font-semibold text-sm hover:text-primary hover:underline truncate block">
+                              {student.firstName} {student.lastName}
+                            </Link>
+                            <div className="flex gap-1 mt-0.5 flex-wrap">
+                              {student.paymentStatus === "paid" && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full border border-emerald-200 font-medium">✓ {isFr ? "Payé" : "مدفوع"}</span>
+                              )}
+                              {student.paymentStatus === "deposited" && (
+                                <span className="text-[10px] bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full border border-yellow-200 font-medium">💰 {isFr ? "Acompte" : "إيداع"}</span>
+                              )}
+                              {student.housingNeeded && (
+                                <span className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded-full border border-blue-200">🏠</span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <a href={`tel:${student.phone}`} className="text-sm hover:text-primary">{student.phone}</a>
+                        <a href={`tel:${student.phone}`} className="text-sm hover:text-primary font-medium">{student.phone}</a>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{student.city}</TableCell>
                       <TableCell>
-                        <span className="text-xs text-muted-foreground">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${student.trainingType === "physical" ? "bg-indigo-50 text-indigo-700 border-indigo-200" : "bg-cyan-50 text-cyan-700 border-cyan-200"}`}>
                           {student.trainingType === "physical" ? (isFr ? "Présentiel" : "حضوري") : (isFr ? "En ligne" : "أونلاين")}
                         </span>
                       </TableCell>
                       <TableCell>
                         <StageSelect
                           student={student}
+                          isFr={isFr}
                           disabled={!canManage || stageMutation.isPending}
                           onChange={stage => canManage && stageMutation.mutate({ id: student.id, stage })}
                         />
@@ -479,38 +489,40 @@ export default function Students() {
                         {format(new Date(student.createdAt), "dd/MM/yyyy")}
                       </TableCell>
                       <TableCell>
-                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Link href={`/gab-c7x2p/students/${student.id}`}>
-                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Profil" : "الملف"}>
-                              <Eye className="w-3.5 h-3.5 text-muted-foreground" />
-                            </Button>
-                          </Link>
+                        <div className="flex gap-0.5 items-center">
                           {canOpenWhatsapp && (
                             <a href={waLink(student)} target="_blank" rel="noopener noreferrer">
-                              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-green-50" title="WhatsApp">
-                                <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+                              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-green-50 text-green-500" title="WhatsApp">
+                                <MessageCircle className="w-3.5 h-3.5" />
                               </Button>
                             </a>
                           )}
-                          {canManage && (
-                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Groupe" : "المجموعة"} onClick={() => setGroupDialogStudent(student)}>
-                              <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Link href={`/gab-c7x2p/students/${student.id}`}>
+                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-primary/10 hover:text-primary" title={isFr ? "Profil" : "الملف"}>
+                              <Eye className="w-3.5 h-3.5 text-muted-foreground" />
                             </Button>
-                          )}
-                          {canManage && (
-                          <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Modifier" : "تعديل"} onClick={() => setDetailStudent(student)}>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                          </Button>
-                          )}
-                          {canManage && (
-                            <Button
-                              variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive"
-                              title={isFr ? "Supprimer" : "حذف"}
-                              onClick={() => { if (confirm(isFr ? "Supprimer cet étudiant ?" : "حذف هذا الطالب؟")) deleteMutation.mutate(student.id); }}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
-                          )}
+                          </Link>
+                          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+                            {canManage && (
+                              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Groupe" : "المجموعة"} onClick={() => setGroupDialogStudent(student)}>
+                                <Users className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Button>
+                            )}
+                            {canManage && (
+                              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Modifier" : "تعديل"} onClick={() => setDetailStudent(student)}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </Button>
+                            )}
+                            {canManage && (
+                              <Button
+                                variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive"
+                                title={isFr ? "Supprimer" : "حذف"}
+                                onClick={() => { if (confirm(isFr ? "Supprimer cet étudiant ?" : "حذف هذا الطالب؟")) deleteMutation.mutate(student.id); }}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </TableCell>
                     </TableRow>

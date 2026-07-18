@@ -194,16 +194,31 @@ function ScheduleStudentCard({ student, groups, currentGroupId, onMove, onReturn
   const fullName = `${student.firstName} ${student.lastName}`;
   const others   = groups.filter((g) => g.id !== currentGroupId);
 
+  const stageAccent: Record<string, string> = {
+    new: "#3b82f6", contacted: "#eab308", interested: "#22c55e",
+    payment_pending: "#f97316", payment_confirmed: "#10b981",
+    confirmed: "#6366f1", attended: "#14b8a6",
+    no_show: "#ef4444", completed: "#a855f7", archived: "#9ca3af",
+  };
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm hover:shadow-md transition-shadow group">
+    <div
+      className="bg-white border border-gray-100 rounded-xl p-3 shadow-sm hover:shadow-md transition-all group relative overflow-hidden"
+      style={{ borderLeft: `3px solid ${stageAccent[localStage] ?? "#e5e7eb"}` }}
+    >
       <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
           <span
             {...(dragHandleProps ?? {})}
             className="text-gray-300 hover:text-gray-500 flex-shrink-0 cursor-grab active:cursor-grabbing touch-manipulation select-none"
           >
-            <GripVertical className="w-4 h-4" />
+            <GripVertical className="w-3.5 h-3.5" />
           </span>
+          <Link href={`/gab-c7x2p/students/${student.id}`} className="flex-shrink-0">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white" style={{ backgroundColor: stageAccent[localStage] ?? "#6b7280" }}>
+              {(student.firstName?.[0] ?? "").toUpperCase()}{(student.lastName?.[0] ?? "").toUpperCase()}
+            </div>
+          </Link>
           <Link
             href={`/gab-c7x2p/students/${student.id}`}
             className="font-semibold text-sm text-gray-800 leading-tight truncate hover:text-primary hover:underline cursor-pointer"

@@ -243,6 +243,8 @@ async function ensureAiTables(): Promise<void> {
     await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "notification_pref" text DEFAULT 'during_shift'`);
     // extended notification settings JSONB column
     await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "notification_settings" jsonb`);
+    // user interface language preference
+    await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "language" text DEFAULT 'fr'`);
   } finally {
     client.release();
   }

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
 export type Lang = "ar" | "fr";
 
@@ -190,12 +190,30 @@ interface I18nContextType {
 const I18nContext = createContext<I18nContextType | null>(null);
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const stored = (localStorage.getItem("gab_lang") as Lang) || "ar";
+  const stored = (localStorage.getItem("gab_lang") as Lang) || "fr";
   const [lang, setLangState] = useState<Lang>(stored);
+
+  useEffect(() => {
+    fetch("/api/user/language", { credentials: "include" })
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { language: Lang } | null) => {
+        if (data?.language && data.language !== lang) {
+          localStorage.setItem("gab_lang", data.language);
+          setLangState(data.language);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const setLang = (l: Lang) => {
     localStorage.setItem("gab_lang", l);
     setLangState(l);
+    fetch("/api/user/language", {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language: l }),
+    }).catch(() => {});
   };
 
   return (
