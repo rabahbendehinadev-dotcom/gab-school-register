@@ -53,6 +53,7 @@ router.post("/staff", requirePermission("manage_staff"), async (req, res): Promi
       fullName: parsed.data.fullName,
       role: parsed.data.role,
       ...(roleId ? { roleId } : {}),
+      ...(parsed.data.shiftType != null ? { shiftType: parsed.data.shiftType } : {}),
     })
     .returning();
 
@@ -82,6 +83,7 @@ router.patch("/staff/:id", requirePermission("manage_staff"), async (req, res): 
   if (parsed.data.role) updateData.role = parsed.data.role;
   if (parsed.data.password) updateData.passwordHash = hashPassword(parsed.data.password);
   if (req.body.roleId !== undefined) updateData.roleId = Number(req.body.roleId);
+  if ("shiftType" in parsed.data) updateData.shiftType = parsed.data.shiftType ?? null;
 
   const [staff] = await db.update(staffTable).set(updateData).where(eq(staffTable.id, params.data.id)).returning();
   if (!staff) { res.status(404).json({ error: "Staff not found" }); return; }

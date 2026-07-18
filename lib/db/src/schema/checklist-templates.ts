@@ -9,6 +9,7 @@ export const checklistTemplatesTable = pgTable("checklist_templates", {
   assignedToStaffId: integer("assigned_to_staff_id").references(() => staffTable.id, { onDelete: "set null" }),
   daysOfWeek: jsonb("days_of_week").$type<number[]>().default([0,1,2,3,4,5,6]),
   shiftType: text("shift_type"),
+  trainingCycle: text("training_cycle"),
   recurrence: text("recurrence").notNull().default("daily"),
   validFrom: timestamp("valid_from", { withTimezone: true }),
   validUntil: timestamp("valid_until", { withTimezone: true }),

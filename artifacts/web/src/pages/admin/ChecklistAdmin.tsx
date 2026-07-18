@@ -113,11 +113,12 @@ function TemplateForm({ initial, staffList, onSave, onCancel }: {
   const [assignedToStaffId, setAssignedToStaffId] = useState<number | null>(
     (initial as { assignedToStaffId?: number | null })?.assignedToStaffId ?? null
   );
-  const [shiftType, setShiftType]       = useState((initial as { shiftType?: string })?.shiftType ?? "");
-  const [validFrom, setValidFrom]       = useState((initial as { validFrom?: string })?.validFrom?.slice(0, 10) ?? "");
-  const [validUntil, setValidUntil]     = useState((initial as { validUntil?: string })?.validUntil?.slice(0, 10) ?? "");
-  const [daysOfWeek, setDaysOfWeek]     = useState<number[]>(initial?.daysOfWeek ?? [0,1,2,3,4,5,6]);
-  const [enabled, setEnabled]           = useState(initial?.enabled ?? true);
+  const [shiftType, setShiftType]         = useState((initial as { shiftType?: string })?.shiftType ?? "");
+  const [trainingCycle, setTrainingCycle] = useState((initial as { trainingCycle?: string })?.trainingCycle ?? "");
+  const [validFrom, setValidFrom]         = useState((initial as { validFrom?: string })?.validFrom?.slice(0, 10) ?? "");
+  const [validUntil, setValidUntil]       = useState((initial as { validUntil?: string })?.validUntil?.slice(0, 10) ?? "");
+  const [daysOfWeek, setDaysOfWeek]       = useState<number[]>(initial?.daysOfWeek ?? [0,1,2,3,4,5,6]);
+  const [enabled, setEnabled]             = useState(initial?.enabled ?? true);
 
   const toggleDay = (d: number) => setDaysOfWeek(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
 
@@ -175,6 +176,16 @@ function TemplateForm({ initial, staffList, onSave, onCancel }: {
             {SHIFT_TYPES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
           </select>
         </div>
+        <div>
+          <label className="text-xs font-semibold text-muted-foreground">دورة التدريب / الموسم</label>
+          <input
+            value={trainingCycle}
+            onChange={e => setTrainingCycle(e.target.value)}
+            className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+            placeholder="مثال: دفعة 2025 — الفصل الأول"
+          />
+          <p className="text-[10px] text-muted-foreground mt-0.5">حقل نصي حر — يُستخدم لتصنيف القوالب حسب الدورة أو الموسم التدريبي</p>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs font-semibold text-muted-foreground">صالح من</label>
@@ -227,6 +238,7 @@ function TemplateForm({ initial, staffList, onSave, onCancel }: {
             assignedToRole: assignedToStaffId ? null : (assignedToRole || null),
             assignedToStaffId: assignedToStaffId || null,
             shiftType: shiftType || null,
+            trainingCycle: trainingCycle || null,
             validFrom: validFrom || null,
             validUntil: validUntil || null,
             daysOfWeek,
@@ -518,6 +530,18 @@ export default function ChecklistAdmin() {
     enabled: tab === "handover",
   });
 
+  type ShiftHandoverEmployee = {
+    staffId: number;
+    staffName: string;
+    shiftType: string | null;
+    tasks: { id: number; title: string; status: string; priority: string; dueAt: string | null }[];
+  };
+  const shiftHandoverQ = useQuery<ShiftHandoverEmployee[]>({
+    queryKey: ["checklist-shift-handover"],
+    queryFn: () => apiFetch("/checklists/shift-handover"),
+    enabled: tab === "handover",
+  });
+
   const settings = settingsDraft ?? settingsQ.data;
 
   const TABS: { id: Tab; label: string; icon: typeof Users }[] = [
@@ -684,51 +708,131 @@ export default function ChecklistAdmin() {
 
           {/* Handover / Transfer Log Tab */}
           {tab === "handover" && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  سجل المهام المحوّلة بين الموظفين — {handoverQ.data?.length ?? 0} تحويل
-                </p>
-                <button
-                  onClick={() => handoverQ.refetch()}
-                  className="text-xs border border-border rounded-lg px-3 py-1.5 text-muted-foreground hover:bg-muted"
-                >
-                  تحديث
-                </button>
-              </div>
+            <div className="space-y-6">
 
-              {handoverQ.isLoading ? (
-                <div className="text-center py-10 text-muted-foreground">جاري التحميل...</div>
-              ) : (handoverQ.data?.length === 0) ? (
-                <div className="text-center py-10 text-muted-foreground">
-                  <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                  <p className="font-medium">لا توجد مهام محوّلة بعد</p>
-                  <p className="text-xs mt-1">عند إعادة تعيين مهمة من موظف لآخر تظهر هنا</p>
+              {/* ── Section 1: Shift-end incomplete task summary ─────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-foreground text-sm">📋 ملخص نهاية الوردية — مهام اليوم غير المكتملة</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">المهام المفتوحة حالياً مجمّعة حسب الموظف — يمكن تحويلها لموظف آخر</p>
+                  </div>
+                  <button
+                    onClick={() => shiftHandoverQ.refetch()}
+                    className="text-xs border border-border rounded-lg px-3 py-1.5 text-muted-foreground hover:bg-muted"
+                  >
+                    تحديث
+                  </button>
                 </div>
-              ) : (
-                <div className="space-y-2">
-                  {(handoverQ.data ?? []).map(h => (
-                    <div key={h.id} className="bg-card border border-border rounded-2xl p-4 flex items-start justify-between gap-3">
-                      <div className="space-y-1 min-w-0">
-                        <p className="font-medium text-sm text-foreground truncate">{h.title}</p>
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>📅 {h.dateKey}</span>
-                          <span>من: <span className="text-red-600 font-medium">{h.fromStaffName ?? "—"}</span></span>
-                          <span>← إلى: <span className="text-green-600 font-medium">{h.toStaffName ?? "—"}</span></span>
+
+                {shiftHandoverQ.isLoading ? (
+                  <div className="text-center py-6 text-muted-foreground">جاري التحميل...</div>
+                ) : (shiftHandoverQ.data?.length === 0) ? (
+                  <div className="text-center py-6 text-green-700 bg-green-50 border border-green-200 rounded-2xl">
+                    <p className="font-bold">✅ رائع! لا توجد مهام مفتوحة لهذا اليوم</p>
+                    <p className="text-xs mt-1 text-green-600">جميع مهام اليوم مكتملة أو ملغاة</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {(shiftHandoverQ.data ?? []).map(emp => (
+                      <div key={emp.staffId} className="bg-card border border-border rounded-2xl overflow-hidden">
+                        <div className="flex items-center justify-between bg-muted/40 px-4 py-2.5 border-b border-border">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-foreground">{emp.staffName}</span>
+                            {emp.shiftType && (
+                              <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                                {emp.shiftType === "morning" ? "☀️ صباحي" : emp.shiftType === "evening" ? "🌙 مسائي" : "🔀 مقسم"}
+                              </span>
+                            )}
+                            <span className="text-xs text-muted-foreground">{emp.tasks.length} مهام</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">تحويل إلى:</span>
+                            <select
+                              className="text-xs border border-border rounded-lg px-2 py-1 bg-background"
+                              defaultValue=""
+                              onChange={async e => {
+                                const toStaffId = parseInt(e.target.value, 10);
+                                if (isNaN(toStaffId)) return;
+                                if (!confirm(`تحويل جميع مهام ${emp.staffName} (${emp.tasks.length}) إلى الموظف المحدد؟`)) { e.target.value = ""; return; }
+                                for (const t of emp.tasks) {
+                                  await reassignAssignment.mutateAsync({ id: t.id, staffId: toStaffId });
+                                }
+                                shiftHandoverQ.refetch();
+                                e.target.value = "";
+                              }}
+                            >
+                              <option value="">— اختر —</option>
+                              {(staffQ.data ?? []).filter(s => s.id !== emp.staffId).map(s => (
+                                <option key={s.id} value={s.id}>{s.fullName}</option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+                        <div className="divide-y divide-border">
+                          {emp.tasks.map(t => (
+                            <div key={t.id} className="flex items-center justify-between px-4 py-2 text-sm">
+                              <span className="text-foreground truncate">{t.title}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${STATUS_COLORS[t.status] ?? "bg-gray-100 text-gray-600"}`}>
+                                {STATUS_LABELS[t.status] ?? t.status}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <div className="flex-shrink-0 text-right space-y-1">
-                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[h.status] ?? "bg-gray-100 text-gray-600"}`}>
-                          {STATUS_LABELS[h.status] ?? h.status}
-                        </span>
-                        {h.completedAt && (
-                          <p className="text-[10px] text-green-600">✅ منجزة</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* ── Section 2: Historical reassignment log ────────────────────── */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-foreground text-sm">🔄 سجل التحويلات السابقة</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">المهام المحوّلة بين الموظفين — {handoverQ.data?.length ?? 0} تحويل</p>
+                  </div>
+                  <button
+                    onClick={() => handoverQ.refetch()}
+                    className="text-xs border border-border rounded-lg px-3 py-1.5 text-muted-foreground hover:bg-muted"
+                  >
+                    تحديث
+                  </button>
                 </div>
-              )}
+
+                {handoverQ.isLoading ? (
+                  <div className="text-center py-10 text-muted-foreground">جاري التحميل...</div>
+                ) : (handoverQ.data?.length === 0) ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="font-medium text-sm">لا توجد مهام محوّلة بعد</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {(handoverQ.data ?? []).map(h => (
+                      <div key={h.id} className="bg-card border border-border rounded-2xl p-4 flex items-start justify-between gap-3">
+                        <div className="space-y-1 min-w-0">
+                          <p className="font-medium text-sm text-foreground truncate">{h.title}</p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>📅 {h.dateKey}</span>
+                            <span>من: <span className="text-red-600 font-medium">{h.fromStaffName ?? "—"}</span></span>
+                            <span>← إلى: <span className="text-green-600 font-medium">{h.toStaffName ?? "—"}</span></span>
+                          </div>
+                        </div>
+                        <div className="flex-shrink-0 text-right space-y-1">
+                          <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[h.status] ?? "bg-gray-100 text-gray-600"}`}>
+                            {STATUS_LABELS[h.status] ?? h.status}
+                          </span>
+                          {h.completedAt && (
+                            <p className="text-[10px] text-green-600">✅ منجزة</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 

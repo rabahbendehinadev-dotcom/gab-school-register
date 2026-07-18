@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, and, desc, or, gte, lte, inArray, isNotNull } from "drizzle-orm";
+import { eq, and, desc, or, gte, lte, inArray, isNotNull, isNull } from "drizzle-orm";
 import {
   db,
   checklistTemplatesTable,
@@ -80,6 +80,7 @@ const TemplateBody = z.object({
   assignedToStaffId: z.coerce.number().int().positive().optional().nullable(),
   daysOfWeek: z.array(z.number().int().min(0).max(6)).optional(),
   shiftType: z.string().optional().nullable(),
+  trainingCycle: z.string().optional().nullable(),
   recurrence: z.string().optional(),
   validFrom: z.string().datetime().optional().nullable(),
   validUntil: z.string().datetime().optional().nullable(),
@@ -109,7 +110,8 @@ router.post("/checklists/templates", requirePermission("manage_checklist_templat
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const values = coerceDateFields(parsed.data as Record<string, unknown>);
   const [tmpl] = await db.insert(checklistTemplatesTable).values({
-    ...(values as typeof parsed.data),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(values as any),
     createdBy: req.session.staffId,
   }).returning();
   await logActivity("checklist_template_created", `📋 قالب جديد: ${tmpl.title}`, req.session.fullName, null, { actionType: "create", entityType: "checklist_template", entityId: tmpl.id });
@@ -122,7 +124,8 @@ router.patch("/checklists/templates/:id", requirePermission("manage_checklist_te
   const parsed = TemplateBody.partial().safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
   const values = coerceDateFields(parsed.data as Record<string, unknown>);
-  const [tmpl] = await db.update(checklistTemplatesTable).set({ ...(values as typeof parsed.data), updatedAt: new Date() }).where(eq(checklistTemplatesTable.id, id)).returning();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [tmpl] = await db.update(checklistTemplatesTable).set({ ...(values as any), updatedAt: new Date() }).where(eq(checklistTemplatesTable.id, id)).returning();
   if (!tmpl) { res.status(404).json({ error: "Template not found" }); return; }
   res.json(tmpl);
 });
@@ -423,6 +426,44 @@ router.post("/checklists/assignments/:id/cancel", requirePermission("manage_chec
     .returning();
   if (!updated) { res.status(404).json({ error: "Assignment not found" }); return; }
   res.json(updated);
+});
+
+/** Shift-end handover summary — incomplete assignments for today, grouped by employee, for transfer. */
+router.get("/checklists/shift-handover", requirePermission("manage_checklist_templates"), async (_req, res): Promise<void> => {
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const incompleteStatuses = ["not_started", "in_progress", "overdue", "pending_postpone"];
+  const rows = await db
+    .select({
+      id: checklistAssignmentsTable.id,
+      title: checklistAssignmentsTable.title,
+      status: checklistAssignmentsTable.status,
+      priority: checklistAssignmentsTable.priority,
+      dueAt: checklistAssignmentsTable.dueAt,
+      staffId: checklistAssignmentsTable.staffId,
+      staffName: staffTable.fullName,
+      staffShiftType: staffTable.shiftType,
+      dateKey: checklistAssignmentsTable.dateKey,
+    })
+    .from(checklistAssignmentsTable)
+    .leftJoin(staffTable, eq(checklistAssignmentsTable.staffId, staffTable.id))
+    .where(
+      and(
+        eq(checklistAssignmentsTable.dateKey, dateKey),
+        inArray(checklistAssignmentsTable.status, incompleteStatuses),
+        isNull(checklistAssignmentsTable.cancelledAt),
+        isNull(checklistAssignmentsTable.completedAt),
+      )
+    )
+    .orderBy(staffTable.fullName, checklistAssignmentsTable.dueAt);
+  // Group by employee
+  const grouped: Record<number, { staffId: number; staffName: string; shiftType: string | null; tasks: typeof rows }> = {};
+  for (const r of rows) {
+    if (!grouped[r.staffId]) {
+      grouped[r.staffId] = { staffId: r.staffId, staffName: r.staffName ?? `#${r.staffId}`, shiftType: r.staffShiftType ?? null, tasks: [] };
+    }
+    grouped[r.staffId].tasks.push(r);
+  }
+  res.json(Object.values(grouped));
 });
 
 /** Handover / transfer log — reassigned assignments with origin staff info. */

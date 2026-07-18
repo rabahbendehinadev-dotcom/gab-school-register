@@ -150,8 +150,9 @@ async function ensureChecklistTables(): Promise<void> {
       )
     `);
     // Idempotent column additions for checklist_templates
-    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "valid_from"  timestamptz`);
-    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "valid_until" timestamptz`);
+    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "valid_from"      timestamptz`);
+    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "valid_until"     timestamptz`);
+    await client.query(`ALTER TABLE "checklist_templates" ADD COLUMN IF NOT EXISTS "training_cycle"  text`);
 
     await client.query(`
       CREATE TABLE IF NOT EXISTS "checklist_items" (

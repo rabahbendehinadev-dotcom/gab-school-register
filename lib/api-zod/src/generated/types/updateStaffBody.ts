@@ -11,4 +11,5 @@ export interface UpdateStaffBody {
   fullName?: string;
   role?: UpdateStaffBodyRole;
   password?: string;
+  shiftType?: string | null;
 }

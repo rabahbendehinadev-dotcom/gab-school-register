@@ -409,6 +409,7 @@ export const CreateStaffBody = zod.object({
   password: zod.string(),
   fullName: zod.string(),
   role: zod.string(),
+  shiftType: zod.string().optional().nullable(),
 });
 
 /**
@@ -422,6 +423,7 @@ export const UpdateStaffBody = zod.object({
   fullName: zod.string().optional(),
   role: zod.string().optional(),
   password: zod.string().optional(),
+  shiftType: zod.string().optional().nullable(),
 });
 
 export const UpdateStaffResponse = zod.object({

@@ -55,6 +55,7 @@ export interface CreateStaffBody {
   password: string;
   fullName: string;
   role: string;
+  shiftType?: string | null;
 }
 
 export type UpdateStaffBodyRole = string;
@@ -75,6 +76,7 @@ export interface UpdateStaffBody {
   fullName?: string;
   role?: string;
   password?: string;
+  shiftType?: string | null;
 }
 
 export type StudentTrainingType =

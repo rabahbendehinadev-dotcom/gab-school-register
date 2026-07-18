@@ -12,4 +12,5 @@ export interface CreateStaffBody {
   password: string;
   fullName: string;
   role: CreateStaffBodyRole;
+  shiftType?: string | null;
 }

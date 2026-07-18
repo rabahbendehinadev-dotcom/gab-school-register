@@ -171,6 +171,18 @@ export default function Staff() {
                   <Input {...createForm.register("role")} defaultValue="staff" className="rounded-xl" />
                 )}
               </div>
+              <div className="space-y-2">
+                <Label>Shift Type</Label>
+                <Select onValueChange={(v) => createForm.setValue("shiftType", v === "__none__" ? null : v)}>
+                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select shift type (optional)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None (default) —</SelectItem>
+                    <SelectItem value="morning">Morning (صباحي)</SelectItem>
+                    <SelectItem value="evening">Evening (مسائي)</SelectItem>
+                    <SelectItem value="split">Split (مقسم)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
               <Button type="submit" className="w-full rounded-xl" disabled={createMutation.isPending}>
                 {createMutation.isPending ? "Creating..." : "Create Member"}
               </Button>
@@ -257,6 +269,21 @@ export default function Staff() {
                 ) : (
                   <Input {...editForm.register("role")} className="rounded-xl" />
                 )}
+              </div>
+              <div className="space-y-2">
+                <Label>Shift Type</Label>
+                <Select
+                  defaultValue={(editMember as StaffMember & { shiftType?: string | null }).shiftType ?? "__none__"}
+                  onValueChange={(v) => editForm.setValue("shiftType", v === "__none__" ? null : v)}
+                >
+                  <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select shift type" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">— None (default) —</SelectItem>
+                    <SelectItem value="morning">Morning (صباحي)</SelectItem>
+                    <SelectItem value="evening">Evening (مسائي)</SelectItem>
+                    <SelectItem value="split">Split (مقسم)</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-2">
                 <Label>New Password (leave blank to keep current)</Label>
