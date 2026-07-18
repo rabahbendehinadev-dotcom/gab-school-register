@@ -256,6 +256,8 @@ function ItemForm({ templateId, initial, onSave, onCancel }: {
   const [priority, setPriority] = useState(initial?.priority ?? "normal");
   const [noteRequired, setNoteRequired] = useState(initial?.noteRequired ?? false);
   const [proofRequired, setProofRequired] = useState(initial?.proofRequired ?? false);
+  const [resultRequired, setResultRequired] = useState((initial as { resultRequired?: boolean })?.resultRequired ?? false);
+  const [studentRequired, setStudentRequired] = useState((initial as { studentRequired?: boolean })?.studentRequired ?? false);
   const [offsetMinutes, setOffsetMinutes] = useState(String(initial?.offsetMinutes ?? 0));
 
   return (
@@ -280,7 +282,7 @@ function ItemForm({ templateId, initial, onSave, onCancel }: {
         <label className="text-xs font-semibold text-muted-foreground">الوصف</label>
         <input value={description} onChange={e => setDescription(e.target.value)} className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background" placeholder="تفاصيل إضافية..." />
       </div>
-      <div className="flex gap-4">
+      <div className="flex flex-wrap gap-3">
         <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
           <input type="checkbox" checked={noteRequired} onChange={e => setNoteRequired(e.target.checked)} className="w-3.5 h-3.5" />
           ملاحظة إلزامية
@@ -289,9 +291,17 @@ function ItemForm({ templateId, initial, onSave, onCancel }: {
           <input type="checkbox" checked={proofRequired} onChange={e => setProofRequired(e.target.checked)} className="w-3.5 h-3.5" />
           إثبات إلزامي
         </label>
+        <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+          <input type="checkbox" checked={resultRequired} onChange={e => setResultRequired(e.target.checked)} className="w-3.5 h-3.5" />
+          نتيجة إلزامية
+        </label>
+        <label className="flex items-center gap-1.5 text-xs font-medium cursor-pointer">
+          <input type="checkbox" checked={studentRequired} onChange={e => setStudentRequired(e.target.checked)} className="w-3.5 h-3.5" />
+          طالب مرتبط إلزامي
+        </label>
       </div>
       <div className="flex gap-2">
-        <button onClick={() => onSave({ title, description: description || null, priority, noteRequired, proofRequired, offsetMinutes: parseInt(offsetMinutes, 10) || 0 })}
+        <button onClick={() => onSave({ title, description: description || null, priority, noteRequired, proofRequired, resultRequired, studentRequired, offsetMinutes: parseInt(offsetMinutes, 10) || 0 })}
           disabled={!title.trim()}
           className="text-xs font-bold bg-primary text-primary-foreground rounded-lg px-3 py-1.5 hover:bg-primary/90 disabled:opacity-50">
           حفظ البند

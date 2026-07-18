@@ -45,11 +45,25 @@ async function notifySupervisors(title: string, message: string, type: string): 
   await Promise.all(supervisors.map(s => notifyStaff(s.id, title, message, type)));
 }
 
-/** Returns true if the current time is within shift hours. */
-async function isWithinShiftHours(now: Date): Promise<boolean> {
+/**
+ * Returns true if `now` is within the employee's own shift window.
+ * shiftType: "morning" → global shift_start..shift_end
+ *            "evening" → shift_end..midnight (shift_end + 4h cap)
+ *            "split"   → always within shift (full day)
+ *            null/other → global shift_start..shift_end (default)
+ */
+async function isWithinEmployeeShift(now: Date, shiftType: string | null | undefined): Promise<boolean> {
   const startHour = await getSettingInt("checklist_shift_start_hour", 9);
-  const endHour   = await getSettingInt("checklist_shift_end_hour", 20);
+  const endHour   = await getSettingInt("checklist_shift_end_hour",  20);
   const h = now.getHours();
+  if (shiftType === "evening") {
+    // Evening: from endHour until midnight
+    return h >= endHour;
+  }
+  if (shiftType === "split") {
+    return true; // split-shift employees are considered "on" all day
+  }
+  // morning / null / other → global shift window
   return h >= startHour && h < endHour;
 }
 
@@ -57,14 +71,12 @@ export async function runChecklistEscalationTick(): Promise<void> {
   try {
     const now = new Date();
 
-    const reminder2Min     = await getSettingInt("checklist_reminder2_min",   15);
-    const importantMin     = await getSettingInt("checklist_important_min",   30);
-    const overdueMin       = await getSettingInt("checklist_overdue_min",     60);
-    const tlNotifyMin      = await getSettingInt("checklist_tl_notify_min",   90);
-    const aiAlertMin       = await getSettingInt("checklist_ai_alert_min",   120);
+    const reminder2Min      = await getSettingInt("checklist_reminder2_min",      15);
+    const importantMin      = await getSettingInt("checklist_important_min",      30);
+    const overdueMin        = await getSettingInt("checklist_overdue_min",        60);
+    const tlNotifyMin       = await getSettingInt("checklist_tl_notify_min",      90);
+    const aiAlertMin        = await getSettingInt("checklist_ai_alert_min",      120);
     const repeatIntervalMin = await getSettingInt("checklist_repeat_interval_min", 15);
-
-    const withinShift = await isWithinShiftHours(now);
 
     // pending_postpone stays in active reminder flow until supervisor approves/rejects
     const activeStatuses = ["not_started", "in_progress", "overdue", "pending_postpone"];
@@ -87,13 +99,27 @@ export async function runChecklistEscalationTick(): Promise<void> {
         )
       );
 
+    // Pre-load staff shiftType for per-employee shift gating
+    const staffShifts = new Map<number, string | null>();
+    const staffIds = [...new Set(active.map(a => a.staffId))];
+    if (staffIds.length > 0) {
+      const rows = await db
+        .select({ id: staffTable.id, shiftType: staffTable.shiftType })
+        .from(staffTable)
+        .where(inArray(staffTable.id, staffIds));
+      for (const r of rows) staffShifts.set(r.id, r.shiftType ?? null);
+    }
+
     for (const a of active) {
       const snoozeActive = a.snoozeUntil && new Date(a.snoozeUntil) > now;
       if (snoozeActive) continue;
 
       const minutesLate = (now.getTime() - new Date(a.dueAt).getTime()) / 60000;
+      // Per-employee shift-aware gate: only send reminders during the employee's own shift
+      const employeeShiftType = staffShifts.get(a.staffId) ?? null;
+      const withinShift = await isWithinEmployeeShift(now, employeeShiftType);
 
-      // ── Level 1: initial due reminder to assignee ──────────────────────────
+      // ── Level 1: initial due reminder to assignee ────────────────────────
       if (minutesLate < reminder2Min) {
         const lastFire = await getLastEscalationFireTime(a.id, 1);
         const shouldFire = !lastFire || (now.getTime() - lastFire.getTime()) / 60000 >= repeatIntervalMin;
@@ -108,7 +134,7 @@ export async function runChecklistEscalationTick(): Promise<void> {
         }
       }
 
-      // ── Level 2: second reminder (repeatIntervalMin interval) ─────────────
+      // ── Level 2: second reminder (repeatIntervalMin interval) ───────────
       if (minutesLate >= reminder2Min && minutesLate < importantMin) {
         const lastFire = await getLastEscalationFireTime(a.id, 2);
         const shouldFire = !lastFire || (now.getTime() - lastFire.getTime()) / 60000 >= repeatIntervalMin;
@@ -123,7 +149,7 @@ export async function runChecklistEscalationTick(): Promise<void> {
         }
       }
 
-      // ── Level 3: urgent reminder to assignee ──────────────────────────────
+      // ── Level 3: urgent reminder to assignee ─────────────────────────────
       if (minutesLate >= importantMin && minutesLate < overdueMin) {
         const lastFire = await getLastEscalationFireTime(a.id, 3);
         const shouldFire = !lastFire || (now.getTime() - lastFire.getTime()) / 60000 >= repeatIntervalMin;
@@ -138,32 +164,30 @@ export async function runChecklistEscalationTick(): Promise<void> {
         }
       }
 
-      // ── Level 4: mark overdue + continue reminding assignee ──────────────
+      // ── Level 4: mark overdue + PERSISTENT assignee reminders ────────────
       if (minutesLate >= overdueMin) {
         // Mark overdue status (idempotent)
-        if (a.status !== "overdue") {
+        if (a.status !== "overdue" && a.status !== "pending_postpone") {
           await db.update(checklistAssignmentsTable).set({ status: "overdue" }).where(eq(checklistAssignmentsTable.id, a.id));
           await logEscalation(a.id, 4, `تم تصنيف المهمة متأخرة`, a.staffId);
         }
         // Continue repeating reminders to the assignee at repeat_interval_min
-        // until the task is completed/cancelled — even after overdue threshold
-        if (minutesLate < tlNotifyMin) {
-          const lastAssigneeReminder = await getLastEscalationFireTime(a.id, 4);
-          const shouldRemind = !lastAssigneeReminder ||
-            (now.getTime() - lastAssigneeReminder.getTime()) / 60000 >= repeatIntervalMin;
-          if (shouldRemind && withinShift) {
-            await notifyStaff(a.staffId,
-              `🔴 مهمة متأخرة: ${a.title}`,
-              `تأخر ${Math.round(minutesLate)} دقيقة — المهمة لم تُنجز`,
-              "checklist_overdue"
-            );
-            await sendPushToStaff(a.staffId, {
-              title: `🔴 مهمة متأخرة`,
-              body: `${a.title} — تأخر ${Math.round(minutesLate)} دقيقة`,
-              tag: `checklist-overdue-${a.id}`,
-            }).catch(() => {});
-            await logEscalation(a.id, 4, `تذكير متأخر للموظف — ${Math.round(minutesLate)} دقيقة`, a.staffId);
-          }
+        // INDEFINITELY until task is completed/cancelled — regardless of escalation level
+        const lastAssigneeReminder = await getLastEscalationFireTime(a.id, 4);
+        const shouldRemind = !lastAssigneeReminder ||
+          (now.getTime() - lastAssigneeReminder.getTime()) / 60000 >= repeatIntervalMin;
+        if (shouldRemind && withinShift) {
+          await notifyStaff(a.staffId,
+            `🔴 مهمة متأخرة: ${a.title}`,
+            `تأخر ${Math.round(minutesLate)} دقيقة — المهمة لم تُنجز`,
+            "checklist_overdue"
+          );
+          await sendPushToStaff(a.staffId, {
+            title: `🔴 مهمة متأخرة`,
+            body: `${a.title} — تأخر ${Math.round(minutesLate)} دقيقة`,
+            tag: `checklist-overdue-${a.id}`,
+          }).catch(() => {});
+          await logEscalation(a.id, 4, `تذكير متأخر للموظف — ${Math.round(minutesLate)} دقيقة`, a.staffId);
         }
       }
 
