@@ -235,12 +235,18 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
         dueAt.setHours(baseHour, 0, 0, 0);
         dueAt.setMinutes(dueAt.getMinutes() + item.offsetMinutes);
 
-        // Warn if dueAt falls outside shift hours (log warning, do not block)
-        if (dueAt.getHours() >= shiftEnd) {
+        // Warn if dueAt falls outside shift hours — notify supervisors AND log
+        const baseHourSettingVal = await getSettingInt("checklist_shift_start_hour", 9);
+        if (dueAt.getHours() >= shiftEnd || dueAt.getHours() < baseHourSettingVal) {
           console.warn(
             `[generateDailyAssignments] Warning: item "${item.title}" (id=${item.id}) ` +
-            `dueAt ${dueAt.toISOString()} is outside shift end hour ${shiftEnd}:00`
+            `dueAt ${dueAt.toISOString()} is outside shift hours (${baseHourSettingVal}:00–${shiftEnd}:00)`
           );
+          await notifySupervisors(
+            `⚠️ مهمة خارج وقت الدوام: ${item.title}`,
+            `الوقت المقرر ${dueAt.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} يقع خارج ساعات الدوام (${baseHourSettingVal}:00 – ${shiftEnd}:00)`,
+            "checklist_out_of_shift"
+          ).catch(() => {});
         }
 
         const [existing] = await db

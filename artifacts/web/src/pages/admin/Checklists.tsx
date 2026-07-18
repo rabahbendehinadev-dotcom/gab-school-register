@@ -27,11 +27,15 @@ interface Assignment {
   priority: string;
   proofRequired: boolean;
   noteRequired: boolean;
+  resultRequired: boolean;
+  studentRequired: boolean;
   dueAt: string;
   status: string;
   startedAt: string | null;
   completedAt: string | null;
   note: string | null;
+  result: string | null;
+  proofUrl: string | null;
   snoozeCount: number;
   snoozeUntil: string | null;
 }
@@ -42,12 +46,13 @@ interface ChecklistSettings {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: typeof CheckCircle }> = {
-  not_started: { label: "لم تبدأ",    color: "text-muted-foreground", icon: Clock },
-  in_progress:  { label: "قيد التنفيذ", color: "text-blue-600",         icon: PlayCircle },
-  completed:    { label: "منجزة",      color: "text-green-600",         icon: CheckCircle },
-  overdue:      { label: "متأخرة",     color: "text-red-600",           icon: AlertTriangle },
-  postponed:    { label: "مؤجلة",      color: "text-amber-600",         icon: PauseCircle },
-  cancelled:    { label: "ملغاة",      color: "text-gray-400",          icon: XCircle },
+  not_started:      { label: "لم تبدأ",           color: "text-muted-foreground", icon: Clock },
+  in_progress:      { label: "قيد التنفيذ",        color: "text-blue-600",         icon: PlayCircle },
+  completed:        { label: "منجزة",             color: "text-green-600",         icon: CheckCircle },
+  overdue:          { label: "متأخرة",            color: "text-red-600",           icon: AlertTriangle },
+  postponed:        { label: "مؤجلة",             color: "text-amber-600",         icon: PauseCircle },
+  pending_postpone: { label: "انتظار موافقة التأجيل", color: "text-purple-600",    icon: HelpCircle },
+  cancelled:        { label: "ملغاة",             color: "text-gray-400",          icon: XCircle },
 };
 
 const PRIORITY_COLORS: Record<string, string> = {
@@ -71,15 +76,16 @@ function countdown(dueAt: string): string {
   return `متبقي ${Math.round(m / 60)} س`;
 }
 
-function CompleteModal({ assignment, settings, onClose, onSuccess }: {
+function CompleteModal({ assignment, onClose, onSuccess }: {
   assignment: Assignment;
   settings: ChecklistSettings;
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [note, setNote] = useState("");
-  const [result, setResult] = useState("");
-  const [error, setError] = useState<string[]>([]);
+  const [note, setNote]       = useState("");
+  const [result, setResult]   = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [error, setError]     = useState<string[]>([]);
   const { toast } = useToast();
 
   const completeMutation = useMutation({
@@ -87,10 +93,15 @@ function CompleteModal({ assignment, settings, onClose, onSuccess }: {
       method: "POST", body: JSON.stringify(body),
     }),
     onSuccess: () => { toast({ title: "✅ تم الإنجاز" }); onSuccess(); onClose(); },
-    onError: (err: Error) => {
+    onError: async (err: Error) => {
       try {
-        const parsed = JSON.parse(err.message.replace(/HTTP \d+/, "").trim());
-        if (Array.isArray(parsed.details)) { setError(parsed.details); return; }
+        const raw = err.message;
+        const idx = raw.indexOf("{");
+        if (idx !== -1) {
+          const parsed = JSON.parse(raw.slice(idx));
+          if (Array.isArray(parsed.details)) { setError(parsed.details); return; }
+          if (parsed.error) { setError([parsed.error]); return; }
+        }
       } catch { /* no-op */ }
       setError([err.message]);
     },
@@ -98,56 +109,68 @@ function CompleteModal({ assignment, settings, onClose, onSuccess }: {
 
   const handleSubmit = () => {
     setError([]);
-    completeMutation.mutate({ note: note || null, result: result || null });
+    completeMutation.mutate({
+      note:     note     || null,
+      result:   result   || null,
+      proofUrl: proofUrl || null,
+    });
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div dir="rtl" className="bg-card rounded-2xl border border-border shadow-2xl p-6 w-full max-w-md space-y-4">
+      <div dir="rtl" className="bg-card rounded-2xl border border-border shadow-2xl p-6 w-full max-w-md space-y-4 max-h-[90vh] overflow-y-auto">
         <h2 className="text-lg font-bold">إنجاز المهمة: {assignment.title}</h2>
+
         {error.length > 0 && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700 space-y-1">
             {error.map((e, i) => <div key={i}>• {e}</div>)}
           </div>
         )}
-        {assignment.noteRequired && (
-          <div>
-            <label className="text-sm font-medium text-foreground">الملاحظة <span className="text-red-500">*</span></label>
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className="mt-1 w-full border border-border rounded-xl p-2 text-sm resize-none bg-background"
-              rows={3}
-              placeholder="اكتب ملاحظتك هنا..."
-            />
-          </div>
-        )}
-        {!assignment.noteRequired && (
-          <div>
-            <label className="text-sm font-medium text-foreground">ملاحظة (اختياري)</label>
-            <textarea
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              className="mt-1 w-full border border-border rounded-xl p-2 text-sm resize-none bg-background"
-              rows={2}
-              placeholder="أضف ملاحظة..."
-            />
-          </div>
-        )}
+
         <div>
-          <label className="text-sm font-medium text-foreground">النتيجة (اختياري)</label>
+          <label className="text-sm font-medium text-foreground">
+            الملاحظة {assignment.noteRequired && <span className="text-red-500">*</span>}
+            {!assignment.noteRequired && <span className="text-muted-foreground font-normal"> (اختياري)</span>}
+          </label>
+          <textarea
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            className="mt-1 w-full border border-border rounded-xl p-2 text-sm resize-none bg-background"
+            rows={assignment.noteRequired ? 3 : 2}
+            placeholder={assignment.noteRequired ? "اكتب ملاحظتك هنا... (مطلوب)" : "أضف ملاحظة..."}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-foreground">
+            النتيجة {assignment.resultRequired && <span className="text-red-500">*</span>}
+            {!assignment.resultRequired && <span className="text-muted-foreground font-normal"> (اختياري)</span>}
+          </label>
           <input
             value={result}
             onChange={e => setResult(e.target.value)}
             className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
-            placeholder="صِف نتيجة المهمة..."
+            placeholder={assignment.resultRequired ? "صِف نتيجة المهمة... (مطلوب)" : "صِف نتيجة المهمة..."}
           />
         </div>
+
         {assignment.proofRequired && (
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
-            ⚠️ يتطلب هذا النوع من المهام إثبات إنجاز. يرجى رفع الإثبات من الإعدادات أو التواصل مع المشرف.
+          <div>
+            <label className="text-sm font-medium text-foreground">
+              رابط الإثبات <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={proofUrl}
+              onChange={e => setProofUrl(e.target.value)}
+              type="url"
+              className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+              placeholder="https://... (رابط صورة أو مستند)"
+              dir="ltr"
+            />
+            <p className="text-xs text-muted-foreground mt-1">ارفع الإثبات على Google Drive أو أي خدمة مشاركة ملفات ثم الصق الرابط</p>
           </div>
         )}
+
         <div className="flex gap-2 pt-2">
           <button
             onClick={handleSubmit}
@@ -261,7 +284,7 @@ export default function Checklists() {
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
-  const pending   = assignments.filter(a => ["not_started", "in_progress"].includes(a.status));
+  const pending   = assignments.filter(a => ["not_started", "in_progress", "pending_postpone"].includes(a.status));
   const overdue   = assignments.filter(a => a.status === "overdue");
   const done      = assignments.filter(a => ["completed", "cancelled", "postponed"].includes(a.status));
 
