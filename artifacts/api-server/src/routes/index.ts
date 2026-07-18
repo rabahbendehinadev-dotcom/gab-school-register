@@ -15,6 +15,8 @@ import tasksRouter from "./tasks";
 import notificationsRouter from "./notifications";
 import pushRouter from "./push";
 import studentExtrasRouter from "./student-extras";
+import rolesRouter from "./roles";
+import sessionsRouter from "./sessions";
 
 const router: IRouter = Router();
 
@@ -34,5 +36,7 @@ router.use(tasksRouter);
 router.use(notificationsRouter);
 router.use(pushRouter);
 router.use(studentExtrasRouter);
+router.use(rolesRouter);
+router.use(sessionsRouter);
 
 export default router;

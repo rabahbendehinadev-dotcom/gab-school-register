@@ -1,4 +1,4 @@
-import { pgTable, text, serial, timestamp, integer } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, timestamp, integer, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -8,6 +8,17 @@ export const activityLogsTable = pgTable("activity_logs", {
   details: text("details").notNull(),
   performedBy: text("performed_by"),
   studentId: integer("student_id"),
+  employeeId: integer("employee_id"),
+  actionType: text("action_type"),
+  entityType: text("entity_type"),
+  entityId: integer("entity_id"),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  sessionId: text("session_id"),
+  deviceType: text("device_type"),
+  os: text("os"),
+  browser: text("browser"),
+  metadata: jsonb("metadata"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

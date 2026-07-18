@@ -19,6 +19,8 @@ import Activity from "@/pages/admin/Activity";
 import Gallery from "@/pages/admin/Gallery";
 import OpenDay from "@/pages/admin/OpenDay";
 import Courses from "@/pages/admin/Courses";
+import StaffActivity from "@/pages/admin/StaffActivity";
+import RolesSettings from "@/pages/admin/RolesSettings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -39,7 +41,7 @@ function Router() {
       {/* Admin Auth */}
       <Route path="/gab-c7x2p/login" component={Login} />
       
-      {/* Admin Protected Routes wrapped in AuthProvider logic inside AdminLayout */}
+      {/* Admin Protected Routes */}
       <Route path="/gab-c7x2p" component={Dashboard} />
       <Route path="/gab-c7x2p/pipeline" component={Pipeline} />
       <Route path="/gab-c7x2p/students" component={Students} />
@@ -47,6 +49,8 @@ function Router() {
       <Route path="/gab-c7x2p/tasks" component={Tasks} />
       <Route path="/gab-c7x2p/groups" component={Groups} />
       <Route path="/gab-c7x2p/staff" component={Staff} />
+      <Route path="/gab-c7x2p/staff-activity" component={StaffActivity} />
+      <Route path="/gab-c7x2p/roles" component={RolesSettings} />
       <Route path="/gab-c7x2p/activity" component={Activity} />
       <Route path="/gab-c7x2p/gallery" component={Gallery} />
       <Route path="/gab-c7x2p/open-day" component={OpenDay} />

@@ -1,24 +1,40 @@
 import { createContext, useContext, ReactNode } from "react";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-import { useLogin, useLogout, getGetMeQueryKey, getMe } from "@workspace/api-client-react";
+import { useLogin, useLogout, getGetMeQueryKey } from "@workspace/api-client-react";
 import { useLocation } from "wouter";
 import type { StaffMember } from "@workspace/api-client-react";
 
+export type AuthUser = StaffMember & { permissions: string[] };
+
 type AuthContextType = {
-  user: StaffMember | null;
+  user: AuthUser | null;
   isLoading: boolean;
   logout: () => void;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function fetchMe(): Promise<AuthUser | null> {
+  const res = await fetch("/api/auth/me", { credentials: "include" });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return {
+    id: data.id,
+    username: data.username,
+    fullName: data.fullName,
+    role: data.role,
+    createdAt: new Date(data.createdAt),
+    permissions: Array.isArray(data.permissions) ? data.permissions : [],
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
 
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading } = useQuery<AuthUser | null>({
     queryKey: getGetMeQueryKey(),
-    queryFn: () => getMe(),
+    queryFn: fetchMe,
     retry: false,
     staleTime: Infinity,
   });

@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useEffect, useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { 
   LayoutDashboard, 
@@ -13,13 +13,41 @@ import {
   Ticket,
   BookOpen,
   ListTodo,
+  RadioTower,
+  Lock,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { usePermission } from "@/hooks/use-permission";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { useI18n } from "@/contexts/i18n-context";
 import { NotificationCenter } from "@/components/admin/NotificationCenter";
 import { PushToggleButton } from "@/components/admin/PushToggleButton";
+
+function useHeartbeat(page: string) {
+  const { user } = useAuth();
+  const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const send = () => {
+      fetch("/api/sessions/heartbeat", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ page }),
+      }).catch(() => {});
+    };
+
+    send();
+    heartbeatRef.current = setInterval(send, 45_000);
+
+    return () => {
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+    };
+  }, [user, page]);
+}
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const [location] = useLocation();
@@ -27,20 +55,34 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { lang, setLang, t } = useI18n();
 
+  useHeartbeat(location);
+
+  const canViewStudents     = user?.permissions?.includes("view_students") ?? false;
+  const canViewGroups       = user?.permissions?.includes("view_groups") ?? false;
+  const canManageTasks      = user?.permissions?.includes("manage_tasks") ?? false;
+  const canViewDashboard    = user?.permissions?.includes("view_dashboard") ?? false;
+  const canViewAuditLogs    = user?.permissions?.includes("view_audit_logs") ?? false;
+  const canManageStaff      = user?.permissions?.includes("manage_staff") ?? false;
+  const canManageRoles      = user?.permissions?.includes("manage_roles") ?? false;
+  const canViewTeamActivity = user?.permissions?.includes("view_team_activity") ?? false;
+  const isAdmin             = user?.role === "admin" || user?.role === "owner";
+
   const navItems = [
-    { href: "/gab-c7x2p", label: t.dashboard, icon: LayoutDashboard, exact: true, roles: ["admin", "manager"] },
-    { href: "/gab-c7x2p/groups", label: t.schedules, icon: Layers, roles: ["admin", "manager", "staff", "assistant"] },
-    { href: "/gab-c7x2p/students", label: t.students, icon: Users, roles: ["admin", "manager", "staff", "assistant"] },
-    { href: "/gab-c7x2p/tasks", label: t.tasks, icon: ListTodo, roles: ["admin", "manager", "staff", "assistant"] },
-    { href: "/gab-c7x2p/open-day", label: t.openDay, icon: Ticket, roles: ["admin", "manager"] },
-    { href: "/gab-c7x2p/courses", label: t.courses, icon: BookOpen, roles: ["admin", "manager"] },
-    { href: "/gab-c7x2p/gallery", label: t.gallery, icon: ImageIcon, roles: ["admin", "manager"] },
-    { href: "/gab-c7x2p/staff", label: t.staff, icon: ShieldCheck, roles: ["admin"] },
-    { href: "/gab-c7x2p/activity", label: t.activityLog, icon: Activity, roles: ["admin", "manager"] },
+    { href: "/gab-c7x2p",               label: t.dashboard,    icon: LayoutDashboard, exact: true, show: canViewDashboard || isAdmin },
+    { href: "/gab-c7x2p/groups",        label: t.schedules,    icon: Layers,          exact: false, show: canViewGroups || isAdmin },
+    { href: "/gab-c7x2p/students",      label: t.students,     icon: Users,           exact: false, show: canViewStudents || isAdmin },
+    { href: "/gab-c7x2p/tasks",         label: t.tasks,        icon: ListTodo,        exact: false, show: canManageTasks || isAdmin },
+    { href: "/gab-c7x2p/open-day",      label: t.openDay,      icon: Ticket,          exact: false, show: isAdmin },
+    { href: "/gab-c7x2p/courses",       label: t.courses,      icon: BookOpen,        exact: false, show: isAdmin },
+    { href: "/gab-c7x2p/gallery",       label: t.gallery,      icon: ImageIcon,       exact: false, show: isAdmin },
+    { href: "/gab-c7x2p/staff",         label: t.staff,        icon: ShieldCheck,     exact: false, show: canManageStaff || isAdmin },
+    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",  icon: RadioTower,      exact: false, show: canViewTeamActivity || isAdmin },
+    { href: "/gab-c7x2p/roles",         label: "الأدوار",      icon: Lock,            exact: false, show: canManageRoles || isAdmin },
+    { href: "/gab-c7x2p/activity",      label: t.activityLog,  icon: Activity,        exact: false, show: canViewAuditLogs || isAdmin },
   ];
 
   if (isLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-background text-primary">Loading...</div>;
+    return <div className="min-h-screen flex items-center justify-center bg-background text-primary">جاري التحميل...</div>;
   }
 
   if (!user) {
@@ -48,7 +90,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
-  const filteredNav = navItems.filter(item => !item.roles || item.roles.includes(user.role));
+  const filteredNav = navItems.filter(item => item.show);
 
   return (
     <div dir="ltr" className="min-h-screen bg-muted/40 flex overflow-hidden">

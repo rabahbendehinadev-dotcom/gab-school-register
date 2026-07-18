@@ -12,3 +12,5 @@ export * from "./attendance";
 export * from "./tasks";
 export * from "./notifications";
 export * from "./push-subscriptions";
+export * from "./roles";
+export * from "./staff-sessions";
