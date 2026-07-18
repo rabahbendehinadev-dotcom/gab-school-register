@@ -117,7 +117,7 @@ router.post("/sessions/end", requireAuth, async (req, res): Promise<void> => {
   res.json({ ok: true });
 });
 
-router.get("/sessions/active", requirePermission("view_team_activity"), async (_req, res): Promise<void> => {
+router.get("/sessions/active", requirePermission("manage_staff"), async (_req, res): Promise<void> => {
   const now = new Date();
   const { hour, dayOfWeek, startOfDay } = getAlgeriaDate();
   const withinWorkingHours = isWithinWorkingHours(hour, dayOfWeek);
