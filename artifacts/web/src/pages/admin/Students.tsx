@@ -88,6 +88,7 @@ export default function Students() {
   const isFr = lang === "fr";
   const { user } = useAuth();
   const canManage = user?.permissions?.includes("edit_students") ?? false;
+  const canOpenWhatsapp = user?.permissions?.includes("open_whatsapp") ?? false;
   const qc = useQueryClient();
   const { toast } = useToast();
 
@@ -360,7 +361,7 @@ export default function Students() {
         </div>
 
         {/* Bulk action bar */}
-        {selectedIds.size > 0 && (
+        {selectedIds.size > 0 && canManage && (
           <div className="flex items-center gap-3 px-5 py-2 bg-primary/5 border-b border-primary/20 flex-shrink-0">
             <span className="text-sm font-medium text-primary">
               {isFr ? `${selectedIds.size} sélectionné(s)` : `تم تحديد ${selectedIds.size} طالب`}
@@ -465,8 +466,8 @@ export default function Students() {
                       <TableCell>
                         <StageSelect
                           student={student}
-                          disabled={stageMutation.isPending}
-                          onChange={stage => stageMutation.mutate({ id: student.id, stage })}
+                          disabled={!canManage || stageMutation.isPending}
+                          onChange={stage => canManage && stageMutation.mutate({ id: student.id, stage })}
                         />
                       </TableCell>
                       <TableCell>
@@ -484,19 +485,23 @@ export default function Students() {
                               <Eye className="w-3.5 h-3.5 text-muted-foreground" />
                             </Button>
                           </Link>
-                          <a href={waLink(student)} target="_blank" rel="noopener noreferrer">
-                            <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-green-50" title="WhatsApp">
-                              <MessageCircle className="w-3.5 h-3.5 text-green-500" />
-                            </Button>
-                          </a>
+                          {canOpenWhatsapp && (
+                            <a href={waLink(student)} target="_blank" rel="noopener noreferrer">
+                              <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-green-50" title="WhatsApp">
+                                <MessageCircle className="w-3.5 h-3.5 text-green-500" />
+                              </Button>
+                            </a>
+                          )}
                           {canManage && (
                             <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Groupe" : "المجموعة"} onClick={() => setGroupDialogStudent(student)}>
                               <Users className="w-3.5 h-3.5 text-muted-foreground" />
                             </Button>
                           )}
+                          {canManage && (
                           <Button variant="ghost" size="icon" className="w-7 h-7 rounded-lg" title={isFr ? "Modifier" : "تعديل"} onClick={() => setDetailStudent(student)}>
                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                           </Button>
+                          )}
                           {canManage && (
                             <Button
                               variant="ghost" size="icon" className="w-7 h-7 rounded-lg hover:bg-destructive/10 hover:text-destructive"

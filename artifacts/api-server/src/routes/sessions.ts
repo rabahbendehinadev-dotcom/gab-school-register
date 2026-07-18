@@ -68,6 +68,7 @@ router.post("/sessions/heartbeat", requireAuth, async (req, res): Promise<void> 
        VALUES ($1, $2, now(), now(), now(), $3, $4, $5, $6, $7, true)
        ON CONFLICT (session_token) DO UPDATE SET
          last_heartbeat_at = now(),
+         last_action_at = now(),
          current_page = EXCLUDED.current_page,
          current_student_id = EXCLUDED.current_student_id,
          device_type = EXCLUDED.device_type,

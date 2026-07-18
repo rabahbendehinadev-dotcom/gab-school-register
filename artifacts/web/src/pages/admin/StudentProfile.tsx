@@ -3,6 +3,7 @@ import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/AdminLayout";
 import { PermissionGuard } from "@/components/admin/PermissionGuard";
+import { useAuth } from "@/hooks/use-auth";
 import { useI18n } from "@/contexts/i18n-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -101,16 +102,26 @@ export default function StudentProfile() {
     </AdminLayout>
   );
 
+  const { user } = useAuth();
+  const perms = user?.permissions ?? [];
+  const canEdit = perms.includes("edit_students");
+  const canCall = perms.includes("call_students");
+  const canWhatsapp = perms.includes("open_whatsapp");
+  const canContact = perms.includes("contact_students");
+  const canAddNotes = perms.includes("add_notes");
+  const canPayments = perms.includes("view_payments");
+
   const stageMeta = STAGES.find((s) => s.value === student.stage);
   const payMeta = PAY_STATUS[student.paymentStatus] ?? PAY_STATUS.unpaid;
 
-  const tabs: { key: Tab; ar: string; fr: string; icon: typeof User }[] = [
+  const allTabs: { key: Tab; ar: string; fr: string; icon: typeof User; perm?: string }[] = [
     { key: "info", ar: "المعلومات", fr: "Infos", icon: User },
     { key: "timeline", ar: "السجل", fr: "Historique", icon: History },
-    { key: "notes", ar: "الملاحظات", fr: "Notes", icon: StickyNote },
-    { key: "attendance", ar: "الحضور", fr: "Présence", icon: CalendarCheck },
-    { key: "payments", ar: "المدفوعات", fr: "Paiements", icon: DollarSign },
+    { key: "notes", ar: "الملاحظات", fr: "Notes", icon: StickyNote, perm: "add_notes" },
+    { key: "attendance", ar: "الحضور", fr: "Présence", icon: CalendarCheck, perm: "edit_students" },
+    { key: "payments", ar: "المدفوعات", fr: "Paiements", icon: DollarSign, perm: "view_payments" },
   ];
+  const tabs = allTabs.filter(tb => !tb.perm || perms.includes(tb.perm));
 
   return (
     <AdminLayout>
@@ -137,15 +148,16 @@ export default function StudentProfile() {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <a href={`tel:${student.phone}`} onClick={() => fetch("/api/activity/track", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "call_click", studentId: student.id, studentName: `${student.firstName} ${student.lastName}` }) })} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors"><Phone className="w-4 h-4" />{isFr ? "Appeler" : "اتصال"}</a>
-              <a href={waLink(student.whatsapp)} target="_blank" rel="noreferrer" onClick={() => fetch("/api/activity/track", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "whatsapp_click", studentId: student.id, studentName: `${student.firstName} ${student.lastName}` }) })} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors"><MessageCircle className="w-4 h-4" />WhatsApp</a>
-              <Button onClick={() => contactMutation.mutate()} disabled={contactMutation.isPending} variant="outline" className="rounded-xl">
+              {canCall && <a href={`tel:${student.phone}`} onClick={() => fetch("/api/activity/track", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "call_click", studentId: student.id, studentName: `${student.firstName} ${student.lastName}` }) })} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 text-blue-700 text-sm font-semibold hover:bg-blue-100 transition-colors"><Phone className="w-4 h-4" />{isFr ? "Appeler" : "اتصال"}</a>}
+              {canWhatsapp && <a href={waLink(student.whatsapp)} target="_blank" rel="noreferrer" onClick={() => fetch("/api/activity/track", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "whatsapp_click", studentId: student.id, studentName: `${student.firstName} ${student.lastName}` }) })} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-green-50 text-green-700 text-sm font-semibold hover:bg-green-100 transition-colors"><MessageCircle className="w-4 h-4" />WhatsApp</a>}
+              {canContact && <Button onClick={() => contactMutation.mutate()} disabled={contactMutation.isPending} variant="outline" className="rounded-xl">
                 <PhoneCall className="w-4 h-4 mr-1" />{isFr ? "Suivi" : "تسجيل تواصل"}
-              </Button>
+              </Button>}
             </div>
           </div>
 
           {/* Stage quick switch */}
+          {canEdit && (
           <div className="flex items-center gap-2 mt-4 pt-4 border-t border-border/50 flex-wrap">
             <span className="text-xs font-semibold text-muted-foreground">{isFr ? "Changer l'étape:" : "تغيير المرحلة:"}</span>
             {STAGES.map((s) => (
@@ -155,6 +167,7 @@ export default function StudentProfile() {
               </button>
             ))}
           </div>
+          )}
         </div>
 
         {/* Tabs */}
