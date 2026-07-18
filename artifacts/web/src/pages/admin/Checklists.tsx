@@ -76,17 +76,35 @@ function countdown(dueAt: string): string {
   return `متبقي ${Math.round(m / 60)} س`;
 }
 
+interface Student { id: number; firstName: string; lastName: string; }
+
 function CompleteModal({ assignment, onClose, onSuccess }: {
   assignment: Assignment;
   settings: ChecklistSettings;
   onClose: () => void;
   onSuccess: () => void;
 }) {
-  const [note, setNote]       = useState("");
-  const [result, setResult]   = useState("");
+  const [note, setNote]         = useState("");
+  const [result, setResult]     = useState("");
   const [proofUrl, setProofUrl] = useState("");
-  const [error, setError]     = useState<string[]>([]);
+  const [studentId, setStudentId] = useState<number | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [error, setError]       = useState<string[]>([]);
   const { toast } = useToast();
+
+  const studentsQ = useQuery<Student[]>({
+    queryKey: ["students-active"],
+    queryFn: () => apiFetch("/students?limit=500"),
+    enabled: assignment.studentRequired,
+    select: (data: unknown) => {
+      const arr = Array.isArray(data) ? data : ((data as { students?: Student[] })?.students ?? []);
+      return arr as Student[];
+    },
+  });
+
+  const filteredStudents = (studentsQ.data ?? []).filter(s =>
+    !studentSearch.trim() || `${s.firstName} ${s.lastName}`.includes(studentSearch)
+  );
 
   const completeMutation = useMutation({
     mutationFn: (body: object) => apiFetch(`/checklists/assignments/${assignment.id}/complete`, {
@@ -110,9 +128,10 @@ function CompleteModal({ assignment, onClose, onSuccess }: {
   const handleSubmit = () => {
     setError([]);
     completeMutation.mutate({
-      note:     note     || null,
-      result:   result   || null,
-      proofUrl: proofUrl || null,
+      note:      note      || null,
+      result:    result    || null,
+      proofUrl:  proofUrl  || null,
+      studentId: studentId || null,
     });
   };
 
@@ -168,6 +187,42 @@ function CompleteModal({ assignment, onClose, onSuccess }: {
               dir="ltr"
             />
             <p className="text-xs text-muted-foreground mt-1">ارفع الإثبات على Google Drive أو أي خدمة مشاركة ملفات ثم الصق الرابط</p>
+          </div>
+        )}
+
+        {assignment.studentRequired && (
+          <div>
+            <label className="text-sm font-medium text-foreground">
+              الطالب المرتبط <span className="text-red-500">*</span>
+            </label>
+            <input
+              value={studentSearch}
+              onChange={e => { setStudentSearch(e.target.value); setStudentId(null); }}
+              className="mt-1 w-full border border-border rounded-xl p-2 text-sm bg-background"
+              placeholder="ابحث باسم الطالب..."
+            />
+            {studentId && (
+              <p className="text-xs text-green-600 mt-1">
+                ✅ {filteredStudents.find(s => s.id === studentId) ? `${filteredStudents.find(s => s.id === studentId)!.firstName} ${filteredStudents.find(s => s.id === studentId)!.lastName}` : `طالب #${studentId}`}
+              </p>
+            )}
+            {studentSearch.trim() && !studentId && filteredStudents.length > 0 && (
+              <div className="border border-border rounded-xl bg-card mt-1 max-h-36 overflow-y-auto shadow-lg">
+                {filteredStudents.slice(0, 8).map(s => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => { setStudentId(s.id); setStudentSearch(`${s.firstName} ${s.lastName}`); }}
+                    className="w-full text-right px-3 py-2 text-sm hover:bg-muted"
+                  >
+                    {s.firstName} {s.lastName}
+                  </button>
+                ))}
+              </div>
+            )}
+            {studentSearch.trim() && !studentId && filteredStudents.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-1">لا يوجد طالب بهذا الاسم</p>
+            )}
           </div>
         )}
 

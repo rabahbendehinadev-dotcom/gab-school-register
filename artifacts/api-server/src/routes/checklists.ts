@@ -30,20 +30,26 @@ const CHECKLIST_SETTING_KEYS = [
   "checklist_shift_start_hour",
   "checklist_shift_end_hour",
   "checklist_repeat_interval_min",
+  "checklist_owner_staff_id",
+  "checklist_default_note_required",
+  "checklist_default_proof_required",
 ] as const;
 
 const CHECKLIST_SETTING_DEFAULTS: Record<string, string> = {
-  checklist_reminder2_min:      "15",
-  checklist_important_min:      "30",
-  checklist_overdue_min:        "60",
-  checklist_tl_notify_min:      "90",
-  checklist_ai_alert_min:       "120",
-  checklist_snooze_options:     "10,30,60",
-  checklist_max_snooze_count:   "3",
-  checklist_base_hour:          "9",
-  checklist_shift_start_hour:   "9",
-  checklist_shift_end_hour:     "20",
-  checklist_repeat_interval_min:"15",
+  checklist_reminder2_min:          "15",
+  checklist_important_min:          "30",
+  checklist_overdue_min:            "60",
+  checklist_tl_notify_min:          "90",
+  checklist_ai_alert_min:           "120",
+  checklist_snooze_options:         "10,30,60",
+  checklist_max_snooze_count:       "3",
+  checklist_base_hour:              "9",
+  checklist_shift_start_hour:       "9",
+  checklist_shift_end_hour:         "20",
+  checklist_repeat_interval_min:    "15",
+  checklist_owner_staff_id:         "0",
+  checklist_default_note_required:  "false",
+  checklist_default_proof_required: "false",
 };
 
 router.get("/checklists/settings", requirePermission("view_dashboard"), async (_req, res): Promise<void> => {

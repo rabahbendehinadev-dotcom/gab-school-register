@@ -67,6 +67,13 @@ interface ChecklistSettings {
   checklist_ai_alert_min: string;
   checklist_snooze_options: string;
   checklist_max_snooze_count: string;
+  checklist_base_hour: string;
+  checklist_shift_start_hour: string;
+  checklist_shift_end_hour: string;
+  checklist_repeat_interval_min: string;
+  checklist_owner_staff_id: string;
+  checklist_default_note_required: string;
+  checklist_default_proof_required: string;
 }
 
 const DAYS = ["أحد", "اثنين", "ثلاثاء", "أربعاء", "خميس", "جمعة", "سبت"];
@@ -387,6 +394,25 @@ export default function ChecklistAdmin() {
     onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
   });
 
+  const reassignAssignment = useMutation({
+    mutationFn: ({ id, staffId }: { id: number; staffId: number }) =>
+      apiFetch(`/checklists/assignments/${id}/reassign`, { method: "POST", body: JSON.stringify({ staffId }) }),
+    onSuccess: () => { toast({ title: "🔄 تم إعادة التعيين" }); qc.invalidateQueries({ queryKey: ["checklist-assignments", assignmentDate] }); qc.invalidateQueries({ queryKey: ["checklist-handover-log"] }); },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const approvePostpone = useMutation({
+    mutationFn: (id: number) => apiFetch(`/checklists/assignments/${id}/approve-postpone`, { method: "POST" }),
+    onSuccess: () => { toast({ title: "✅ تم الموافقة على التأجيل" }); qc.invalidateQueries({ queryKey: ["checklist-assignments", assignmentDate] }); },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
+  const rejectPostpone = useMutation({
+    mutationFn: (id: number) => apiFetch(`/checklists/assignments/${id}/reject-postpone`, { method: "POST" }),
+    onSuccess: () => { toast({ title: "❌ تم رفض التأجيل" }); qc.invalidateQueries({ queryKey: ["checklist-assignments", assignmentDate] }); },
+    onError: (err: Error) => toast({ title: err.message, variant: "destructive" }),
+  });
+
   const handoverQ = useQuery<HandoverEntry[]>({
     queryKey: ["checklist-handover-log"],
     queryFn: () => apiFetch("/checklists/handover-log"),
@@ -518,15 +544,34 @@ export default function ChecklistAdmin() {
                             {new Date(a.dueAt).toLocaleTimeString("ar-DZ", { hour: "2-digit", minute: "2-digit" })}
                           </td>
                           <td className="p-3 text-xs text-center text-muted-foreground">{a.snoozeCount}</td>
-                          <td className="p-3">
-                            {!["completed", "cancelled"].includes(a.status) && (
-                              <button
-                                onClick={() => cancelAssignment.mutate(a.id)}
-                                className="text-[10px] text-red-600 hover:underline"
-                              >
-                                إلغاء
-                              </button>
-                            )}
+                            <td className="p-3">
+                            <div className="flex flex-col gap-1 items-start">
+                              {a.status === "pending_postpone" && (
+                                <>
+                                  <button onClick={() => approvePostpone.mutate(a.id)} className="text-[10px] text-green-600 hover:underline font-medium">✅ موافقة</button>
+                                  <button onClick={() => rejectPostpone.mutate(a.id)} className="text-[10px] text-red-500 hover:underline">❌ رفض</button>
+                                </>
+                              )}
+                              {!["completed", "cancelled"].includes(a.status) && a.status !== "pending_postpone" && (
+                                <>
+                                  <select
+                                    defaultValue=""
+                                    onChange={e => {
+                                      const sid = parseInt(e.target.value, 10);
+                                      if (sid > 0) reassignAssignment.mutate({ id: a.id, staffId: sid });
+                                      e.target.value = "";
+                                    }}
+                                    className="text-[10px] border border-border rounded-lg px-1 py-0.5 bg-background text-muted-foreground"
+                                  >
+                                    <option value="">🔄 تعيين</option>
+                                    {(staffQ.data ?? []).filter(s => s.id !== a.staffId).map(s => (
+                                      <option key={s.id} value={s.id}>{s.fullName}</option>
+                                    ))}
+                                  </select>
+                                  <button onClick={() => cancelAssignment.mutate(a.id)} className="text-[10px] text-red-600 hover:underline">إلغاء</button>
+                                </>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -635,6 +680,52 @@ export default function ChecklistAdmin() {
                         onChange={e => setSettingsDraft(prev => ({ ...(prev ?? settings!), checklist_max_snooze_count: e.target.value }))}
                         className="w-full border border-border rounded-xl p-2 text-sm bg-background"
                       />
+                    </div>
+
+                    {[
+                      { key: "checklist_base_hour",          label: "ساعة بداية اليوم", hint: "ساعة توليد المهام اليومية (0-23)" },
+                      { key: "checklist_shift_start_hour",   label: "بداية الوردية", hint: "الساعة التي تبدأ فيها الوردية (0-23)" },
+                      { key: "checklist_shift_end_hour",     label: "نهاية الوردية", hint: "الساعة التي تنتهي فيها الوردية (0-23)" },
+                      { key: "checklist_repeat_interval_min",label: "تكرار الإشعار (دقائق)", hint: "الفاصل الزمني بين الإشعارات المتكررة" },
+                      { key: "checklist_owner_staff_id",     label: "معرّف المسؤول (L6)", hint: "staff_id الموظف المسؤول لتلقي تنبيه AI Control — 0 يعني جميع المشرفين" },
+                    ].map(({ key, label, hint }) => (
+                      <div key={key}>
+                        <label className="text-xs font-semibold text-foreground">{label}</label>
+                        <p className="text-[10px] text-muted-foreground mb-1">{hint}</p>
+                        <input
+                          type="number"
+                          min={0}
+                          value={(settingsDraft ?? settings)[key as keyof ChecklistSettings]}
+                          onChange={e => setSettingsDraft(prev => ({ ...(prev ?? settings!), [key]: e.target.value }))}
+                          className="w-full border border-border rounded-xl p-2 text-sm bg-background"
+                        />
+                      </div>
+                    ))}
+
+                    <div>
+                      <label className="text-xs font-semibold text-foreground">الملاحظة مطلوبة افتراضياً</label>
+                      <p className="text-[10px] text-muted-foreground mb-1">قيمة افتراضية عند إنشاء بنود جديدة</p>
+                      <select
+                        value={(settingsDraft ?? settings).checklist_default_note_required}
+                        onChange={e => setSettingsDraft(prev => ({ ...(prev ?? settings!), checklist_default_note_required: e.target.value }))}
+                        className="w-full border border-border rounded-xl p-2 text-sm bg-background"
+                      >
+                        <option value="false">لا</option>
+                        <option value="true">نعم</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-semibold text-foreground">الإثبات مطلوب افتراضياً</label>
+                      <p className="text-[10px] text-muted-foreground mb-1">قيمة افتراضية عند إنشاء بنود جديدة</p>
+                      <select
+                        value={(settingsDraft ?? settings).checklist_default_proof_required}
+                        onChange={e => setSettingsDraft(prev => ({ ...(prev ?? settings!), checklist_default_proof_required: e.target.value }))}
+                        className="w-full border border-border rounded-xl p-2 text-sm bg-background"
+                      >
+                        <option value="false">لا</option>
+                        <option value="true">نعم</option>
+                      </select>
                     </div>
                   </div>
 

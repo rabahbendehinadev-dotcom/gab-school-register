@@ -179,12 +179,20 @@ export async function runChecklistEscalationTick(): Promise<void> {
       if (minutesLate >= aiAlertMin) {
         const lastFire = await getLastEscalationFireTime(a.id, 6);
         if (!lastFire) {
-          await sendPushToAdmins({
+          const pushPayload = {
             title: `🚨 AI Control: مهمة متأخرة جداً`,
             body: `${a.title} — تأخر ${Math.round(minutesLate)} دقيقة بدون إنجاز`,
             tag: `checklist-ai-alert-${a.id}`,
-          }, 3).catch(() => {});
-          await logEscalation(a.id, 6, `تنبيه AI Control أُرسل للمالك`, a.staffId);
+          };
+          // Try targeted owner push first; fall back to all admins
+          const ownerStaffId = await getSettingInt("checklist_owner_staff_id", 0);
+          if (ownerStaffId > 0) {
+            await sendPushToStaff(ownerStaffId, pushPayload).catch(() => {});
+            await notifyStaff(ownerStaffId, pushPayload.title, pushPayload.body, "checklist_ai_alert");
+          } else {
+            await sendPushToAdmins(pushPayload, 3).catch(() => {});
+          }
+          await logEscalation(a.id, 6, `تنبيه AI Control أُرسل للمالك`, ownerStaffId || a.staffId);
         }
       }
     }
