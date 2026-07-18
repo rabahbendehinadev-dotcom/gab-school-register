@@ -124,6 +124,7 @@ async function ensureStaffRoleIdColumn(): Promise<void> {
   const client = await pool.connect();
   try {
     await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "role_id" integer`);
+    await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "shift_type" text`);
   } finally {
     client.release();
   }

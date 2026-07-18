@@ -9,6 +9,7 @@ export const staffTable = pgTable("staff", {
   fullName: text("full_name").notNull(),
   role: text("role").notNull().default("staff"),
   roleId: integer("role_id"),
+  shiftType: text("shift_type"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 

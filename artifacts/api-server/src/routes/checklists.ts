@@ -178,7 +178,9 @@ router.delete("/checklists/items/:id", requirePermission("manage_tasks"), async 
 router.post("/checklists/generate", requireAuth, async (req, res): Promise<void> => {
   const staffId = req.session.staffId!;
   const role = req.session.role ?? "staff";
-  await generateDailyAssignments(staffId, role);
+  // Fetch staff's own shiftType for shift-aware generation
+  const [staffRow] = await db.select({ shiftType: staffTable.shiftType }).from(staffTable).where(eq(staffTable.id, staffId));
+  await generateDailyAssignments(staffId, role, staffRow?.shiftType ?? null);
   res.json({ success: true });
 });
 

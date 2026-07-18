@@ -211,8 +211,10 @@ export async function runChecklistEscalationTick(): Promise<void> {
   }
 }
 
-/** Generate assignments for a given staff member today (idempotent via dateKey). */
-export async function generateDailyAssignments(staffId: number, staffRole: string): Promise<void> {
+/** Generate assignments for a given staff member today (idempotent via dateKey).
+ *  staffShiftType: the employee's own shift (morning/evening/split/null = no shift assigned).
+ */
+export async function generateDailyAssignments(staffId: number, staffRole: string, staffShiftType?: string | null): Promise<void> {
   try {
     const { checklistTemplatesTable, checklistItemsTable } = await import("@workspace/db");
     const { eq: eqT, and: andT, or: orT, isNull: isNullT, lte: lteT, gte: gteT } = await import("drizzle-orm");
@@ -221,8 +223,9 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
     const dateKey = today.toISOString().slice(0, 10);
     const dayOfWeek = today.getDay();
 
-    const baseHour    = await getSettingInt("checklist_base_hour",        9);
-    const shiftEnd    = await getSettingInt("checklist_shift_end_hour",  20);
+    const baseHour = await getSettingInt("checklist_base_hour",        9);
+    const shiftEnd = await getSettingInt("checklist_shift_end_hour",  20);
+    const shiftStart = await getSettingInt("checklist_shift_start_hour", 9);
 
     const templates = await db
       .select()
@@ -240,13 +243,21 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
 
       // Targeting: specific staff wins over role; role wins over "all"
       if (tmpl.assignedToStaffId !== null && tmpl.assignedToStaffId !== undefined) {
-        // Template is for a specific employee only
         if (tmpl.assignedToStaffId !== staffId) continue;
       } else if (tmpl.assignedToRole) {
-        // Template is for a role — skip staff that don't match
         if (tmpl.assignedToRole !== staffRole) continue;
       }
       // else: no targeting → generate for all active staff
+
+      // ── Shift-type filtering ────────────────────────────────────────────
+      // If template specifies a shiftType, only generate for staff with that shift.
+      // Staff with no shift assigned (null) match only un-targeted templates (null shiftType).
+      const tmplShift = (tmpl as { shiftType?: string | null }).shiftType;
+      if (tmplShift) {
+        // Template requires a specific shift — skip staff whose shift doesn't match
+        if (!staffShiftType || staffShiftType !== tmplShift) continue;
+      }
+      // Template shiftType null → generate for all staff regardless of shift
 
       const items = await db
         .select()
@@ -258,20 +269,7 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
         dueAt.setHours(baseHour, 0, 0, 0);
         dueAt.setMinutes(dueAt.getMinutes() + item.offsetMinutes);
 
-        // Warn if dueAt falls outside shift hours — notify supervisors AND log
-        const baseHourSettingVal = await getSettingInt("checklist_shift_start_hour", 9);
-        if (dueAt.getHours() >= shiftEnd || dueAt.getHours() < baseHourSettingVal) {
-          console.warn(
-            `[generateDailyAssignments] Warning: item "${item.title}" (id=${item.id}) ` +
-            `dueAt ${dueAt.toISOString()} is outside shift hours (${baseHourSettingVal}:00–${shiftEnd}:00)`
-          );
-          await notifySupervisors(
-            `⚠️ مهمة خارج وقت الدوام: ${item.title}`,
-            `الوقت المقرر ${dueAt.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} يقع خارج ساعات الدوام (${baseHourSettingVal}:00 – ${shiftEnd}:00)`,
-            "checklist_out_of_shift"
-          ).catch(() => {});
-        }
-
+        // ── Idempotency check first — only warn/insert for NEW assignments ──
         const [existing] = await db
           .select({ id: checklistAssignmentsTable.id })
           .from(checklistAssignmentsTable)
@@ -281,6 +279,19 @@ export async function generateDailyAssignments(staffId: number, staffRole: strin
             eqT(checklistAssignmentsTable.dateKey, dateKey),
           ));
         if (existing) continue;
+
+        // Warn only on first creation (not on every repeated /generate call)
+        if (dueAt.getHours() >= shiftEnd || dueAt.getHours() < shiftStart) {
+          console.warn(
+            `[generateDailyAssignments] Warning: item "${item.title}" (id=${item.id}) ` +
+            `dueAt ${dueAt.toISOString()} is outside shift hours (${shiftStart}:00–${shiftEnd}:00)`
+          );
+          await notifySupervisors(
+            `⚠️ مهمة خارج وقت الدوام: ${item.title}`,
+            `الوقت المقرر ${dueAt.toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" })} يقع خارج ساعات الدوام (${shiftStart}:00 – ${shiftEnd}:00)`,
+            "checklist_out_of_shift"
+          ).catch(() => {});
+        }
 
         await db.insert(checklistAssignmentsTable).values({
           templateId:      tmpl.id,
@@ -315,11 +326,11 @@ async function runDailyAutoGeneration(): Promise<void> {
 
   try {
     const activeStaff = await db
-      .select({ id: staffTable.id, role: staffTable.role })
+      .select({ id: staffTable.id, role: staffTable.role, shiftType: staffTable.shiftType })
       .from(staffTable);
 
     for (const s of activeStaff) {
-      await generateDailyAssignments(s.id, s.role ?? "");
+      await generateDailyAssignments(s.id, s.role ?? "", s.shiftType ?? null);
     }
     console.log(`[checklistScheduler] Auto-generated assignments for ${activeStaff.length} staff on ${dateKey}`);
   } catch (err) {
