@@ -151,7 +151,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const canManageRoles      = perms.includes("manage_roles");
   const canManageNotifications = perms.includes("manage_notifications");
   const canViewAiControl    = perms.includes("view_ai_control");
-  const canViewReports      = perms.includes("view_reports") || perms.includes("view_ai_control");
+  const canViewReports      = perms.includes("manage_staff") || perms.includes("view_ai_control");
 
   const { data: aiUnreadData } = useQuery<{ count: number }>({
     queryKey: ["ai-unread-count"],

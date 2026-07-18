@@ -224,7 +224,7 @@ router.put("/ai/my-notification-pref", async (req, res): Promise<void> => {
 // ── EMPLOYEE PERFORMANCE REPORTS ─────────────────────────────────────────────
 
 /** GET /ai/staff-performance?from=YYYY-MM-DD&to=YYYY-MM-DD */
-router.get("/ai/staff-performance", requireAnyPermission("view_ai_control", "view_reports"), async (req, res): Promise<void> => {
+router.get("/ai/staff-performance", requireAnyPermission("view_ai_control", "manage_staff"), async (req, res): Promise<void> => {
   const defaultTo   = new Date().toISOString().slice(0, 10);
   const defaultFrom = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
 

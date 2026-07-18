@@ -123,7 +123,7 @@ export default function Reports() {
   const [applied, setApplied] = useState({ from: daysAgo(30), to: todayStr() });
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({ key: "totalActions", dir: "desc" });
 
-  const canView = user?.permissions?.includes("view_ai_control") || user?.permissions?.includes("view_reports");
+  const canView = user?.permissions?.includes("view_ai_control") || user?.permissions?.includes("manage_staff");
   if (!canView) { navigate("/gab-c7x2p"); return null; }
 
   const { data, isLoading, refetch } = useQuery<StaffPerf[]>({
