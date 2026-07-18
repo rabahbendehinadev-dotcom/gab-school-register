@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { useI18n } from "@/contexts/i18n-context";
 import { useToast } from "@/hooks/use-toast";
 import {
@@ -169,6 +170,7 @@ export default function Tasks() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="manage_tasks">
       <div dir={isFr ? "ltr" : "rtl"} className="space-y-6 max-w-3xl mx-auto">
         <div className="flex items-center justify-between">
           <div>
@@ -246,6 +248,7 @@ export default function Tasks() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

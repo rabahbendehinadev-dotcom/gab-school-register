@@ -8,7 +8,7 @@ import {
   UpdateGalleryImageBody,
   UpdateGalleryImageResponse,
 } from "@workspace/api-zod";
-import { requireRole } from "../middlewares/auth";
+import { requirePermission } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import { objectStorageClient } from "../lib/objectStorage";
 import "../types/session";
@@ -37,11 +37,7 @@ async function uploadToGCS(buffer: Buffer, mimetype: string, originalname: strin
   const ext = originalname.split(".").pop() || "jpg";
   const objectName = `gallery/${randomUUID()}.${ext}`;
   const file = bucket.file(objectName);
-
-  await file.save(buffer, {
-    metadata: { contentType: mimetype },
-  });
-
+  await file.save(buffer, { metadata: { contentType: mimetype } });
   return `/api/gallery/image/${objectName}`;
 }
 
@@ -55,8 +51,7 @@ async function deleteFromGCS(url: string): Promise<void> {
     const file = bucket.file(objectName);
     const [exists] = await file.exists();
     if (exists) await file.delete();
-  } catch {
-  }
+  } catch { }
 }
 
 const router: IRouter = Router();
@@ -82,20 +77,12 @@ router.get(/^\/gallery\/image\/(.+)$/, async (req, res): Promise<void> => {
 });
 
 router.get("/gallery", async (_req, res): Promise<void> => {
-  const images = await db
-    .select()
-    .from(galleryImagesTable)
-    .orderBy(galleryImagesTable.sortOrder);
-
+  const images = await db.select().from(galleryImagesTable).orderBy(galleryImagesTable.sortOrder);
   res.json(ListGalleryImagesResponse.parse(images));
 });
 
-router.post("/gallery", requireRole("admin", "manager"), upload.single("image"), async (req, res): Promise<void> => {
-  if (!req.file) {
-    res.status(400).json({ error: "No image file provided" });
-    return;
-  }
-
+router.post("/gallery", requirePermission("manage_notifications"), upload.single("image"), async (req, res): Promise<void> => {
+  if (!req.file) { res.status(400).json({ error: "No image file provided" }); return; }
   let url: string;
   try {
     url = await uploadToGCS(req.file.buffer, req.file.mimetype, req.file.originalname);
@@ -104,73 +91,34 @@ router.post("/gallery", requireRole("admin", "manager"), upload.single("image"),
     res.status(500).json({ error: "Failed to upload image to storage" });
     return;
   }
-
   const caption = req.body?.caption || null;
   const sortOrder = parseInt(req.body?.sortOrder || "0", 10);
-
-  const [image] = await db
-    .insert(galleryImagesTable)
-    .values({ url, caption, sortOrder })
-    .returning();
-
+  const [image] = await db.insert(galleryImagesTable).values({ url, caption, sortOrder }).returning();
   const performer = req.session.fullName ?? "Unknown";
-  await logActivity("image_uploaded", `Gallery image uploaded: ${req.file.originalname}`, performer);
-
+  await logActivity("image_uploaded", `صورة جديدة: ${req.file.originalname}`, performer);
   res.status(201).json(image);
 });
 
-router.delete("/gallery/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+router.delete("/gallery/:id", requirePermission("manage_notifications"), async (req, res): Promise<void> => {
   const params = DeleteGalleryImageParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
-  const [image] = await db
-    .delete(galleryImagesTable)
-    .where(eq(galleryImagesTable.id, params.data.id))
-    .returning();
-
-  if (!image) {
-    res.status(404).json({ error: "Image not found" });
-    return;
-  }
-
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+  const [image] = await db.delete(galleryImagesTable).where(eq(galleryImagesTable.id, params.data.id)).returning();
+  if (!image) { res.status(404).json({ error: "Image not found" }); return; }
   deleteFromGCS(image.url).catch(() => {});
-
   const performer = req.session.fullName ?? "Unknown";
-  await logActivity("image_deleted", `Gallery image deleted`, performer);
-
+  await logActivity("image_deleted", `حذف صورة من المعرض`, performer);
   res.sendStatus(204);
 });
 
-router.patch("/gallery/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+router.patch("/gallery/:id", requirePermission("manage_notifications"), async (req, res): Promise<void> => {
   const params = UpdateGalleryImageParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
-
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
   const parsed = UpdateGalleryImageBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
-
-  const [image] = await db
-    .update(galleryImagesTable)
-    .set(parsed.data)
-    .where(eq(galleryImagesTable.id, params.data.id))
-    .returning();
-
-  if (!image) {
-    res.status(404).json({ error: "Image not found" });
-    return;
-  }
-
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
+  const [image] = await db.update(galleryImagesTable).set(parsed.data).where(eq(galleryImagesTable.id, params.data.id)).returning();
+  if (!image) { res.status(404).json({ error: "Image not found" }); return; }
   const performer = req.session.fullName ?? "Unknown";
-  await logActivity("image_updated", `Gallery image metadata updated (id: ${image.id})`, performer);
-
+  await logActivity("image_updated", `تحديث صورة في المعرض (${image.id})`, performer);
   res.json(UpdateGalleryImageResponse.parse(image));
 });
 

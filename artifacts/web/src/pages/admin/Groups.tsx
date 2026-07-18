@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import {
   useListStudents,
   useListGroups,
@@ -574,6 +575,7 @@ export default function Groups() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="view_groups">
       {/* ── Top bar ── */}
       <div className="flex items-center gap-2 mb-5 flex-wrap">
         {/* Group selector */}
@@ -982,6 +984,7 @@ export default function Groups() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { 
   useListStaff, useCreateStaff, useUpdateStaff, useDeleteStaff, getListStaffQueryKey,
   type CreateStaffBody, type UpdateStaffBody, type StaffMember,
@@ -83,6 +84,7 @@ export default function Staff() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="manage_staff">
       <div className="flex justify-between items-center mb-8">
         <div>
           <h2 className="text-2xl font-bold">Staff Management</h2>
@@ -207,6 +209,7 @@ export default function Staff() {
           )}
         </DialogContent>
       </Dialog>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

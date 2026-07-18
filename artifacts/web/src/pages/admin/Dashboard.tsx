@@ -1,4 +1,5 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { useGetDashboardStats, useListActivity } from "@workspace/api-client-react";
 import { Users, UserPlus, PhoneCall, CheckCircle, XCircle, Archive, Layers, FolderOpen, CalendarDays, Save, Wallet, Banknote, Target, AlertCircle, GraduationCap } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -230,6 +231,7 @@ export default function Dashboard() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="view_dashboard">
       {/* ERP metrics + journey funnel */}
       <ErpMetrics />
 
@@ -281,6 +283,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

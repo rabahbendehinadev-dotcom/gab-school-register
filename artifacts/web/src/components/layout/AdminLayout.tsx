@@ -31,12 +31,15 @@ function useHeartbeat(page: string) {
   useEffect(() => {
     if (!user) return;
 
+    const studentMatch = page.match(/^\/gab-c7x2p\/students\/(\d+)/);
+    const studentId = studentMatch ? Number(studentMatch[1]) : undefined;
+
     const send = () => {
       fetch("/api/sessions/heartbeat", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ page }),
+        body: JSON.stringify({ page, ...(studentId ? { studentId } : {}) }),
       }).catch(() => {});
     };
 

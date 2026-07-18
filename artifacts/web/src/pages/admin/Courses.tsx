@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -89,6 +90,7 @@ export default function Courses() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="manage_notifications">
       <div dir="ltr" className="max-w-3xl mx-auto py-8 px-4 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -228,6 +230,7 @@ export default function Courses() {
           </div>
         )}
       </div>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

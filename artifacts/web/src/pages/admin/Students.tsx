@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { useI18n } from "@/contexts/i18n-context";
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -219,6 +220,7 @@ export default function Students() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="view_students">
       <div dir="rtl" className="flex flex-col h-[calc(100vh-8rem)] bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
 
         {/* Header */}
@@ -527,6 +529,7 @@ export default function Students() {
         onSave={(id, data) => updateMutation.mutate({ id, data })}
         isPending={updateMutation.isPending}
       />
+      </PermissionGuard>
     </AdminLayout>
   );
 }

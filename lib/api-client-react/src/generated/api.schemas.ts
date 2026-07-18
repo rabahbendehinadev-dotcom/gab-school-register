@@ -14,54 +14,66 @@ export interface LoginBody {
   password: string;
 }
 
-export type StaffMemberRole =
-  (typeof StaffMemberRole)[keyof typeof StaffMemberRole];
+export type StaffMemberRole = string;
 
 export const StaffMemberRole = {
   admin: "admin",
   manager: "manager",
   assistant: "assistant",
   staff: "staff",
+  owner: "owner",
+  team_leader: "team_leader",
+  sales_agent: "sales_agent",
+  instructor: "instructor",
+  support: "support",
 } as const;
 
 export interface StaffMember {
   id: number;
   username: string;
   fullName: string;
-  role: StaffMemberRole;
+  role: string;
   createdAt: string;
 }
 
-export type CreateStaffBodyRole =
-  (typeof CreateStaffBodyRole)[keyof typeof CreateStaffBodyRole];
+export type CreateStaffBodyRole = string;
 
 export const CreateStaffBodyRole = {
   admin: "admin",
   manager: "manager",
   assistant: "assistant",
   staff: "staff",
+  owner: "owner",
+  team_leader: "team_leader",
+  sales_agent: "sales_agent",
+  instructor: "instructor",
+  support: "support",
 } as const;
 
 export interface CreateStaffBody {
   username: string;
   password: string;
   fullName: string;
-  role: CreateStaffBodyRole;
+  role: string;
 }
 
-export type UpdateStaffBodyRole =
-  (typeof UpdateStaffBodyRole)[keyof typeof UpdateStaffBodyRole];
+export type UpdateStaffBodyRole = string;
 
 export const UpdateStaffBodyRole = {
   admin: "admin",
   manager: "manager",
   assistant: "assistant",
   staff: "staff",
+  owner: "owner",
+  team_leader: "team_leader",
+  sales_agent: "sales_agent",
+  instructor: "instructor",
+  support: "support",
 } as const;
 
 export interface UpdateStaffBody {
   fullName?: string;
-  role?: UpdateStaffBodyRole;
+  role?: string;
   password?: string;
 }
 

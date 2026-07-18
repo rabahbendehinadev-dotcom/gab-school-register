@@ -23,7 +23,7 @@ async function fetchMe(): Promise<AuthUser | null> {
     username: data.username,
     fullName: data.fullName,
     role: data.role,
-    createdAt: new Date(data.createdAt),
+    createdAt: data.createdAt,
     permissions: Array.isArray(data.permissions) ? data.permissions : [],
   };
 }

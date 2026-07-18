@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { 
   useListGalleryImages, useDeleteGalleryImage, useUpdateGalleryImage, 
   getListGalleryImagesQueryKey, type GalleryImage 
@@ -101,6 +102,7 @@ export default function Gallery() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="manage_notifications">
       <div className="flex justify-between items-end mb-8">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
@@ -197,6 +199,7 @@ export default function Gallery() {
           )}
         </DialogContent>
       </Dialog>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

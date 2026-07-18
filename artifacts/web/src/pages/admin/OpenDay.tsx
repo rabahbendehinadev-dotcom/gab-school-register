@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { useToast } from "@/hooks/use-toast";
 import { Calendar, Users, Clock, Power, Settings2, Trash2, Download, Eye, EyeOff } from "lucide-react";
 
@@ -128,6 +129,7 @@ export default function OpenDay() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="manage_notifications">
       <div dir="rtl" className="max-w-4xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
@@ -321,6 +323,7 @@ export default function OpenDay() {
           )}
         </div>
       </div>
+      </PermissionGuard>
     </AdminLayout>
   );
 }
