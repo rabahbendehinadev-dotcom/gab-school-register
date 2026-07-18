@@ -35,10 +35,11 @@ async function generateDerivedNotifications(): Promise<void> {
   }
 }
 
-const SUPERVISOR_PERMISSIONS = ["manage_staff", "manage_tasks"];
-
 function isSupervisor(perms: string[]): boolean {
-  return SUPERVISOR_PERMISSIONS.some(p => perms.includes(p));
+  // Only manage_staff (admin / team_leader) grants supervisor-level
+  // notification visibility. manage_tasks is held by regular staff and
+  // must NOT confer cross-user read access.
+  return perms.includes("manage_staff");
 }
 
 router.get("/notifications", requirePermission("view_dashboard"), async (req, res): Promise<void> => {
