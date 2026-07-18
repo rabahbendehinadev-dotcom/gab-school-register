@@ -166,59 +166,70 @@ router.put("/ai/settings", requirePermission("manage_ai_control"), async (req, r
   res.json({ success: true });
 });
 
-// ── NOTIFICATION PREFERENCES ────────────────────────────────────────────────
+// ── NOTIFICATION PREFERENCES (admin-managed, employees cannot self-edit) ─────
 
-const VALID_PREFS = ["always", "during_shift", "critical_only", "off"] as const;
+const DEFAULT_NOTIF_SETTINGS = {
+  enabled: true,
+  pref: "during_shift",
+  push: true,
+  tasks: true,
+  newStudents: true,
+  followups: true,
+  checklist: true,
+  ai: true,
+  sound: true,
+  reminderIntervalMin: 60,
+};
 
-/** GET /ai/notification-prefs — list all staff with their notification_pref (admin only) */
-router.get("/ai/notification-prefs", requirePermission("manage_ai_control"), async (_req, res): Promise<void> => {
-  const result = await pool.query<{ id: number; full_name: string; role: string; notification_pref: string }>(
-    `SELECT id, full_name, role, COALESCE(notification_pref, 'during_shift') AS notification_pref FROM staff ORDER BY full_name`
+function mergedSettings(raw: unknown) {
+  return { ...DEFAULT_NOTIF_SETTINGS, ...(typeof raw === "object" && raw !== null ? raw : {}) };
+}
+
+/** GET /ai/notification-prefs — list all staff with full notification settings (admin/owner) */
+router.get("/ai/notification-prefs", requireAnyPermission("manage_ai_control", "manage_staff"), async (_req, res): Promise<void> => {
+  const result = await pool.query(
+    `SELECT id, full_name, role, notification_settings FROM staff ORDER BY full_name`
   );
-  res.json(result.rows);
+  const rows = result.rows.map((r: any) => ({
+    id: r.id,
+    fullName: r.full_name,
+    role: r.role,
+    settings: mergedSettings(r.notification_settings),
+  }));
+  res.json(rows);
 });
 
-/** PUT /ai/notification-prefs/:staffId — owner or admin override per employee */
+/** PUT /ai/notification-prefs/:staffId — owner or admin sets a staff member's notification settings */
 router.put("/ai/notification-prefs/:staffId", requireAnyPermission("manage_ai_control", "manage_staff"), async (req, res): Promise<void> => {
   const staffId = parseInt(req.params.staffId, 10);
-  const { pref } = req.body as { pref: string };
-  if (!VALID_PREFS.includes(pref as typeof VALID_PREFS[number])) {
-    res.status(400).json({ error: "Invalid pref. Must be one of: " + VALID_PREFS.join(", ") });
-    return;
-  }
-  await pool.query(`UPDATE staff SET notification_pref = $1 WHERE id = $2`, [pref, staffId]);
-  res.json({ success: true });
+  const body = req.body as Record<string, unknown>;
+  const current = await pool.query(`SELECT notification_settings FROM staff WHERE id = $1`, [staffId]);
+  const existing = mergedSettings(current.rows[0]?.notification_settings);
+  const merged = { ...existing, ...body };
+  await pool.query(`UPDATE staff SET notification_settings = $1 WHERE id = $2`, [JSON.stringify(merged), staffId]);
+  res.json({ success: true, settings: merged });
 });
 
 /**
- * GET /ai/my-notification-pref — employee self-service: get own preference.
- * Available to any authenticated staff member (no special permission required).
+ * GET /ai/my-notification-pref — read own admin-set settings (read-only for staff).
+ * Used by scheduler/push to know the policy for this staff member.
  */
 router.get("/ai/my-notification-pref", async (req, res): Promise<void> => {
   const staffId = (req.session as any)?.staffId ?? (req.session as any)?.userId;
   if (!staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const result = await pool.query<{ notification_pref: string }>(
-    `SELECT COALESCE(notification_pref, 'during_shift') AS notification_pref FROM staff WHERE id = $1`,
-    [staffId]
+  const result = await pool.query(
+    `SELECT notification_settings FROM staff WHERE id = $1`, [staffId]
   );
-  const pref = result.rows[0]?.notification_pref ?? "during_shift";
-  res.json({ pref });
+  const settings = mergedSettings(result.rows[0]?.notification_settings);
+  res.json({ settings });
 });
 
 /**
- * PUT /ai/my-notification-pref — employee self-service: update own preference.
- * Available to any authenticated staff member (no special permission required).
+ * PUT /ai/my-notification-pref — DISABLED: employees cannot change their own settings.
+ * Notification settings are managed exclusively by admin/owner.
  */
-router.put("/ai/my-notification-pref", async (req, res): Promise<void> => {
-  const staffId = (req.session as any)?.staffId ?? (req.session as any)?.userId;
-  if (!staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
-  const { pref } = req.body as { pref: string };
-  if (!VALID_PREFS.includes(pref as typeof VALID_PREFS[number])) {
-    res.status(400).json({ error: "Invalid pref. Must be one of: " + VALID_PREFS.join(", ") });
-    return;
-  }
-  await pool.query(`UPDATE staff SET notification_pref = $1 WHERE id = $2`, [pref, staffId]);
-  res.json({ success: true });
+router.put("/ai/my-notification-pref", async (_req, res): Promise<void> => {
+  res.status(403).json({ error: "إعدادات الإشعارات يديرها الإدارة فقط. يرجى التواصل مع المسؤول." });
 });
 
 // ── EMPLOYEE PERFORMANCE REPORTS ─────────────────────────────────────────────

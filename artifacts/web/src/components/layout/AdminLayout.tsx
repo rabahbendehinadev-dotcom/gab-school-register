@@ -19,70 +19,16 @@ import {
   ClipboardList,
   BarChart2,
   Cpu,
-  Bell,
+  BellRing,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
-import { usePermission } from "@/hooks/use-permission";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/contexts/i18n-context";
 import { NotificationCenter } from "@/components/admin/NotificationCenter";
-import { PushToggleButton } from "@/components/admin/PushToggleButton";
 
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-const NOTIF_LABELS: Record<string, string> = {
-  always: "دائماً", during_shift: "أثناء الوردية", critical_only: "الحرجة فقط", off: "إيقاف",
-};
-
-function MyNotifPref() {
-  const qc = useQueryClient();
-  const { data } = useQuery<{ pref: string }>({
-    queryKey: ["my-notif-pref"],
-    queryFn: async () => {
-      const r = await fetch(`${BASE}/api/ai/my-notification-pref`, { credentials: "include" });
-      if (!r.ok) throw new Error("Failed");
-      return r.json();
-    },
-  });
-  const update = useMutation({
-    mutationFn: async (pref: string) => {
-      const r = await fetch(`${BASE}/api/ai/my-notification-pref`, {
-        method: "PUT", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pref }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      return r.json();
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["my-notif-pref"] }),
-  });
-
-  return (
-    <div className="mb-2 px-1">
-      <div className="flex items-center gap-1.5 mb-1">
-        <Bell className="w-3.5 h-3.5 text-muted-foreground" />
-        <span className="text-xs text-muted-foreground">إشعاراتي</span>
-      </div>
-      <div className="grid grid-cols-2 gap-1">
-        {Object.entries(NOTIF_LABELS).map(([v, label]) => (
-          <button
-            key={v}
-            onClick={() => update.mutate(v)}
-            disabled={update.isPending}
-            className={`text-xs py-1 px-2 rounded-lg border transition-all ${
-              (data?.pref ?? "during_shift") === v
-                ? "bg-primary text-white border-primary"
-                : "bg-muted text-muted-foreground border-border hover:border-primary/50"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 function useHeartbeat(page: string) {
   const { user } = useAuth();
@@ -152,11 +98,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const canManageNotifications = perms.includes("manage_notifications");
   const canViewAiControl    = perms.includes("view_ai_control");
   const canViewReports      = perms.includes("manage_staff") || perms.includes("view_ai_control");
+  const canManageNotifSettings = perms.includes("manage_staff") || perms.includes("view_ai_control");
 
   const { data: aiUnreadData } = useQuery<{ count: number }>({
     queryKey: ["ai-unread-count"],
     queryFn: async () => {
-      const res = await fetch("/api/ai/alerts/unread-count", { credentials: "include" });
+      const res = await fetch(`${BASE}/api/ai/alerts/unread-count`, { credentials: "include" });
       if (!res.ok) return { count: 0 };
       return res.json();
     },
@@ -168,7 +115,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const { data: myChecklists } = useQuery<{ id: number; status: string }[]>({
     queryKey: ["my-checklists-badge"],
     queryFn: async () => {
-      const res = await fetch("/api/checklists/my", { credentials: "include" });
+      const res = await fetch(`${BASE}/api/checklists/my`, { credentials: "include" });
       if (!res.ok) return [];
       return res.json();
     },
@@ -191,7 +138,8 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",    icon: RadioTower,      exact: false, show: canManageStaff },
     { href: "/gab-c7x2p/roles",         label: "الأدوار",        icon: Lock,            exact: false, show: canManageRoles },
     { href: "/gab-c7x2p/activity",      label: t.activityLog,    icon: Activity,        exact: false, show: canViewAuditLogs },
-    { href: "/gab-c7x2p/reports",      label: "تقارير الأداء",  icon: BarChart2,       exact: false, show: canViewReports },
+    { href: "/gab-c7x2p/reports",       label: "تقارير الأداء",  icon: BarChart2,       exact: false, show: canViewReports },
+    { href: "/gab-c7x2p/notification-management", label: "إدارة الإشعارات", icon: BellRing, exact: false, show: canManageNotifSettings },
     { href: "/gab-c7x2p/ai-control",   label: "لوحة التحكم المتقدمة", icon: Cpu,      exact: false, show: canViewAiControl, badge: aiUnreadCount > 0 ? String(aiUnreadCount) : undefined },
   ];
 
@@ -298,10 +246,9 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             <p className="text-sm font-semibold text-foreground truncate">{user.fullName}</p>
             <p className="text-xs text-muted-foreground capitalize mt-0.5">{user.role}</p>
           </div>
-          <MyNotifPref />
           <Button 
             variant="outline" 
-            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 mt-2"
+            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
             onClick={() => logout()}
           >
             <LogOut className="w-4 h-4 mr-2" />
@@ -325,7 +272,6 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               {filteredNav.find(n => n.exact ? location === n.href : location.startsWith(n.href))?.label || t.dashboard}
             </h1>
             <div className="flex items-center gap-2 sm:gap-4">
-              <PushToggleButton />
               <NotificationCenter />
               <Button variant="outline" size="sm" asChild className="hidden sm:flex rounded-full">
                 <Link href="/">{t.viewSite}</Link>

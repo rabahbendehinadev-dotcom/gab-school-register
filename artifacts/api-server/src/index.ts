@@ -239,8 +239,10 @@ async function ensureAiTables(): Promise<void> {
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS "idx_ai_reports_severity"     ON "ai_reports" ("severity")`);
     await client.query(`CREATE INDEX IF NOT EXISTS "idx_ai_reports_generated_at" ON "ai_reports" ("generated_at" DESC)`);
-    // notification preference column on staff
+    // notification preference column on staff (legacy)
     await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "notification_pref" text DEFAULT 'during_shift'`);
+    // extended notification settings JSONB column
+    await client.query(`ALTER TABLE "staff" ADD COLUMN IF NOT EXISTS "notification_settings" jsonb`);
   } finally {
     client.release();
   }

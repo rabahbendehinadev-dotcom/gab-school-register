@@ -25,6 +25,7 @@ import Checklists from "@/pages/admin/Checklists";
 import ChecklistAdmin from "@/pages/admin/ChecklistAdmin";
 import AiControl from "@/pages/admin/AiControl";
 import Reports from "@/pages/admin/Reports";
+import NotificationManagement from "@/pages/admin/NotificationManagement";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -63,6 +64,7 @@ function Router() {
       <Route path="/gab-c7x2p/checklist-admin" component={ChecklistAdmin} />
       <Route path="/gab-c7x2p/ai-control" component={AiControl} />
       <Route path="/gab-c7x2p/reports" component={Reports} />
+      <Route path="/gab-c7x2p/notification-management" component={NotificationManagement} />
       
       {/* 404 */}
       <Route component={NotFound} />

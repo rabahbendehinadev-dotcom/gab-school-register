@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 const SW_URL = "/sw.js";
 
@@ -60,6 +60,21 @@ function detectIOSBrowser(): boolean {
   return !isStandalone;
 }
 
+/** Report to backend that the browser notification permission was denied.
+ *  Only fires once per page load to avoid flooding the log. */
+async function reportDeniedToBackend(reason: string): Promise<void> {
+  try {
+    await fetch("/api/push/report-denied", {
+      method:      "POST",
+      headers:     { "Content-Type": "application/json" },
+      credentials: "include",
+      body:        JSON.stringify({ reason }),
+    });
+  } catch {
+    // non-critical
+  }
+}
+
 export type PushStatus =
   | "unsupported"
   | "ios-needs-pwa"   // iOS Safari browser — must add to home screen first
@@ -70,6 +85,7 @@ export type PushStatus =
 
 export function usePushNotifications() {
   const [status, setStatus] = useState<PushStatus>("loading");
+  const deniedReported = useRef(false);
 
   const refresh = useCallback(async () => {
     // iOS in browser: show install guide instead of failing silently
@@ -80,7 +96,13 @@ export function usePushNotifications() {
       setStatus("unsupported"); return;
     }
     if (Notification.permission === "denied") {
-      setStatus("denied"); return;
+      setStatus("denied");
+      // Report once per page load that this staff member has notifications blocked
+      if (!deniedReported.current) {
+        deniedReported.current = true;
+        reportDeniedToBackend("المتصفح بحالة denied");
+      }
+      return;
     }
     try {
       const reg = await navigator.serviceWorker.getRegistration(SW_URL);
@@ -94,11 +116,36 @@ export function usePushNotifications() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Auto-enable: if user is logged in and push is unsubscribed, attempt silent enable
+  useEffect(() => {
+    if (status !== "unsubscribed") return;
+    // Only auto-enable if permission was already granted (don't prompt without user gesture)
+    if (Notification.permission !== "granted") return;
+    (async () => {
+      try {
+        const reg = await registerSW();
+        await navigator.serviceWorker.ready;
+        const sub = await subscribe(reg);
+        await saveSubscription(sub);
+        setStatus("subscribed");
+      } catch {
+        // silent — user hasn't granted permission yet
+      }
+    })();
+  }, [status]);
+
   const enable = useCallback(async () => {
     setStatus("loading");
     try {
       const perm = await Notification.requestPermission();
-      if (perm !== "granted") { setStatus("denied"); return; }
+      if (perm !== "granted") {
+        setStatus("denied");
+        if (!deniedReported.current) {
+          deniedReported.current = true;
+          reportDeniedToBackend("رفض طلب الإذن");
+        }
+        return;
+      }
       const reg = await registerSW();
       await navigator.serviceWorker.ready;
       const sub = await subscribe(reg);
@@ -124,5 +171,5 @@ export function usePushNotifications() {
     }
   }, []);
 
-  return { status, enable, disable };
+  return { status, enable, disable, refresh };
 }
