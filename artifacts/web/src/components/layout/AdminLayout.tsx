@@ -15,11 +15,14 @@ import {
   ListTodo,
   RadioTower,
   Lock,
+  CheckSquare,
+  ClipboardList,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermission } from "@/hooks/use-permission";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useI18n } from "@/contexts/i18n-context";
 import { NotificationCenter } from "@/components/admin/NotificationCenter";
 import { PushToggleButton } from "@/components/admin/PushToggleButton";
@@ -91,18 +94,32 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const canManageRoles      = perms.includes("manage_roles");
   const canManageNotifications = perms.includes("manage_notifications");
 
+  const { data: myChecklists } = useQuery<{ id: number; status: string }[]>({
+    queryKey: ["my-checklists-badge"],
+    queryFn: async () => {
+      const res = await fetch("/api/checklists/my", { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    refetchInterval: 30_000,
+    enabled: !!user,
+  });
+  const overdueChecklistCount = (myChecklists ?? []).filter(a => ["overdue", "not_started", "in_progress"].includes(a.status) && true).length;
+
   const navItems = [
-    { href: "/gab-c7x2p",               label: t.dashboard,    icon: LayoutDashboard, exact: true, show: canViewDashboard },
-    { href: "/gab-c7x2p/groups",        label: t.schedules,    icon: Layers,          exact: false, show: canViewGroups },
-    { href: "/gab-c7x2p/students",      label: t.students,     icon: Users,           exact: false, show: canViewStudents },
-    { href: "/gab-c7x2p/tasks",         label: t.tasks,        icon: ListTodo,        exact: false, show: canManageTasks },
-    { href: "/gab-c7x2p/open-day",      label: t.openDay,      icon: Ticket,          exact: false, show: canManageNotifications },
-    { href: "/gab-c7x2p/courses",       label: t.courses,      icon: BookOpen,        exact: false, show: canManageNotifications },
-    { href: "/gab-c7x2p/gallery",       label: t.gallery,      icon: ImageIcon,       exact: false, show: canManageNotifications },
-    { href: "/gab-c7x2p/staff",         label: t.staff,        icon: ShieldCheck,     exact: false, show: canManageStaff },
-    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",  icon: RadioTower,      exact: false, show: canManageStaff },
-    { href: "/gab-c7x2p/roles",         label: "الأدوار",      icon: Lock,            exact: false, show: canManageRoles },
-    { href: "/gab-c7x2p/activity",      label: t.activityLog,  icon: Activity,        exact: false, show: canViewAuditLogs },
+    { href: "/gab-c7x2p",               label: t.dashboard,      icon: LayoutDashboard, exact: true,  show: canViewDashboard },
+    { href: "/gab-c7x2p/groups",        label: t.schedules,      icon: Layers,          exact: false, show: canViewGroups },
+    { href: "/gab-c7x2p/students",      label: t.students,       icon: Users,           exact: false, show: canViewStudents },
+    { href: "/gab-c7x2p/checklists",    label: "مهامي",          icon: CheckSquare,     exact: false, show: canViewDashboard, badge: overdueChecklistCount > 0 ? String(overdueChecklistCount) : undefined },
+    { href: "/gab-c7x2p/checklist-admin", label: "إدارة المهام", icon: ClipboardList,   exact: false, show: canManageTasks },
+    { href: "/gab-c7x2p/tasks",         label: t.tasks,          icon: ListTodo,        exact: false, show: canManageTasks },
+    { href: "/gab-c7x2p/open-day",      label: t.openDay,        icon: Ticket,          exact: false, show: canManageNotifications },
+    { href: "/gab-c7x2p/courses",       label: t.courses,        icon: BookOpen,        exact: false, show: canManageNotifications },
+    { href: "/gab-c7x2p/gallery",       label: t.gallery,        icon: ImageIcon,       exact: false, show: canManageNotifications },
+    { href: "/gab-c7x2p/staff",         label: t.staff,          icon: ShieldCheck,     exact: false, show: canManageStaff },
+    { href: "/gab-c7x2p/staff-activity",label: "نشاط الفريق",    icon: RadioTower,      exact: false, show: canManageStaff },
+    { href: "/gab-c7x2p/roles",         label: "الأدوار",        icon: Lock,            exact: false, show: canManageRoles },
+    { href: "/gab-c7x2p/activity",      label: t.activityLog,    icon: Activity,        exact: false, show: canViewAuditLogs },
   ];
 
   if (isLoading) {
@@ -152,6 +169,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </div>
           {filteredNav.map((item) => {
             const isActive = item.exact ? location === item.href : location.startsWith(item.href);
+            const badge = (item as { badge?: string }).badge;
             return (
               <Link 
                 key={item.href} 
@@ -165,7 +183,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                 onClick={() => setSidebarOpen(false)}
               >
                 <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {badge && (
+                  <span className="min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full bg-red-500 text-white text-[10px] font-bold">
+                    {badge}
+                  </span>
+                )}
               </Link>
             );
           })}

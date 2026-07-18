@@ -21,6 +21,8 @@ import OpenDay from "@/pages/admin/OpenDay";
 import Courses from "@/pages/admin/Courses";
 import StaffActivity from "@/pages/admin/StaffActivity";
 import RolesSettings from "@/pages/admin/RolesSettings";
+import Checklists from "@/pages/admin/Checklists";
+import ChecklistAdmin from "@/pages/admin/ChecklistAdmin";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -55,6 +57,8 @@ function Router() {
       <Route path="/gab-c7x2p/gallery" component={Gallery} />
       <Route path="/gab-c7x2p/open-day" component={OpenDay} />
       <Route path="/gab-c7x2p/courses" component={Courses} />
+      <Route path="/gab-c7x2p/checklists" component={Checklists} />
+      <Route path="/gab-c7x2p/checklist-admin" component={ChecklistAdmin} />
       
       {/* 404 */}
       <Route component={NotFound} />

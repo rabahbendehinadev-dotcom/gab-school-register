@@ -1,6 +1,7 @@
 import app from "./app";
 import { seedAdmin } from "./seed";
 import { pool } from "@workspace/db";
+import { startChecklistScheduler } from "./lib/checklistScheduler";
 
 const rawPort = process.env["PORT"];
 
@@ -127,14 +128,94 @@ async function ensureStaffRoleIdColumn(): Promise<void> {
   }
 }
 
+async function ensureChecklistTables(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "checklist_templates" (
+        "id"                   serial PRIMARY KEY,
+        "title"                text NOT NULL,
+        "description"          text,
+        "assigned_to_role"     text,
+        "assigned_to_staff_id" integer REFERENCES "staff"("id") ON DELETE SET NULL,
+        "days_of_week"         jsonb DEFAULT '[0,1,2,3,4,5,6]',
+        "shift_type"           text,
+        "recurrence"           text NOT NULL DEFAULT 'daily',
+        "enabled"              boolean NOT NULL DEFAULT true,
+        "created_by"           integer REFERENCES "staff"("id") ON DELETE SET NULL,
+        "created_at"           timestamptz NOT NULL DEFAULT now(),
+        "updated_at"           timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "checklist_items" (
+        "id"             serial PRIMARY KEY,
+        "template_id"    integer NOT NULL REFERENCES "checklist_templates"("id") ON DELETE CASCADE,
+        "title"          text NOT NULL,
+        "description"    text,
+        "priority"       text NOT NULL DEFAULT 'normal',
+        "proof_required" boolean NOT NULL DEFAULT false,
+        "note_required"  boolean NOT NULL DEFAULT false,
+        "offset_minutes" integer NOT NULL DEFAULT 0,
+        "sort_order"     integer NOT NULL DEFAULT 0,
+        "created_at"     timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "checklist_assignments" (
+        "id"               serial PRIMARY KEY,
+        "template_id"      integer REFERENCES "checklist_templates"("id") ON DELETE SET NULL,
+        "item_id"          integer REFERENCES "checklist_items"("id") ON DELETE SET NULL,
+        "title"            text NOT NULL,
+        "description"      text,
+        "priority"         text NOT NULL DEFAULT 'normal',
+        "proof_required"   boolean NOT NULL DEFAULT false,
+        "note_required"    boolean NOT NULL DEFAULT false,
+        "staff_id"         integer NOT NULL REFERENCES "staff"("id") ON DELETE CASCADE,
+        "due_at"           timestamptz NOT NULL,
+        "status"           text NOT NULL DEFAULT 'not_started',
+        "started_at"       timestamptz,
+        "completed_at"     timestamptz,
+        "note"             text,
+        "proof_url"        text,
+        "result"           text,
+        "snooze_count"     integer NOT NULL DEFAULT 0,
+        "snooze_until"     timestamptz,
+        "student_id"       integer REFERENCES "students"("id") ON DELETE SET NULL,
+        "cancelled_by"     integer REFERENCES "staff"("id") ON DELETE SET NULL,
+        "cancelled_at"     timestamptz,
+        "reassigned_from"  integer,
+        "date_key"         text,
+        "created_at"       timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS "idx_checklist_assignments_staff_date" ON "checklist_assignments" ("staff_id", "date_key")`);
+    await client.query(`CREATE INDEX IF NOT EXISTS "idx_checklist_assignments_status" ON "checklist_assignments" ("status")`);
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "escalation_log" (
+        "id"                serial PRIMARY KEY,
+        "assignment_id"     integer NOT NULL REFERENCES "checklist_assignments"("id") ON DELETE CASCADE,
+        "level"             integer NOT NULL,
+        "notified_staff_id" integer REFERENCES "staff"("id") ON DELETE SET NULL,
+        "note"              text,
+        "notified_at"       timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+  } finally {
+    client.release();
+  }
+}
+
 ensureSessionTable()
   .then(() => ensurePushSubscriptionsTable())
   .then(() => ensureRolesTable())
   .then(() => ensureStaffSessionsTable())
   .then(() => ensureActivityLogsExtended())
   .then(() => ensureStaffRoleIdColumn())
+  .then(() => ensureChecklistTables())
   .then(() => seedAdmin())
   .then(() => {
+    startChecklistScheduler();
     app.listen(port, () => {
       console.log(`Server listening on port ${port}`);
     });
