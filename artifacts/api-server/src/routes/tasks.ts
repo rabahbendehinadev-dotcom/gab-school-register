@@ -1,8 +1,8 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, isNull } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { db, followupTasksTable, studentsTable, staffTable } from "@workspace/db";
 import { z } from "zod/v4";
-import { requireRole } from "../middlewares/auth";
+import { requirePermission } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import { createNotification } from "../lib/notifications";
 import "../types/session";
@@ -25,8 +25,7 @@ const UpdateTaskBody = z.object({
   type: z.enum(["call", "whatsapp", "payment", "group", "site", "other"]).optional(),
 });
 
-// List tasks with optional filters
-router.get("/tasks", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
+router.get("/tasks", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
   const conditions = [];
   if (req.query.completed === "true") conditions.push(eq(followupTasksTable.completed, true));
   if (req.query.completed === "false") conditions.push(eq(followupTasksTable.completed, false));
@@ -59,8 +58,7 @@ router.get("/tasks", requireRole("admin", "manager", "staff", "assistant"), asyn
   res.json(tasks);
 });
 
-// Create task
-router.post("/tasks", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
+router.post("/tasks", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
   const parsed = CreateTaskBody.safeParse(req.body);
   if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
@@ -74,13 +72,19 @@ router.post("/tasks", requireRole("admin", "manager", "staff", "assistant"), asy
     createdBy: performer,
   }).returning();
 
-  await logActivity("task_created", `📋 مهمة جديدة: ${task.title}`, performer, task.studentId);
+  await logActivity("task_created", `📋 مهمة: ${task.title}`, performer, task.studentId, {
+    employeeId: req.session.staffId,
+    actionType: "task_created",
+    entityType: "task",
+    entityId: task.id,
+    newValue: task.title,
+    sessionId: req.session.sessionToken,
+  });
 
   res.status(201).json(task);
 });
 
-// Update / complete task
-router.patch("/tasks/:id", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
+router.patch("/tasks/:id", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
 
@@ -102,14 +106,19 @@ router.patch("/tasks/:id", requireRole("admin", "manager", "staff", "assistant")
 
   const performer = req.session.fullName ?? "Unknown";
   if (parsed.data.completed === true) {
-    await logActivity("task_completed", `✅ مهمة مكتملة: ${task.title}`, performer, task.studentId);
+    await logActivity("task_completed", `✅ مهمة مكتملة: ${task.title}`, performer, task.studentId, {
+      employeeId: req.session.staffId,
+      actionType: "task_completed",
+      entityType: "task",
+      entityId: task.id,
+      sessionId: req.session.sessionToken,
+    });
   }
 
   res.json(task);
 });
 
-// Delete task
-router.delete("/tasks/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+router.delete("/tasks/:id", requirePermission("manage_tasks"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
   if (Number.isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   await db.delete(followupTasksTable).where(eq(followupTasksTable.id, id));

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, and, gte, sql } from "drizzle-orm";
+import { and, gte, sql } from "drizzle-orm";
 import { db, staffTable, staffSessionsTable, activityLogsTable } from "@workspace/db";
 import { requireAuth, requirePermission } from "../middlewares/auth";
 import { randomUUID } from "crypto";
@@ -8,14 +8,29 @@ import "../types/session";
 
 const router: IRouter = Router();
 
-function getAlgeriaStartOfDay(): Date {
+// Algeria timezone working hours: 8:00–18:00, Saturday through Thursday (Friday off)
+const WORK_START_HOUR = 8;  // 08:00 Algeria local time
+const WORK_END_HOUR   = 18; // 18:00 Algeria local time
+const WORK_DAYS = [0, 1, 2, 3, 4, 6]; // Sun=0, Mon=1, Tue=2, Wed=3, Thu=4, Sat=6
+
+function getAlgeriaDate(): { hour: number; dayOfWeek: number; startOfDay: Date } {
   const now = new Date();
-  const algeriaTZ = new Intl.DateTimeFormat("fr-FR", {
-    timeZone: "Africa/Algiers",
-    year: "numeric", month: "2-digit", day: "2-digit",
-  }).format(now);
-  const [day, month, year] = algeriaTZ.split("/");
-  return new Date(`${year}-${month}-${day}T00:00:00+01:00`);
+  // Algeria is UTC+1 (Africa/Algiers, no DST)
+  const algeriaMs = now.getTime() + 60 * 60 * 1000;
+  const algeriaDate = new Date(algeriaMs);
+  const hour = algeriaDate.getUTCHours();
+  const dayOfWeek = algeriaDate.getUTCDay();
+
+  // Start of today Algeria time (UTC)
+  const startOfDayAlgeria = new Date(algeriaMs);
+  startOfDayAlgeria.setUTCHours(0, 0, 0, 0);
+  const startOfDay = new Date(startOfDayAlgeria.getTime() - 60 * 60 * 1000); // back to UTC
+
+  return { hour, dayOfWeek, startOfDay };
+}
+
+function isWithinWorkingHours(hour: number, dayOfWeek: number): boolean {
+  return WORK_DAYS.includes(dayOfWeek) && hour >= WORK_START_HOUR && hour < WORK_END_HOUR;
 }
 
 function getDeviceInfo(req: import("express").Request) {
@@ -82,7 +97,6 @@ router.post("/sessions/action", requireAuth, async (req, res): Promise<void> => 
   } finally {
     client.release();
   }
-
   res.json({ ok: true });
 });
 
@@ -104,28 +118,47 @@ router.post("/sessions/end", requireAuth, async (req, res): Promise<void> => {
 });
 
 router.get("/sessions/active", requirePermission("view_team_activity"), async (_req, res): Promise<void> => {
-  const startOfDay = getAlgeriaStartOfDay();
   const now = new Date();
-  const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+  const { hour, dayOfWeek, startOfDay } = getAlgeriaDate();
+  const withinWorkingHours = isWithinWorkingHours(hour, dayOfWeek);
+
+  const fiveMinAgo    = new Date(now.getTime() - 5 * 60 * 1000);
   const fifteenMinAgo = new Date(now.getTime() - 15 * 60 * 1000);
-  const twoMinAgo = new Date(now.getTime() - 2 * 60 * 1000);
+  const twoMinAgo     = new Date(now.getTime() - 2 * 60 * 1000);
+  const tenMinAgo     = new Date(now.getTime() - 10 * 60 * 1000);
 
   const allStaff = await db
     .select({ id: staffTable.id, fullName: staffTable.fullName, role: staffTable.role, username: staffTable.username })
     .from(staffTable)
     .orderBy(staffTable.fullName);
 
-  const activeSessions = await db
+  // Get all sessions updated in the last 10 minutes (for online status)
+  const recentSessions = await db
     .select()
     .from(staffSessionsTable)
-    .where(gte(staffSessionsTable.lastHeartbeatAt, new Date(now.getTime() - 10 * 60 * 1000)));
+    .where(gte(staffSessionsTable.lastHeartbeatAt, tenMinAgo));
 
-  const sessionMap = new Map<number, typeof activeSessions[0]>();
-  for (const s of activeSessions) {
-    const existing = sessionMap.get(s.staffId);
+  // Get today's sessions (to determine shift_not_started vs offline vs shift_ended)
+  const todaySessions = await db
+    .select({ staffId: staffSessionsTable.staffId, isActive: staffSessionsTable.isActive })
+    .from(staffSessionsTable)
+    .where(gte(staffSessionsTable.startedAt, startOfDay));
+
+  const recentSessionMap = new Map<number, typeof recentSessions[0]>();
+  for (const s of recentSessions) {
+    const existing = recentSessionMap.get(s.staffId);
     if (!existing || s.lastHeartbeatAt > existing.lastHeartbeatAt) {
-      sessionMap.set(s.staffId, s);
+      recentSessionMap.set(s.staffId, s);
     }
+  }
+
+  // For each staff, track: hadSessionToday, hadActiveSessionToday (explicitly ended)
+  const todaySessionInfo = new Map<number, { hadSession: boolean; hadExplicitEnd: boolean }>();
+  for (const s of todaySessions) {
+    const existing = todaySessionInfo.get(s.staffId) ?? { hadSession: false, hadExplicitEnd: false };
+    existing.hadSession = true;
+    if (!s.isActive) existing.hadExplicitEnd = true;
+    todaySessionInfo.set(s.staffId, existing);
   }
 
   const todayStats = await db
@@ -152,14 +185,17 @@ router.get("/sessions/active", requirePermission("view_team_activity"), async (_
   }
 
   const result = allStaff.map((staff) => {
-    const session = sessionMap.get(staff.id);
+    const session = recentSessionMap.get(staff.id);
     const stats = statsMap.get(staff.id) ?? {};
+    const todayInfo = todaySessionInfo.get(staff.id);
 
-    let status = "offline";
+    let status: string;
+
     if (session) {
       const heartbeat = new Date(session.lastHeartbeatAt);
       const lastAction = session.lastActionAt ? new Date(session.lastActionAt) : null;
       if (heartbeat >= twoMinAgo) {
+        // Online — determine activity level
         if (lastAction && lastAction >= fiveMinAgo) {
           status = "active";
         } else if (lastAction && lastAction >= fifteenMinAgo) {
@@ -167,6 +203,22 @@ router.get("/sessions/active", requirePermission("view_team_activity"), async (_
         } else {
           status = "idle_15";
         }
+      } else {
+        // Heartbeat stale — they dropped off
+        status = withinWorkingHours
+          ? (todayInfo?.hadExplicitEnd ? "shift_ended" : "offline")
+          : "outside_shift";
+      }
+    } else {
+      // No recent session at all
+      if (!withinWorkingHours) {
+        status = "outside_shift";
+      } else if (!todayInfo?.hadSession) {
+        status = "shift_not_started";
+      } else if (todayInfo?.hadExplicitEnd) {
+        status = "shift_ended";
+      } else {
+        status = "offline";
       }
     }
 

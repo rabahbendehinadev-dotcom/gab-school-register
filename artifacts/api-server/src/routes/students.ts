@@ -3,23 +3,17 @@ import { eq, ilike, or, and, sql, desc, isNull, gte, lt } from "drizzle-orm";
 import { db, studentsTable, groupsTable } from "@workspace/db";
 import {
   CreateStudentBody,
-  ListStudentsQueryParams,
-  ListStudentsResponse,
   GetStudentParams,
-  GetStudentResponse,
   UpdateStudentParams,
   UpdateStudentBody,
-  UpdateStudentResponse,
   DeleteStudentParams,
   UpdateStudentStageParams,
-  UpdateStudentStageBody,
-  UpdateStudentStageResponse,
+  UpdateStudentStageParams as _USP,
   AssignStudentToGroupParams,
   AssignStudentToGroupBody,
-  AssignStudentToGroupResponse,
   GetDashboardStatsResponse,
 } from "@workspace/api-zod";
-import { requireAuth, requireRole } from "../middlewares/auth";
+import { requirePermission, requireAuth } from "../middlewares/auth";
 import { logActivity } from "../lib/activityLogger";
 import { createNotification } from "../lib/notifications";
 import { sendTelegramNotification } from "../lib/telegram";
@@ -43,7 +37,7 @@ function parseStoragePath(path: string): { bucketName: string; objectName: strin
 
 const router: IRouter = Router();
 
-router.get("/students", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
+router.get("/students", requirePermission("view_students"), async (req, res): Promise<void> => {
   const rq = req.query as Record<string, string | undefined>;
   const conditions = [isNull(studentsTable.deletedAt)];
 
@@ -79,14 +73,14 @@ router.get("/students", requireRole("admin", "manager", "staff", "assistant"), a
     )!);
   }
   if (rq.dateFrom) {
-    try { conditions.push(gte(studentsTable.createdAt, new Date(rq.dateFrom))); } catch { /* ignore invalid date */ }
+    try { conditions.push(gte(studentsTable.createdAt, new Date(rq.dateFrom))); } catch { /* ignore */ }
   }
   if (rq.dateTo) {
     try {
       const end = new Date(rq.dateTo);
       end.setDate(end.getDate() + 1);
       conditions.push(lt(studentsTable.createdAt, end));
-    } catch { /* ignore invalid date */ }
+    } catch { /* ignore */ }
   }
 
   const students = await db
@@ -114,7 +108,8 @@ router.post("/students", async (req, res): Promise<void> => {
     "student_registered",
     `🎓 تسجيل جديد: ${student.firstName} ${student.lastName} — ${student.city}`,
     "Public Registration",
-    student.id
+    student.id,
+    { actionType: "student_registered", entityType: "student", entityId: student.id }
   );
 
   await createNotification(
@@ -124,7 +119,6 @@ router.post("/students", async (req, res): Promise<void> => {
     student.id
   ).catch(() => {});
 
-  // Web Push to all subscribed admins (rings 3 times, 8 s apart)
   import("../lib/webPush").then(({ sendPushToAdmins }) =>
     sendPushToAdmins({
       title: "🎓 تسجيل جديد في GAB SCHOOL!",
@@ -135,14 +129,12 @@ router.post("/students", async (req, res): Promise<void> => {
   ).catch(() => {});
 
   const trainingLabel = student.trainingType === "physical" ? "حضوري" : "أونلاين";
-
   function toIntlPhone(phone: string): string {
     let clean = phone.replace(/\D/g, "");
     if (clean.startsWith("0") && clean.length === 10) clean = "213" + clean.slice(1);
     else if (clean.startsWith("5") && clean.length === 9) clean = "213" + clean;
     return clean;
   }
-
   const waNumber = toIntlPhone(student.whatsapp || student.phone);
   const waText = encodeURIComponent(`مرحباً ${student.firstName}، شكراً على تسجيلك في GAB SCHOOL! سنتواصل معك قريباً بخصوص تفاصيل الدورة.`);
   const waLink = `https://wa.me/${waNumber}?text=${waText}`;
@@ -167,7 +159,7 @@ router.post("/students", async (req, res): Promise<void> => {
   res.status(201).json(student);
 });
 
-router.get("/students/stage-counts", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
+router.get("/students/stage-counts", requirePermission("view_students"), async (_req, res): Promise<void> => {
   const rows = await db
     .select({ stage: studentsTable.stage, cnt: sql<number>`count(*)::int` })
     .from(studentsTable)
@@ -182,7 +174,7 @@ router.get("/students/stage-counts", requireRole("admin", "manager", "staff", "a
   res.json(result);
 });
 
-router.patch("/students/bulk/stage", requireRole("admin", "manager", "staff"), async (req, res): Promise<void> => {
+router.patch("/students/bulk/stage", requirePermission("edit_students"), async (req, res): Promise<void> => {
   const ids: unknown = req.body?.ids;
   const stage: unknown = req.body?.stage;
   if (!Array.isArray(ids) || ids.length === 0 || typeof stage !== "string" || !(ALL_STAGE_VALUES as readonly string[]).includes(stage)) {
@@ -190,10 +182,7 @@ router.patch("/students/bulk/stage", requireRole("admin", "manager", "staff"), a
     return;
   }
   const numIds = ids.map(Number).filter(n => !isNaN(n) && n > 0);
-  if (numIds.length === 0) {
-    res.status(400).json({ error: "No valid ids" });
-    return;
-  }
+  if (numIds.length === 0) { res.status(400).json({ error: "No valid ids" }); return; }
 
   const { inArray } = await import("drizzle-orm");
   const updated = await db
@@ -206,73 +195,88 @@ router.patch("/students/bulk/stage", requireRole("admin", "manager", "staff"), a
   await logActivity(
     "stage_changed",
     `🔄 تغيير مرحلة جماعي → ${stage} (${updated.length} طالب)`,
-    performer
+    performer,
+    null,
+    {
+      employeeId: req.session.staffId,
+      actionType: "bulk_stage_changed",
+      entityType: "student",
+      newValue: stage,
+      sessionId: req.session.sessionToken,
+      metadata: { count: updated.length, ids: numIds },
+    }
   ).catch(() => {});
 
   res.json({ updated: updated.length });
 });
 
-router.get("/students/:id", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
+router.get("/students/:id", requirePermission("view_students"), async (req, res): Promise<void> => {
   const params = GetStudentParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const [student] = await db
     .select()
     .from(studentsTable)
     .where(eq(studentsTable.id, params.data.id));
 
-  if (!student) {
-    res.status(404).json({ error: "Student not found" });
-    return;
-  }
+  if (!student) { res.status(404).json({ error: "Student not found" }); return; }
+
+  await logActivity(
+    "student_viewed",
+    `${student.firstName} ${student.lastName} — فتح ملف الطالب`,
+    req.session.fullName ?? null,
+    student.id,
+    {
+      employeeId: req.session.staffId,
+      actionType: "student_viewed",
+      entityType: "student",
+      entityId: student.id,
+      sessionId: req.session.sessionToken,
+    }
+  ).catch(() => {});
 
   res.json(student);
 });
 
-router.patch("/students/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+router.patch("/students/:id", requirePermission("edit_students"), async (req, res): Promise<void> => {
   const params = UpdateStudentParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const parsed = UpdateStudentBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
+  const [before] = await db.select().from(studentsTable).where(eq(studentsTable.id, params.data.id));
   const [student] = await db
     .update(studentsTable)
     .set(parsed.data)
     .where(eq(studentsTable.id, params.data.id))
     .returning();
 
-  if (!student) {
-    res.status(404).json({ error: "Student not found" });
-    return;
-  }
+  if (!student) { res.status(404).json({ error: "Student not found" }); return; }
 
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "student_updated",
     `✏️ تحديث بيانات: ${student.firstName} ${student.lastName}`,
     performer,
-    student.id
+    student.id,
+    {
+      employeeId: req.session.staffId,
+      actionType: "student_updated",
+      entityType: "student",
+      entityId: student.id,
+      oldValue: before ? JSON.stringify({ stage: before.stage, paymentStatus: before.paymentStatus }) : null,
+      newValue: JSON.stringify({ stage: student.stage, paymentStatus: student.paymentStatus }),
+      sessionId: req.session.sessionToken,
+    }
   );
 
   res.json(student);
 });
 
-router.delete("/students/:id", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+router.delete("/students/:id", requirePermission("delete_students"), async (req, res): Promise<void> => {
   const params = DeleteStudentParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const [student] = await db
     .update(studentsTable)
@@ -280,28 +284,29 @@ router.delete("/students/:id", requireRole("admin", "manager"), async (req, res)
     .where(and(eq(studentsTable.id, params.data.id), isNull(studentsTable.deletedAt)))
     .returning();
 
-  if (!student) {
-    res.status(404).json({ error: "Student not found" });
-    return;
-  }
+  if (!student) { res.status(404).json({ error: "Student not found" }); return; }
 
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "student_deleted",
-    `🗑️ أرشفة طالب (soft delete): ${student.firstName} ${student.lastName}`,
+    `🗑️ أرشفة: ${student.firstName} ${student.lastName}`,
     performer,
-    student.id
+    student.id,
+    {
+      employeeId: req.session.staffId,
+      actionType: "student_deleted",
+      entityType: "student",
+      entityId: student.id,
+      sessionId: req.session.sessionToken,
+    }
   );
 
   res.sendStatus(204);
 });
 
-router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "assistant"), async (req, res): Promise<void> => {
+router.patch("/students/:id/stage", requirePermission("edit_students"), async (req, res): Promise<void> => {
   const params = UpdateStudentStageParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const stageVal = typeof req.body?.stage === "string" ? req.body.stage : "";
   if (!(ALL_STAGE_VALUES as readonly string[]).includes(stageVal)) {
@@ -309,15 +314,8 @@ router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "as
     return;
   }
 
-  const [oldStudent] = await db
-    .select()
-    .from(studentsTable)
-    .where(eq(studentsTable.id, params.data.id));
-
-  if (!oldStudent) {
-    res.status(404).json({ error: "Student not found" });
-    return;
-  }
+  const [oldStudent] = await db.select().from(studentsTable).where(eq(studentsTable.id, params.data.id));
+  if (!oldStudent) { res.status(404).json({ error: "Student not found" }); return; }
 
   const [student] = await db
     .update(studentsTable)
@@ -330,31 +328,31 @@ router.patch("/students/:id/stage", requireRole("admin", "manager", "staff", "as
     "stage_changed",
     `🔄 ${student.firstName} ${student.lastName}: ${oldStudent.stage} → ${stageVal}`,
     performer,
-    student.id
+    student.id,
+    {
+      employeeId: req.session.staffId,
+      actionType: "stage_changed",
+      entityType: "student",
+      entityId: student.id,
+      oldValue: oldStudent.stage,
+      newValue: stageVal,
+      sessionId: req.session.sessionToken,
+    }
   );
 
   res.json(student);
 });
 
-router.patch("/students/:id/group", requireRole("admin", "manager"), async (req, res): Promise<void> => {
+router.patch("/students/:id/group", requirePermission("assign_students"), async (req, res): Promise<void> => {
   const params = AssignStudentToGroupParams.safeParse(req.params);
-  if (!params.success) {
-    res.status(400).json({ error: params.error.message });
-    return;
-  }
+  if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
 
   const parsed = AssignStudentToGroupBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
-    return;
-  }
+  if (!parsed.success) { res.status(400).json({ error: parsed.error.message }); return; }
 
   if (parsed.data.groupId !== null && parsed.data.groupId !== undefined) {
     const [group] = await db.select({ id: groupsTable.id }).from(groupsTable).where(eq(groupsTable.id, parsed.data.groupId));
-    if (!group) {
-      res.status(404).json({ error: "Group not found" });
-      return;
-    }
+    if (!group) { res.status(404).json({ error: "Group not found" }); return; }
   }
 
   const [student] = await db
@@ -363,40 +361,36 @@ router.patch("/students/:id/group", requireRole("admin", "manager"), async (req,
     .where(eq(studentsTable.id, params.data.id))
     .returning();
 
-  if (!student) {
-    res.status(404).json({ error: "Student not found" });
-    return;
-  }
+  if (!student) { res.status(404).json({ error: "Student not found" }); return; }
 
   const performer = req.session.fullName ?? "Unknown";
   await logActivity(
     "group_assigned",
     `👥 ${student.firstName} ${student.lastName} → مجموعة ${parsed.data.groupId ?? "بدون"}`,
     performer,
-    student.id
+    student.id,
+    {
+      employeeId: req.session.staffId,
+      actionType: "group_assigned",
+      entityType: "student",
+      entityId: student.id,
+      newValue: String(parsed.data.groupId ?? "null"),
+      sessionId: req.session.sessionToken,
+    }
   );
 
   res.json(student);
 });
 
-router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.single("receipt"), async (req, res): Promise<void> => {
+router.post("/students/:id/receipt", requirePermission("manage_payments"), upload.single("receipt"), async (req, res): Promise<void> => {
   const id = parseInt(String(req.params.id), 10);
-  if (!req.file) {
-    res.status(400).json({ error: "No file provided" });
-    return;
-  }
+  if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
 
   const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
-  if (!privateDir) {
-    res.status(500).json({ error: "Storage not configured" });
-    return;
-  }
+  if (!privateDir) { res.status(500).json({ error: "Storage not configured" }); return; }
 
   const [existing] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.id, id));
-  if (!existing) {
-    res.status(404).json({ error: "Student not found" });
-    return;
-  }
+  if (!existing) { res.status(404).json({ error: "Student not found" }); return; }
 
   try {
     const objectId = randomUUID();
@@ -409,11 +403,7 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
     });
 
     const serveUrl = `/api/storage/receipts/${objectId}`;
-
-    await db
-      .update(studentsTable)
-      .set({ receiptUrl: serveUrl })
-      .where(eq(studentsTable.id, id));
+    await db.update(studentsTable).set({ receiptUrl: serveUrl }).where(eq(studentsTable.id, id));
 
     res.json({ receiptUrl: serveUrl });
   } catch (error) {
@@ -422,7 +412,7 @@ router.post("/students/:id/receipt", requireRole("admin", "manager"), upload.sin
   }
 });
 
-router.get("/stats", requireRole("admin", "manager"), async (_req, res): Promise<void> => {
+router.get("/stats", requirePermission("view_reports"), async (_req, res): Promise<void> => {
   const students = (await db.select().from(studentsTable)).filter((s) => !s.deletedAt);
   const stats = {
     totalStudents: students.length,
@@ -434,27 +424,21 @@ router.get("/stats", requireRole("admin", "manager"), async (_req, res): Promise
     totalGroups: 0,
     openGroups: 0,
   };
-
-  const { groupsTable } = await import("@workspace/db");
-  const groups = (await db.select().from(groupsTable)).filter((g) => !g.deletedAt);
+  const { groupsTable: gt } = await import("@workspace/db");
+  const groups = (await db.select().from(gt)).filter((g) => !g.deletedAt);
   stats.totalGroups = groups.length;
   stats.openGroups = groups.filter((g) => g.status === "open").length;
-
   res.json(GetDashboardStatsResponse.parse(stats));
 });
 
-// Extended ERP dashboard metrics for the 5-day training journey
-router.get("/stats/erp", requireRole("admin", "manager", "staff", "assistant"), async (_req, res): Promise<void> => {
+router.get("/stats/erp", requirePermission("view_reports"), async (_req, res): Promise<void> => {
   const all = await db.select().from(studentsTable);
   const students = all.filter((s) => !s.deletedAt);
-
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
   const todayRegistrations = students.filter((s) => new Date(s.createdAt) >= startOfDay).length;
   const monthRegistrations = students.filter((s) => new Date(s.createdAt) >= startOfMonth).length;
-
   const isStage = (s: typeof students[number], ...stages: string[]) => stages.includes(s.stage);
   const notContacted = students.filter((s) => isStage(s, "new")).length;
   const waitingPayment = students.filter((s) => isStage(s, "payment_pending", "interested")).length;
@@ -462,22 +446,9 @@ router.get("/stats/erp", requireRole("admin", "manager", "staff", "assistant"), 
   const inTraining = students.filter((s) => isStage(s, "assigned", "in_training")).length;
   const completed = students.filter((s) => isStage(s, "completed")).length;
   const archived = students.filter((s) => isStage(s, "archived")).length;
-
   const paidCount = students.filter((s) => s.paymentStatus === "paid").length;
   const conversionRate = students.length > 0 ? Math.round((paidCount / students.length) * 100) : 0;
-
-  res.json({
-    todayRegistrations,
-    monthRegistrations,
-    notContacted,
-    waitingPayment,
-    confirmed,
-    inTraining,
-    completed,
-    archived,
-    totalStudents: students.length,
-    conversionRate,
-  });
+  res.json({ todayRegistrations, monthRegistrations, notContacted, waitingPayment, confirmed, inTraining, completed, archived, totalStudents: students.length, conversionRate });
 });
 
 export default router;

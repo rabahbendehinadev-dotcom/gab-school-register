@@ -1,14 +1,15 @@
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { useQuery } from "@tanstack/react-query";
-import { RadioTower, Monitor, Smartphone, Globe, Clock, Zap, Moon, WifiOff, MessageCircle, Phone, StickyNote, ArrowRightLeft } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
+import { RadioTower, Monitor, Smartphone, Globe, Clock, Zap, Moon, WifiOff, AlarmClock, Coffee } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 import { ar } from "date-fns/locale";
 
 interface StaffActivityItem {
   staffId: number;
   fullName: string;
   role: string;
-  status: "active" | "idle_5" | "idle_15" | "offline";
+  status: "active" | "idle_5" | "idle_15" | "offline" | "outside_shift" | "shift_not_started" | "shift_ended";
   lastHeartbeatAt: string | null;
   lastActionAt: string | null;
   currentPage: string | null;
@@ -25,26 +26,26 @@ interface StaffActivityItem {
   };
 }
 
-function statusConfig(status: string) {
+type StatusKey = "active" | "idle_5" | "idle_15" | "offline" | "outside_shift" | "shift_not_started" | "shift_ended";
+
+function statusConfig(status: StatusKey) {
   switch (status) {
-    case "active":   return { label: "نشط الآن",    color: "bg-emerald-500", text: "text-emerald-700", bg: "bg-emerald-50 dark:bg-emerald-950/20", icon: Zap };
-    case "idle_5":   return { label: "خامل 5 د",    color: "bg-amber-400",   text: "text-amber-700",   bg: "bg-amber-50 dark:bg-amber-950/20",   icon: Moon };
-    case "idle_15":  return { label: "خامل 15 د",   color: "bg-orange-400",  text: "text-orange-700",  bg: "bg-orange-50 dark:bg-orange-950/20", icon: Moon };
-    default:         return { label: "غير متصل",    color: "bg-muted-foreground/30", text: "text-muted-foreground", bg: "bg-muted/50", icon: WifiOff };
+    case "active":            return { label: "نشط الآن",       color: "bg-emerald-500",              text: "text-emerald-700", bg: "bg-emerald-50 dark:bg-emerald-950/20", icon: Zap };
+    case "idle_5":            return { label: "خامل 5 د",        color: "bg-amber-400",                text: "text-amber-700",   bg: "bg-amber-50 dark:bg-amber-950/20",   icon: Moon };
+    case "idle_15":           return { label: "خامل 15 د",       color: "bg-orange-400",               text: "text-orange-700",  bg: "bg-orange-50 dark:bg-orange-950/20", icon: Moon };
+    case "offline":           return { label: "غير متصل",        color: "bg-muted-foreground/30",      text: "text-muted-foreground", bg: "bg-muted/50",                   icon: WifiOff };
+    case "outside_shift":     return { label: "خارج وقت العمل",  color: "bg-slate-300",                text: "text-slate-500",   bg: "bg-slate-50 dark:bg-slate-950/20",  icon: Coffee };
+    case "shift_not_started": return { label: "لم يبدأ وردية",   color: "bg-blue-300",                 text: "text-blue-600",    bg: "bg-blue-50 dark:bg-blue-950/20",    icon: AlarmClock };
+    case "shift_ended":       return { label: "انتهت الوردية",   color: "bg-purple-300",               text: "text-purple-600",  bg: "bg-purple-50 dark:bg-purple-950/20", icon: AlarmClock };
+    default:                  return { label: "غير معروف",        color: "bg-muted-foreground/30",      text: "text-muted-foreground", bg: "bg-muted/50",                   icon: WifiOff };
   }
 }
 
 function roleLabel(role: string) {
   const map: Record<string, string> = {
-    owner: "المالك",
-    admin: "مشرف",
-    manager: "مدير",
-    team_leader: "قائد الفريق",
-    staff: "موظف",
-    sales_agent: "مندوب",
-    assistant: "مساعد",
-    content_manager: "مدير محتوى",
-    viewer: "مراقب",
+    owner: "المالك", admin: "مشرف", manager: "مدير", team_leader: "قائد الفريق",
+    staff: "موظف", sales_agent: "مندوب", assistant: "مساعد",
+    content_manager: "مدير محتوى", viewer: "مراقب",
   };
   return map[role] ?? role;
 }
@@ -75,8 +76,8 @@ async function fetchActiveStaff(): Promise<StaffActivityItem[]> {
   return res.json();
 }
 
-export default function StaffActivity() {
-  const { data, isLoading, error } = useQuery<StaffActivityItem[]>({
+function StaffActivityContent() {
+  const { data, isLoading } = useQuery<StaffActivityItem[]>({
     queryKey: ["sessions", "active"],
     queryFn: fetchActiveStaff,
     refetchInterval: 30_000,
@@ -85,65 +86,58 @@ export default function StaffActivity() {
 
   const activeCount  = data?.filter(s => s.status === "active").length ?? 0;
   const idleCount    = data?.filter(s => s.status === "idle_5" || s.status === "idle_15").length ?? 0;
-  const offlineCount = data?.filter(s => s.status === "offline").length ?? 0;
+  const offlineCount = data?.filter(s => ["offline", "shift_ended"].includes(s.status)).length ?? 0;
+  const absentCount  = data?.filter(s => ["shift_not_started", "outside_shift"].includes(s.status)).length ?? 0;
 
   return (
-    <AdminLayout>
-      <div dir="rtl" className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-2">
-              <RadioTower className="w-6 h-6 text-primary" /> نشاط الفريق المباشر
-            </h2>
-            <p className="text-muted-foreground text-sm mt-1">يتحدث كل 30 ثانية تلقائياً</p>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />{activeCount} نشط</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />{idleCount} خامل</span>
-            <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/30 inline-block" />{offlineCount} غائب</span>
-          </div>
+    <div dir="rtl" className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <RadioTower className="w-6 h-6 text-primary" /> نشاط الفريق المباشر
+          </h2>
+          <p className="text-muted-foreground text-sm mt-1">يتحدث كل 30 ثانية — وقت العمل 8:00–18:00 السبت–الخميس</p>
         </div>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />{activeCount} نشط</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />{idleCount} خامل</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/30 inline-block" />{offlineCount} غير متصل</span>
+          <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-blue-300 inline-block" />{absentCount} خارج الوردية</span>
+        </div>
+      </div>
 
-        {isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[...Array(6)].map((_, i) => (
-              <div key={i} className="rounded-2xl bg-muted/30 border border-border/50 h-44 animate-pulse" />
-            ))}
-          </div>
-        )}
+      {isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="rounded-2xl bg-muted/30 border border-border/50 h-44 animate-pulse" />
+          ))}
+        </div>
+      )}
 
-        {error && (
-          <div className="text-destructive text-center py-10">
-            ليس لديك صلاحية مشاهدة نشاط الفريق
-          </div>
-        )}
+      {data && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.map((member) => {
+            const cfg = statusConfig(member.status as StatusKey);
+            const StatusIcon = cfg.icon;
+            const DeviceIcon = member.deviceType === "mobile" ? Smartphone : Monitor;
 
-        {data && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {data.map((member) => {
-              const cfg = statusConfig(member.status);
-              const StatusIcon = cfg.icon;
-              const DeviceIcon = member.deviceType === "mobile" ? Smartphone : Monitor;
-
-              return (
-                <div
-                  key={member.staffId}
-                  className={`rounded-2xl border border-border/50 shadow-sm p-4 ${cfg.bg} transition-all`}
-                >
-                  {/* Top row: name + status */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="font-semibold text-foreground text-sm leading-tight">{member.fullName}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{roleLabel(member.role)}</p>
-                    </div>
-                    <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${cfg.text} bg-card/70`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${cfg.color}`} />
-                      {cfg.label}
-                    </span>
+            return (
+              <div
+                key={member.staffId}
+                className={`rounded-2xl border border-border/50 shadow-sm p-4 ${cfg.bg} transition-all`}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <p className="font-semibold text-foreground text-sm leading-tight">{member.fullName}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{roleLabel(member.role)}</p>
                   </div>
+                  <span className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${cfg.text} bg-card/70`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${cfg.color}`} />
+                    {cfg.label}
+                  </span>
+                </div>
 
-                  {/* Current page */}
+                {(member.status === "active" || member.status === "idle_5" || member.status === "idle_15") && (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground mb-2">
                     <Globe className="w-3.5 h-3.5 shrink-0" />
                     <span className="truncate">{pageLabel(member.currentPage)}</span>
@@ -151,12 +145,13 @@ export default function StaffActivity() {
                       <span className="text-primary font-medium">#{member.currentStudentId}</span>
                     )}
                   </div>
+                )}
 
-                  {/* Device + time */}
+                {member.os && (
                   <div className="flex items-center gap-3 text-xs text-muted-foreground mb-3">
                     <span className="flex items-center gap-1">
                       <DeviceIcon className="w-3.5 h-3.5" />
-                      {member.os ?? "—"} · {member.browser ?? "—"}
+                      {member.os} · {member.browser}
                     </span>
                     {member.lastActionAt && (
                       <span className="flex items-center gap-1">
@@ -165,32 +160,41 @@ export default function StaffActivity() {
                       </span>
                     )}
                   </div>
+                )}
 
-                  {/* Today's stats */}
-                  <div className="grid grid-cols-4 gap-1 border-t border-border/30 pt-3">
-                    <div className="text-center">
-                      <p className="text-base font-bold text-emerald-600">{member.todayStats.whatsappClicks}</p>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">واتساب</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-base font-bold text-blue-600">{member.todayStats.callClicks}</p>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">مكالمات</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-base font-bold text-purple-600">{member.todayStats.notesAdded}</p>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">ملاحظات</p>
-                    </div>
-                    <div className="text-center">
-                      <p className="text-base font-bold text-foreground">{member.todayStats.totalActions}</p>
-                      <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">إجمالي</p>
-                    </div>
+                <div className="grid grid-cols-4 gap-1 border-t border-border/30 pt-3">
+                  <div className="text-center">
+                    <p className="text-base font-bold text-emerald-600">{member.todayStats.whatsappClicks}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">واتساب</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-bold text-blue-600">{member.todayStats.callClicks}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">مكالمات</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-bold text-purple-600">{member.todayStats.notesAdded}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">ملاحظات</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-base font-bold text-foreground">{member.todayStats.totalActions}</p>
+                    <p className="text-[10px] text-muted-foreground leading-tight mt-0.5">إجمالي</p>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function StaffActivity() {
+  return (
+    <AdminLayout>
+      <PermissionGuard permission="view_team_activity">
+        <StaffActivityContent />
+      </PermissionGuard>
     </AdminLayout>
   );
 }
