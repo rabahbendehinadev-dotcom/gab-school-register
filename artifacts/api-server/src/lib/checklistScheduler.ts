@@ -137,23 +137,16 @@ export async function runChecklistEscalationTick(): Promise<void> {
         }
       }
 
-      // ── Level 4: mark overdue + notify supervisors ─────────────────────────
-      if (minutesLate >= overdueMin) {
+      // ── Level 4: mark overdue only (no supervisor alert yet) ─────────────
+      if (minutesLate >= overdueMin && minutesLate < tlNotifyMin) {
         if (a.status !== "overdue") {
           await db.update(checklistAssignmentsTable).set({ status: "overdue" }).where(eq(checklistAssignmentsTable.id, a.id));
+          await logEscalation(a.id, 4, `تم تصنيف المهمة متأخرة`, a.staffId);
         }
-        if (minutesLate < tlNotifyMin) {
-          const lastFire = await getLastEscalationFireTime(a.id, 4);
-          const shouldFire = !lastFire || (now.getTime() - lastFire.getTime()) / 60000 >= repeatIntervalMin;
-          if (shouldFire) {
-            await notifySupervisors(
-              `🔴 مهمة متأخرة: ${a.title}`,
-              `الموظف (ID: ${a.staffId}) لم ينجز المهمة منذ ${Math.round(minutesLate)} دقيقة`,
-              "checklist_overdue_tl"
-            );
-            await logEscalation(a.id, 4, `مهمة متأخرة — إشعار المشرفين`, a.staffId);
-          }
-        }
+      }
+      // Mark overdue for levels 5/6 too (in case scheduler missed the L4 window)
+      if (minutesLate >= overdueMin && a.status !== "overdue") {
+        await db.update(checklistAssignmentsTable).set({ status: "overdue" }).where(eq(checklistAssignmentsTable.id, a.id));
       }
 
       // ── Level 5: escalate to supervisors with push ────────────────────────
