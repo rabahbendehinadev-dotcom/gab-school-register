@@ -17,6 +17,7 @@ import pushRouter from "./push";
 import studentExtrasRouter from "./student-extras";
 import rolesRouter from "./roles";
 import sessionsRouter from "./sessions";
+import studentCollabRouter from "./student-collab";
 
 const router: IRouter = Router();
 
@@ -38,5 +39,6 @@ router.use(pushRouter);
 router.use(studentExtrasRouter);
 router.use(rolesRouter);
 router.use(sessionsRouter);
+router.use(studentCollabRouter);
 
 export default router;
