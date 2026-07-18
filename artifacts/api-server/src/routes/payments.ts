@@ -89,7 +89,7 @@ router.delete("/payments/:id", requirePermission("manage_payments"), async (req,
   res.sendStatus(204);
 });
 
-router.get("/stats/financials", requirePermission("view_reports"), async (_req, res): Promise<void> => {
+router.get("/stats/financials", requirePermission("view_dashboard"), async (_req, res): Promise<void> => {
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);

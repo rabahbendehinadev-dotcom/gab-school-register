@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRoute, useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { AdminLayout } from "@/components/layout/AdminLayout";
+import { PermissionGuard } from "@/components/admin/PermissionGuard";
 import { useI18n } from "@/contexts/i18n-context";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -113,6 +114,7 @@ export default function StudentProfile() {
 
   return (
     <AdminLayout>
+      <PermissionGuard permission="view_students">
       <div dir={isFr ? "ltr" : "rtl"} className="space-y-5 max-w-4xl mx-auto">
         <button onClick={() => navigate("/gab-c7x2p/students")} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
           <ArrowRight className={`w-4 h-4 ${isFr ? "rotate-180" : ""}`} />{isFr ? "Tous les étudiants" : "كل الطلاب"}
@@ -174,6 +176,7 @@ export default function StudentProfile() {
         {tab === "attendance" && <AttendanceTab id={id} isFr={isFr} />}
         {tab === "payments" && <PaymentsTab id={id} isFr={isFr} />}
       </div>
+      </PermissionGuard>
     </AdminLayout>
   );
 }

@@ -197,7 +197,7 @@ function StaffActivityContent() {
 export default function StaffActivity() {
   return (
     <AdminLayout>
-      <PermissionGuard permission="manage_staff">
+      <PermissionGuard permission="view_team_activity">
         <StaffActivityContent />
       </PermissionGuard>
     </AdminLayout>

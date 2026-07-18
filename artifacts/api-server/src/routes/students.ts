@@ -412,7 +412,7 @@ router.post("/students/:id/receipt", requirePermission("manage_payments"), uploa
   }
 });
 
-router.get("/stats", requirePermission("view_reports"), async (_req, res): Promise<void> => {
+router.get("/stats", requirePermission("view_dashboard"), async (_req, res): Promise<void> => {
   const students = (await db.select().from(studentsTable)).filter((s) => !s.deletedAt);
   const stats = {
     totalStudents: students.length,
@@ -431,7 +431,7 @@ router.get("/stats", requirePermission("view_reports"), async (_req, res): Promi
   res.json(GetDashboardStatsResponse.parse(stats));
 });
 
-router.get("/stats/erp", requirePermission("view_reports"), async (_req, res): Promise<void> => {
+router.get("/stats/erp", requirePermission("view_dashboard"), async (_req, res): Promise<void> => {
   const all = await db.select().from(studentsTable);
   const students = all.filter((s) => !s.deletedAt);
   const now = new Date();
