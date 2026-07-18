@@ -19,15 +19,70 @@ import {
   ClipboardList,
   BarChart2,
   Cpu,
+  Bell,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { usePermission } from "@/hooks/use-permission";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useI18n } from "@/contexts/i18n-context";
 import { NotificationCenter } from "@/components/admin/NotificationCenter";
 import { PushToggleButton } from "@/components/admin/PushToggleButton";
+
+const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const NOTIF_LABELS: Record<string, string> = {
+  always: "دائماً", during_shift: "أثناء الوردية", critical_only: "الحرجة فقط", off: "إيقاف",
+};
+
+function MyNotifPref() {
+  const qc = useQueryClient();
+  const { data } = useQuery<{ pref: string }>({
+    queryKey: ["my-notif-pref"],
+    queryFn: async () => {
+      const r = await fetch(`${BASE}/api/ai/my-notification-pref`, { credentials: "include" });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+  });
+  const update = useMutation({
+    mutationFn: async (pref: string) => {
+      const r = await fetch(`${BASE}/api/ai/my-notification-pref`, {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pref }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["my-notif-pref"] }),
+  });
+
+  return (
+    <div className="mb-2 px-1">
+      <div className="flex items-center gap-1.5 mb-1">
+        <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">إشعاراتي</span>
+      </div>
+      <div className="grid grid-cols-2 gap-1">
+        {Object.entries(NOTIF_LABELS).map(([v, label]) => (
+          <button
+            key={v}
+            onClick={() => update.mutate(v)}
+            disabled={update.isPending}
+            className={`text-xs py-1 px-2 rounded-lg border transition-all ${
+              (data?.pref ?? "during_shift") === v
+                ? "bg-primary text-white border-primary"
+                : "bg-muted text-muted-foreground border-border hover:border-primary/50"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 function useHeartbeat(page: string) {
   const { user } = useAuth();
@@ -239,13 +294,14 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="p-4 border-t border-border/50">
-          <div className="bg-muted rounded-2xl p-4 mb-4">
+          <div className="bg-muted rounded-2xl p-4 mb-3">
             <p className="text-sm font-semibold text-foreground truncate">{user.fullName}</p>
             <p className="text-xs text-muted-foreground capitalize mt-0.5">{user.role}</p>
           </div>
+          <MyNotifPref />
           <Button 
             variant="outline" 
-            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+            className="w-full justify-start text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20 mt-2"
             onClick={() => logout()}
           >
             <LogOut className="w-4 h-4 mr-2" />

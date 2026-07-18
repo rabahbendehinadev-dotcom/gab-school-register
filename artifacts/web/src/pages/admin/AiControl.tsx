@@ -46,6 +46,11 @@ interface AiSettings {
   ai_late_response_threshold_h: string;
   ai_calls_without_result_threshold: string;
   ai_critical_alert_interval_min: string;
+  ai_3h_interval_h: string;
+  ai_midday_hour: string;
+  ai_eod_hour: string;
+  ai_weekly_day: string;
+  ai_weekly_hour: string;
 }
 
 const severityConfig: Record<Severity, { label: string; color: string; icon: React.ElementType; bg: string; border: string }> = {
@@ -258,9 +263,54 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">فاصل فحص الحرج (دقائق)</Label>
             <Input
-              type="number" min="5" max="60"
+              type="number" min="1" max="60"
               value={merged.ai_critical_alert_interval_min ?? "10"}
               onChange={e => setForm(f => ({ ...f, ai_critical_alert_interval_min: e.target.value }))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">فاصل الملخص الدوري (ساعات)</Label>
+            <Input
+              type="number" min="1" max="12"
+              value={merged.ai_3h_interval_h ?? "3"}
+              onChange={e => setForm(f => ({ ...f, ai_3h_interval_h: e.target.value }))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">ساعة تقرير الظهيرة</Label>
+            <Input
+              type="number" min="8" max="16"
+              value={merged.ai_midday_hour ?? "12"}
+              onChange={e => setForm(f => ({ ...f, ai_midday_hour: e.target.value }))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">ساعة تقرير نهاية اليوم</Label>
+            <Input
+              type="number" min="16" max="23"
+              value={merged.ai_eod_hour ?? "20"}
+              onChange={e => setForm(f => ({ ...f, ai_eod_hour: e.target.value }))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">يوم التقرير الأسبوعي (0=أحد, 1=اثنين)</Label>
+            <Input
+              type="number" min="0" max="6"
+              value={merged.ai_weekly_day ?? "1"}
+              onChange={e => setForm(f => ({ ...f, ai_weekly_day: e.target.value }))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">ساعة التقرير الأسبوعي</Label>
+            <Input
+              type="number" min="5" max="12"
+              value={merged.ai_weekly_hour ?? "8"}
+              onChange={e => setForm(f => ({ ...f, ai_weekly_hour: e.target.value }))}
               className="h-8 text-sm"
             />
           </div>

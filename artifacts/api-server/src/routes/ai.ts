@@ -57,7 +57,7 @@ router.get("/ai/reports/:id", requirePermission("view_ai_control"), async (req, 
 });
 
 /**
- * GET /ai/alerts/active — unread warning+/important/critical alerts
+ * GET /ai/alerts/active — unread warning/important/critical alerts
  * from the last 48 h, or any unread. Ordered by severity then date.
  */
 router.get("/ai/alerts/active", requirePermission("view_ai_control"), async (_req, res): Promise<void> => {
@@ -74,11 +74,11 @@ router.get("/ai/alerts/active", requirePermission("view_ai_control"), async (_re
   res.json(result.rows);
 });
 
-/** GET /ai/alerts/unread-count — badge count (only important/critical unread) */
+/** GET /ai/alerts/unread-count — badge count (warning+ unread) */
 router.get("/ai/alerts/unread-count", requirePermission("view_ai_control"), async (_req, res): Promise<void> => {
   const result = await pool.query(`
     SELECT COUNT(*) FROM ai_reports
-    WHERE is_read = false AND severity IN ('important','critical')
+    WHERE is_read = false AND severity IN ('warning','important','critical')
   `);
   res.json({ count: parseInt(result.rows[0].count, 10) });
 });
@@ -125,14 +125,24 @@ const AI_KEYS = [
   "ai_late_response_threshold_h",
   "ai_calls_without_result_threshold",
   "ai_critical_alert_interval_min",
+  "ai_3h_interval_h",
+  "ai_midday_hour",
+  "ai_eod_hour",
+  "ai_weekly_day",
+  "ai_weekly_hour",
 ];
 
 const AI_DEFAULTS: Record<string, string> = {
-  ai_scheduler_enabled: "true",
-  ai_idle_threshold_min: String(DEFAULT_SETTINGS.idleThresholdMin),
-  ai_late_response_threshold_h: String(DEFAULT_SETTINGS.lateResponseThresholdH),
-  ai_calls_without_result_threshold: String(DEFAULT_SETTINGS.callsWithoutResultThreshold),
-  ai_critical_alert_interval_min: "10",
+  ai_scheduler_enabled:               "true",
+  ai_idle_threshold_min:              String(DEFAULT_SETTINGS.idleThresholdMin),
+  ai_late_response_threshold_h:       String(DEFAULT_SETTINGS.lateResponseThresholdH),
+  ai_calls_without_result_threshold:  String(DEFAULT_SETTINGS.callsWithoutResultThreshold),
+  ai_critical_alert_interval_min:     "10",
+  ai_3h_interval_h:                   "3",
+  ai_midday_hour:                     "12",
+  ai_eod_hour:                        "20",
+  ai_weekly_day:                      "1",
+  ai_weekly_hour:                     "8",
 };
 
 router.get("/ai/settings", requireAnyPermission("view_ai_control", "manage_ai_control"), async (_req, res): Promise<void> => {
@@ -160,7 +170,7 @@ router.put("/ai/settings", requirePermission("manage_ai_control"), async (req, r
 
 const VALID_PREFS = ["always", "during_shift", "critical_only", "off"] as const;
 
-/** GET /ai/notification-prefs — list all staff with their notification_pref */
+/** GET /ai/notification-prefs — list all staff with their notification_pref (admin only) */
 router.get("/ai/notification-prefs", requirePermission("manage_ai_control"), async (_req, res): Promise<void> => {
   const result = await pool.query<{ id: number; full_name: string; role: string; notification_pref: string }>(
     `SELECT id, full_name, role, COALESCE(notification_pref, 'during_shift') AS notification_pref FROM staff ORDER BY full_name`
@@ -168,9 +178,40 @@ router.get("/ai/notification-prefs", requirePermission("manage_ai_control"), asy
   res.json(result.rows);
 });
 
-/** PUT /ai/notification-prefs/:staffId — set notification preference for a staff member */
+/** PUT /ai/notification-prefs/:staffId — admin sets another staff member's preference */
 router.put("/ai/notification-prefs/:staffId", requirePermission("manage_ai_control"), async (req, res): Promise<void> => {
   const staffId = parseInt(req.params.staffId, 10);
+  const { pref } = req.body as { pref: string };
+  if (!VALID_PREFS.includes(pref as typeof VALID_PREFS[number])) {
+    res.status(400).json({ error: "Invalid pref. Must be one of: " + VALID_PREFS.join(", ") });
+    return;
+  }
+  await pool.query(`UPDATE staff SET notification_pref = $1 WHERE id = $2`, [pref, staffId]);
+  res.json({ success: true });
+});
+
+/**
+ * GET /ai/my-notification-pref — employee self-service: get own preference.
+ * Available to any authenticated staff member (no special permission required).
+ */
+router.get("/ai/my-notification-pref", async (req, res): Promise<void> => {
+  const staffId = (req.session as any)?.staffId ?? (req.session as any)?.userId;
+  if (!staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
+  const result = await pool.query<{ notification_pref: string }>(
+    `SELECT COALESCE(notification_pref, 'during_shift') AS notification_pref FROM staff WHERE id = $1`,
+    [staffId]
+  );
+  const pref = result.rows[0]?.notification_pref ?? "during_shift";
+  res.json({ pref });
+});
+
+/**
+ * PUT /ai/my-notification-pref — employee self-service: update own preference.
+ * Available to any authenticated staff member (no special permission required).
+ */
+router.put("/ai/my-notification-pref", async (req, res): Promise<void> => {
+  const staffId = (req.session as any)?.staffId ?? (req.session as any)?.userId;
+  if (!staffId) { res.status(401).json({ error: "Not authenticated" }); return; }
   const { pref } = req.body as { pref: string };
   if (!VALID_PREFS.includes(pref as typeof VALID_PREFS[number])) {
     res.status(400).json({ error: "Invalid pref. Must be one of: " + VALID_PREFS.join(", ") });

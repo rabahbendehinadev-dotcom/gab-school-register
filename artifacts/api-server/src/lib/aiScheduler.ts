@@ -44,22 +44,48 @@ async function getAlertRecipients(severity: Severity): Promise<number[]> {
       if (!(roleMap[s.role] ?? []).includes("receive_ai_alerts")) return false;
       const pref = s.notification_pref;
       if (pref === "off") return false;
+      // critical_only: only send for critical findings
       if (pref === "critical_only" && severity !== "critical") return false;
+      // during_shift: send warning/important/critical during working hours (06:00–22:00)
       if (pref === "during_shift" && (hour < 6 || hour >= 22)) return false;
+      // always: all severities including warning, no time restriction
+      // warning and above are included for always + during_shift
       return true;
     })
     .map(s => s.id);
 }
 
+async function getScheduleSettings() {
+  const keys = [
+    "ai_3h_interval_h", "ai_midday_hour", "ai_eod_hour",
+    "ai_weekly_day", "ai_weekly_hour",
+  ];
+  const result = await pool.query<{ key: string; value: string }>(
+    `SELECT key, value FROM settings WHERE key = ANY($1)`, [keys]
+  );
+  const m: Record<string, string> = {};
+  for (const r of result.rows) m[r.key] = r.value;
+  return {
+    interval3h:  parseInt(m.ai_3h_interval_h ?? "3",  10),
+    middayHour:  parseInt(m.ai_midday_hour   ?? "12", 10),
+    eodHour:     parseInt(m.ai_eod_hour      ?? "20", 10),
+    weeklyDay:   parseInt(m.ai_weekly_day    ?? "1",  10),
+    weeklyHour:  parseInt(m.ai_weekly_hour   ?? "8",  10),
+  };
+}
+
 async function notifyRecipients(findings: AiFinding[], tag: string): Promise<void> {
-  const urgent = findings.filter(f => f.severity === "critical" || f.severity === "important");
-  if (urgent.length === 0) return;
-  const topSev: Severity = urgent.some(f => f.severity === "critical") ? "critical" : "important";
+  // Notify for warning and above — recipients are filtered per their pref
+  const notable = findings.filter(f => f.severity !== "info");
+  if (notable.length === 0) return;
+  const topSev: Severity = notable.some(f => f.severity === "critical")  ? "critical"
+                          : notable.some(f => f.severity === "important") ? "important"
+                          : "warning";
   const staffIds = await getAlertRecipients(topSev);
   if (staffIds.length === 0) return;
   const payload: PushPayload = {
-    title: `تنبيه — ${urgent.length} تنبيه مهم`,
-    body: urgent[0].titleAr,
+    title: `تنبيه — ${notable.length} تنبيه`,
+    body: notable[0].titleAr,
     url: "/gab-c7x2p/ai-control",
     tag: `ai-alert-${tag}`,
   };
@@ -134,21 +160,26 @@ export function startAiScheduler(): void {
   // Critical: base tick every 1 minute; actual firing determined by ai_critical_alert_interval_min setting
   setInterval(runCriticalCheck, 60_000);
 
-  // 3-hour rolling summary
-  setInterval(() => runReport("3h_summary"), 3 * 60 * 60_000);
+  // 3-hour rolling summary — interval is configurable, checked every 5 min
+  let last3h = 0;
+  setInterval(async () => {
+    const { interval3h } = await getScheduleSettings();
+    const elapsedH = (Date.now() - last3h) / 3_600_000;
+    if (elapsedH >= interval3h) { last3h = Date.now(); runReport("3h_summary"); }
+  }, 5 * 60_000);
 
-  // Midday, EOD, Weekly — checked every 15 min
+  // Midday, EOD, Weekly — checked every 15 min, timings read from settings
   const fired: Record<string, string> = { midday: "", eod: "", weekly: "" };
-  setInterval(() => {
-    const now     = new Date();
-    const hour    = now.getHours();
-    const dayKey  = now.toISOString().slice(0, 10);
-    const weekKey = `${now.getFullYear()}-W${now.getDay() === 1 ? dayKey : ""}`;
+  setInterval(async () => {
+    const now = new Date();
+    const hour   = now.getHours();
+    const dayKey = now.toISOString().slice(0, 10);
+    const { middayHour, eodHour, weeklyDay, weeklyHour } = await getScheduleSettings();
+    const weekKey = `${now.getFullYear()}-${now.getDay()}-${dayKey}`;
 
-    if (hour === 12 && fired.midday !== dayKey) { fired.midday = dayKey; runReport("midday_report"); }
-    if (hour === 20 && fired.eod   !== dayKey) { fired.eod   = dayKey; runReport("end_of_day"); }
-    // Weekly: every Monday at 08:00
-    if (now.getDay() === 1 && hour === 8 && fired.weekly !== weekKey) {
+    if (hour === middayHour && fired.midday !== dayKey)  { fired.midday = dayKey; runReport("midday_report"); }
+    if (hour === eodHour    && fired.eod   !== dayKey)   { fired.eod   = dayKey; runReport("end_of_day"); }
+    if (now.getDay() === weeklyDay && hour === weeklyHour && fired.weekly !== weekKey) {
       fired.weekly = weekKey; runReport("weekly_summary");
     }
   }, 15 * 60_000);
