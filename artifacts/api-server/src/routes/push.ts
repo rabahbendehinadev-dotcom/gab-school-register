@@ -66,7 +66,7 @@ router.post("/push/report-denied", requireAuth, async (req, res): Promise<void> 
     await sendPushToRole("owner", {
       title: "⚠️ تعطيل الإشعارات",
       body:  `الموظف "${staffName}" قام بتعطيل إشعارات المتصفح`,
-      data:  { url: "/gab-c7x2p/activity" },
+      url:   "/gab-c7x2p/activity",
     });
   } catch {
     // non-critical — log was already written

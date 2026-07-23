@@ -1,0 +1,49 @@
+# ── Development & editor files ────────────────────────────────────────────────
+.git
+.gitignore
+.cursor
+.local
+.cache
+*.md
+!MIGRATION.md
+
+# ── Secrets & environment ─────────────────────────────────────────────────────
+.env
+.env.*
+*.pem
+*.key
+
+# ── Dependencies (reinstalled inside Docker) ──────────────────────────────────
+node_modules
+**/node_modules
+
+# ── Build outputs (rebuilt inside Docker) ────────────────────────────────────
+dist
+**/dist
+artifacts/web/dist
+artifacts/api-server/dist
+
+# ── Uploads & user data (never in image — use Docker volume) ─────────────────
+artifacts/api-server/uploads/
+uploads/
+
+# ── Sensitive / large files ───────────────────────────────────────────────────
+backups/
+*.dump
+*.sql
+*.log
+logs/
+
+# ── Replit-specific ───────────────────────────────────────────────────────────
+.replit
+replit.nix
+.upm/
+
+# ── TypeScript build info ─────────────────────────────────────────────────────
+*.tsbuildinfo
+lib/**/src/generated/
+
+# ── Test / CI ─────────────────────────────────────────────────────────────────
+**/*.test.ts
+**/*.spec.ts
+coverage/

@@ -5,6 +5,10 @@ import connectPgSimple from "connect-pg-simple";
 import router from "./routes";
 import crypto from "crypto";
 import { pool } from "@workspace/db";
+import { ensureUploadDirs } from "./lib/localFileStorage";
+
+// Ensure local upload directories exist on every startup
+ensureUploadDirs();
 
 const app: Express = express();
 
@@ -52,5 +56,16 @@ app.use(
 );
 
 app.use("/api", router);
+
+// In production, serve the pre-built React frontend as static files.
+// This lets a single container serve both API and frontend.
+if (process.env.NODE_ENV === "production") {
+  const frontendDir = process.env.FRONTEND_STATIC_DIR || "/app/public";
+  app.use(express.static(frontendDir));
+  // SPA fallback — serve index.html for all non-API routes
+  app.get("*", (_req, res) => {
+    res.sendFile("index.html", { root: frontendDir });
+  });
+}
 
 export default app;

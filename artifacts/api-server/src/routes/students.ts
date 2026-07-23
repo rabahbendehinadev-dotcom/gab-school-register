@@ -17,7 +17,6 @@ import { requirePermission, requireAnyPermission, requireAuth } from "../middlew
 import { logActivity } from "../lib/activityLogger";
 import { createNotification } from "../lib/notifications";
 import { sendTelegramNotification } from "../lib/telegram";
-import { objectStorageClient } from "../lib/objectStorage";
 import multer from "multer";
 import { randomUUID } from "crypto";
 import "../types/session";
@@ -28,12 +27,6 @@ const ALL_STAGE_VALUES = [
 ] as const;
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
-
-function parseStoragePath(path: string): { bucketName: string; objectName: string } {
-  if (!path.startsWith("/")) path = `/${path}`;
-  const parts = path.split("/");
-  return { bucketName: parts[1], objectName: parts.slice(2).join("/") };
-}
 
 const router: IRouter = Router();
 
@@ -417,21 +410,13 @@ router.post("/students/:id/receipt", requirePermission("manage_payments"), uploa
   const id = parseInt(String(req.params.id), 10);
   if (!req.file) { res.status(400).json({ error: "No file provided" }); return; }
 
-  const privateDir = process.env.PRIVATE_OBJECT_DIR || "";
-  if (!privateDir) { res.status(500).json({ error: "Storage not configured" }); return; }
-
   const [existing] = await db.select({ id: studentsTable.id }).from(studentsTable).where(eq(studentsTable.id, id));
   if (!existing) { res.status(404).json({ error: "Student not found" }); return; }
 
   try {
+    const { getReceiptsDir, saveFile } = await import("../lib/localFileStorage");
     const objectId = randomUUID();
-    const fullGcsPath = `${privateDir}/uploads/${objectId}`;
-    const { bucketName, objectName } = parseStoragePath(fullGcsPath);
-
-    await objectStorageClient.bucket(bucketName).file(objectName).save(req.file.buffer, {
-      contentType: req.file.mimetype,
-      resumable: false,
-    });
+    await saveFile(getReceiptsDir(), objectId, req.file.buffer);
 
     const serveUrl = `/api/storage/receipts/${objectId}`;
     await db.update(studentsTable).set({ receiptUrl: serveUrl }).where(eq(studentsTable.id, id));

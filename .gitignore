@@ -1,49 +1,66 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
-
-# compiled output
-dist
-tmp
-out-tsc
+# ── Compiled output ───────────────────────────────────────────────────────────
+dist/
+tmp/
+out-tsc/
 *.tsbuildinfo
 .expo
 .expo-shared
 
-# dependencies
-node_modules
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+**/node_modules/
 
-# IDEs and editors
+# ── Secrets & environment ─────────────────────────────────────────────────────
+.env
+.env.*
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ── User-uploaded files (use Docker volume — never commit) ────────────────────
+uploads/
+artifacts/api-server/uploads/
+
+# ── Database dumps & backups (NEVER commit client data) ──────────────────────
+backups/
+*.dump
+*.sql
+*.bak
+
+# ── Logs ─────────────────────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# ── Large or sensitive attached assets ───────────────────────────────────────
+attached_assets/
+
+# ── OS files ──────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── IDEs & editors ────────────────────────────────────────────────────────────
 /.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
-
-# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
+*.sublime-workspace
+.cursor/
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
-npm-debug.log
-yarn-error.log
-testem.log
-/typings
-
-# System Files
-.DS_Store
-Thumbs.db
-
-.cursor/rules/nx-rules.mdc
-.github/instructions/nx.instructions.md
-
-# Replit
+# ── Replit-specific ───────────────────────────────────────────────────────────
 .cache/
 .local/
+.upm/
+.replit
+replit.nix
+
+# ── Generated files (rebuilt from source) ─────────────────────────────────────
+lib/api-client-react/src/generated/
+lib/api-zod/src/generated/
+
+# ── Coverage & test output ────────────────────────────────────────────────────
+coverage/

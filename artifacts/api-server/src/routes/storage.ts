@@ -1,104 +1,53 @@
 import { Router, type IRouter, type Request, type Response } from "express";
-import { Readable } from "stream";
-import {
-  RequestUploadUrlBody,
-  RequestUploadUrlResponse,
-} from "@workspace/api-zod";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
 import { requireAuth } from "../middlewares/auth";
+import path from "path";
+import {
+  getReceiptsDir,
+  streamFileToBrowser,
+  guessMimeType,
+} from "../lib/localFileStorage";
 
 const router: IRouter = Router();
-const objectStorageService = new ObjectStorageService();
 
-router.post("/storage/uploads/request-url", requireAuth, async (req: Request, res: Response) => {
-  const parsed = RequestUploadUrlBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: "Missing or invalid required fields" });
-    return;
-  }
-
-  try {
-    const { name, size, contentType } = parsed.data;
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-    const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-    res.json(RequestUploadUrlResponse.parse({ uploadURL, objectPath, metadata: { name, size, contentType } }));
-  } catch (error) {
-    console.error("Error generating upload URL", error);
-    res.status(500).json({ error: "Failed to generate upload URL" });
-  }
-});
-
-router.get("/storage/public-objects/*filePath", async (req: Request, res: Response) => {
-  try {
-    const raw = req.params.filePath;
-    const filePath = Array.isArray(raw) ? raw.join("/") : raw;
-    const file = await objectStorageService.searchPublicObject(filePath);
-    if (!file) {
-      res.status(404).json({ error: "File not found" });
-      return;
-    }
-    const response = await objectStorageService.downloadObject(file);
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    console.error("Error serving public object", error);
-    res.status(500).json({ error: "Failed to serve public object" });
-  }
-});
-
+/**
+ * Serve a receipt file from the local uploads volume.
+ * URL: /api/storage/receipts/:uuid
+ * File on disk: UPLOADS_DIR/receipts/:uuid
+ */
 router.get("/storage/receipts/:uuid", async (req: Request, res: Response) => {
   try {
     const uuid = String(req.params.uuid);
-    const objectPath = `/objects/uploads/${uuid}`;
-    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-    const response = await objectStorageService.downloadObject(objectFile, 86400);
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    if (error instanceof ObjectNotFoundError) {
-      res.status(404).json({ error: "Receipt not found" });
+    if (!uuid || uuid.includes("/") || uuid.includes("..")) {
+      res.status(400).json({ error: "Invalid receipt id" });
       return;
     }
-    console.error("Error serving receipt", error);
+    const filePath = path.join(getReceiptsDir(), uuid);
+    const mimeType = guessMimeType(uuid) === "application/octet-stream"
+      ? "application/octet-stream"
+      : guessMimeType(uuid);
+
+    await streamFileToBrowser(filePath, mimeType, res, { cacheMaxAge: 86400 });
+  } catch {
     res.status(500).json({ error: "Failed to serve receipt" });
   }
 });
 
-router.get("/storage/objects/*path", requireAuth, async (req: Request, res: Response) => {
-  try {
-    const raw = req.params.path;
-    const wildcardPath = Array.isArray(raw) ? raw.join("/") : raw;
-    const objectPath = `/objects/${wildcardPath}`;
-    const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
-    const response = await objectStorageService.downloadObject(objectFile);
-    res.status(response.status);
-    response.headers.forEach((value, key) => res.setHeader(key, value));
-    if (response.body) {
-      const nodeStream = Readable.fromWeb(response.body as ReadableStream<Uint8Array>);
-      nodeStream.pipe(res);
-    } else {
-      res.end();
-    }
-  } catch (error) {
-    if (error instanceof ObjectNotFoundError) {
-      res.status(404).json({ error: "Object not found" });
-      return;
-    }
-    console.error("Error serving object", error);
-    res.status(500).json({ error: "Failed to serve object" });
-  }
+/**
+ * NOTE: The Replit-specific routes below (request-url, public-objects, objects)
+ * relied on Replit Object Storage (GCS sidecar) and are disabled in production.
+ * They return 501 so clients get a clear error rather than a crash.
+ */
+
+router.post("/storage/uploads/request-url", requireAuth, (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Direct-upload signed URLs are not supported in self-hosted mode. Upload files through the gallery or receipt endpoints instead." });
+});
+
+router.get("/storage/public-objects/*filePath", (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Replit object storage not available in self-hosted mode." });
+});
+
+router.get("/storage/objects/*path", requireAuth, (_req: Request, res: Response) => {
+  res.status(501).json({ error: "Replit object storage not available in self-hosted mode." });
 });
 
 export default router;

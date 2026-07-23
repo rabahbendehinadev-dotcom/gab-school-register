@@ -45,7 +45,7 @@ router.get("/ai/reports", requirePermission("view_ai_control"), async (req, res)
 
 /** GET /ai/reports/:id — single report, marks as read */
 router.get("/ai/reports/:id", requirePermission("view_ai_control"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
   const result = await pool.query(
     `UPDATE ai_reports SET is_read = true WHERE id = $1
@@ -106,7 +106,7 @@ router.post("/ai/reports/run", requirePermission("view_ai_control"), async (req,
 
 /** POST /ai/reports/:id/read — mark one as read */
 router.post("/ai/reports/:id/read", requirePermission("view_ai_control"), async (req, res): Promise<void> => {
-  const id = parseInt(req.params.id, 10);
+  const id = parseInt(String(req.params.id), 10);
   await pool.query(`UPDATE ai_reports SET is_read = true WHERE id = $1`, [id]);
   res.json({ success: true });
 });
@@ -201,7 +201,7 @@ router.get("/ai/notification-prefs", requireAnyPermission("manage_ai_control", "
 
 /** PUT /ai/notification-prefs/:staffId — owner or admin sets a staff member's notification settings */
 router.put("/ai/notification-prefs/:staffId", requireAnyPermission("manage_ai_control", "manage_staff"), async (req, res): Promise<void> => {
-  const staffId = parseInt(req.params.staffId, 10);
+  const staffId = parseInt(String(req.params.staffId), 10);
   const body = req.body as Record<string, unknown>;
   const current = await pool.query(`SELECT notification_settings FROM staff WHERE id = $1`, [staffId]);
   const existing = mergedSettings(current.rows[0]?.notification_settings);

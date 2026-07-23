@@ -1,0 +1,46 @@
+version: "3.9"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# GAB System — Local Docker Compose (for testing the production image locally)
+# NOT used in Dokploy — Dokploy manages services independently.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: gabschool
+      POSTGRES_USER: gabuser
+      POSTGRES_PASSWORD: changeme_in_production
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gabuser -d gabschool"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      DATABASE_URL: postgres://gabuser:changeme_in_production@db:5432/gabschool
+      SESSION_SECRET: change_this_to_a_long_random_string_in_production
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      # Persistent uploads — survives container rebuilds
+      - uploads_data:/app/uploads
+
+volumes:
+  pg_data:
+  uploads_data:
