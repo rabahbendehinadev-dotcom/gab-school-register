@@ -41,7 +41,8 @@ replit.nix
 
 # ── TypeScript build info ─────────────────────────────────────────────────────
 *.tsbuildinfo
-lib/**/src/generated/
+# NOTE: lib/**/src/generated/ must NOT be excluded — the Docker builder needs
+# these files. They are committed to git and included in the build context.
 
 # ── Test / CI ─────────────────────────────────────────────────────────────────
 **/*.test.ts

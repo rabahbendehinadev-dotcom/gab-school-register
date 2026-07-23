@@ -11,7 +11,10 @@ import { createReadStream } from "fs";
 import type { Response } from "express";
 
 export function getUploadsDir(): string {
-  return process.env.UPLOADS_DIR || "/app/uploads";
+  if (process.env.UPLOADS_DIR) return process.env.UPLOADS_DIR;
+  // In development (Replit / local), fall back to a sibling "uploads/" folder
+  // next to the running process so files land in artifacts/api-server/uploads/
+  return path.join(process.cwd(), "uploads");
 }
 
 export function getGalleryDir(): string {

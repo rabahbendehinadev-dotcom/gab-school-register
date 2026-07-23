@@ -42,11 +42,12 @@ router.post("/storage/uploads/request-url", requireAuth, (_req: Request, res: Re
   res.status(501).json({ error: "Direct-upload signed URLs are not supported in self-hosted mode. Upload files through the gallery or receipt endpoints instead." });
 });
 
-router.get("/storage/public-objects/*filePath", (_req: Request, res: Response) => {
+// Express 5: use a regex to avoid named-wildcard issues with path-to-regexp v8
+router.get(/^\/storage\/public-objects\/(.+)$/, (_req: Request, res: Response) => {
   res.status(501).json({ error: "Replit object storage not available in self-hosted mode." });
 });
 
-router.get("/storage/objects/*path", requireAuth, (_req: Request, res: Response) => {
+router.get(/^\/storage\/objects\/(.+)$/, requireAuth, (_req: Request, res: Response) => {
   res.status(501).json({ error: "Replit object storage not available in self-hosted mode." });
 });
 

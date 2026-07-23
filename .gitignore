@@ -58,9 +58,11 @@ Thumbs.db
 .replit
 replit.nix
 
-# ── Generated files (rebuilt from source) ─────────────────────────────────────
-lib/api-client-react/src/generated/
-lib/api-zod/src/generated/
+# ── Generated API client files ───────────────────────────────────────────────
+# These ARE committed intentionally — the Docker build needs them and Dokploy
+# clones from GitHub. Running codegen is not part of the Docker build.
+# DO commit: lib/api-client-react/src/generated/
+# DO commit: lib/api-zod/src/generated/
 
 # ── Coverage & test output ────────────────────────────────────────────────────
 coverage/

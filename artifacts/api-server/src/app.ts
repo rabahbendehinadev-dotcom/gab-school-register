@@ -62,8 +62,9 @@ app.use("/api", router);
 if (process.env.NODE_ENV === "production") {
   const frontendDir = process.env.FRONTEND_STATIC_DIR || "/app/public";
   app.use(express.static(frontendDir));
-  // SPA fallback — serve index.html for all non-API routes
-  app.get("*", (_req, res) => {
+  // SPA fallback — serve index.html for all non-API routes.
+  // Use app.use() (not app.get("*")) to avoid Express 5 unnamed-wildcard error.
+  app.use((_req, res) => {
     res.sendFile("index.html", { root: frontendDir });
   });
 }

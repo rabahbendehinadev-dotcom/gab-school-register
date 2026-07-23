@@ -1,87 +1,94 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# GAB System — Production Dockerfile
-# Multi-stage build: build frontend + bundle backend, then produce slim image.
+# GAB System — Production Dockerfile (Multi-stage)
+#
+# Analysis: the esbuild bundle only has ONE external npm runtime dependency:
+#   web-push@3.6.7
+# Everything else (express, pg, drizzle-orm, cors, multer, session, zod…)
+# is fully bundled. This keeps the final image very small.
+#
+# Uses Debian-based Node (not Alpine) to avoid musl/glibc binary issues
+# with native tooling (esbuild, @tailwindcss/oxide) used during the build.
 # ─────────────────────────────────────────────────────────────────────────────
 
-# ── Stage 1: Install all dependencies ────────────────────────────────────────
-FROM node:24-alpine AS deps
+# ── Stage 1: Install all dependencies ─────────────────────────────────────────
+FROM node:24 AS deps
 WORKDIR /app
 
-RUN npm install -g pnpm@9 --quiet
+# Match the pnpm version used in the workspace
+RUN npm install -g pnpm@10 --quiet
 
-# Copy workspace manifests first (better layer caching)
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+# Copy workspace-level manifests first (best Docker layer caching)
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY tsconfig.base.json tsconfig.json ./
 
-# Library packages
-COPY lib/db/package.json             lib/db/
-COPY lib/api-spec/package.json       lib/api-spec/
-COPY lib/api-zod/package.json        lib/api-zod/
+# Library package manifests
+COPY lib/db/package.json               lib/db/
+COPY lib/api-spec/package.json         lib/api-spec/
+COPY lib/api-zod/package.json          lib/api-zod/
 COPY lib/api-client-react/package.json lib/api-client-react/
 
-# Artifact packages
+# Artifact + scripts manifests
 COPY artifacts/api-server/package.json artifacts/api-server/
 COPY artifacts/web/package.json        artifacts/web/
+COPY scripts/package.json              scripts/
 
+# Install everything (devDeps needed for build tools: vite, esbuild, tsx…)
 RUN pnpm install --frozen-lockfile
 
-# ── Stage 2: Build everything ─────────────────────────────────────────────────
+# ── Stage 2: Build frontend + backend ─────────────────────────────────────────
 FROM deps AS builder
 WORKDIR /app
 
-# Copy source
+# Copy all source files (tsconfig files are included inside each directory)
 COPY lib/                  lib/
 COPY artifacts/api-server/ artifacts/api-server/
 COPY artifacts/web/        artifacts/web/
+COPY scripts/              scripts/
 
-# attached_assets may be referenced by @assets alias in the frontend
+# attached_assets — referenced via @assets Vite alias; include so the alias
+# resolves cleanly during the build even if nothing in production imports it.
 COPY attached_assets/      attached_assets/
 
-# Build frontend (static files → artifacts/web/dist/public)
-# BASE_PATH=/ for standalone deployment at root
-ENV NODE_ENV=production
-ENV BASE_PATH=/
-ENV PORT=3000
+# ── Build React/Vite frontend → artifacts/web/dist/public/ ───────────────────
+# BASE_PATH=/ → SPA served at root in Dokploy.
+# PORT is required by vite.config.ts validation but unused during `vite build`.
+ENV NODE_ENV=production \
+    BASE_PATH=/ \
+    PORT=3000
 RUN pnpm --filter @workspace/web run build
 
-# Build backend (esbuild bundle → artifacts/api-server/dist/index.cjs)
+# ── Build Express backend bundle → artifacts/api-server/dist/index.cjs ───────
 RUN pnpm --filter @workspace/api-server run build
 
-# ── Stage 3: Production image ─────────────────────────────────────────────────
-FROM node:24-alpine AS production
+# ── Stage 3: Minimal production image ─────────────────────────────────────────
+FROM node:24-slim AS production
 WORKDIR /app
 
-# Install pnpm (needed only to install production node_modules)
-RUN npm install -g pnpm@9 --quiet
+# Install the ONLY external npm runtime dependency the bundle needs.
+# Everything else (express, pg, drizzle-orm, cors, multer, etc.) is
+# fully inlined by esbuild. No pnpm, no workspace — just one package.
+RUN npm install --no-save web-push@3.6.7
 
-# Copy workspace manifests for production install
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY lib/db/package.json             lib/db/
-COPY lib/api-spec/package.json       lib/api-spec/
-COPY lib/api-zod/package.json        lib/api-zod/
-COPY lib/api-client-react/package.json lib/api-client-react/
-COPY artifacts/api-server/package.json artifacts/api-server/
+# Copy the pre-built frontend (served as static files by the API server)
+COPY --from=builder /app/artifacts/web/dist/public ./public
 
-# Install only production dependencies
-RUN pnpm install --frozen-lockfile --prod
-
-# Copy built artifacts from builder
+# Copy the pre-built server bundle
 COPY --from=builder /app/artifacts/api-server/dist ./artifacts/api-server/dist
-COPY --from=builder /app/artifacts/web/dist/public  ./public
 
-# Tell the server to serve the frontend from /app/public
-ENV FRONTEND_STATIC_DIR=/app/public
-
-# Uploads volume — mount this in Dokploy as a persistent volume
-# so that files survive container rebuilds and restarts
-ENV UPLOADS_DIR=/app/uploads
+# Pre-create upload directories.
+# Mount /app/uploads as a persistent Docker volume in Dokploy so files
+# survive container rebuilds and restarts.
 RUN mkdir -p /app/uploads/gallery /app/uploads/receipts
 
-# Expose port (Dokploy will inject PORT via env)
-ENV PORT=3000
+# ── Runtime configuration ──────────────────────────────────────────────────────
+ENV NODE_ENV=production \
+    PORT=3000 \
+    UPLOADS_DIR=/app/uploads \
+    FRONTEND_STATIC_DIR=/app/public
+
 EXPOSE 3000
 
-ENV NODE_ENV=production
+# Volume annotation (informational — define the actual volume in Dokploy)
+VOLUME ["/app/uploads"]
 
-# Run the bundled server
 CMD ["node", "artifacts/api-server/dist/index.cjs"]
