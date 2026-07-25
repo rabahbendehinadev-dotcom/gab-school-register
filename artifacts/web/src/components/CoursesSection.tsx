@@ -78,9 +78,6 @@ function CourseCard({ course }: { course: Course }) {
         </span>
         <div className="flex items-center gap-2">
           <span className="text-gray-400 text-xs">{dateLabel}</span>
-          <span className="text-[10px] bg-white/10 text-gray-300 px-2 py-0.5 rounded-full">
-            {course.seats} مقعد
-          </span>
         </div>
       </div>
 
