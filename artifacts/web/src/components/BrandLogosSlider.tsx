@@ -143,24 +143,22 @@ export default function BrandLogosSlider() {
                 draggable={false}
                 className="brand-logo-img"
                 style={{
-                  height: "75px",
+                  height: "85px",
                   width: "auto",
-                  maxWidth: "160px",
+                  maxWidth: "150px",
                   objectFit: "contain",
                   display: "block",
                   userSelect: "none",
-                  opacity: 0.8,
-                  transition: "opacity 0.3s ease, transform 0.3s ease",
+                  opacity: 1,
+                  filter: "none",
+                  mixBlendMode: "normal",
+                  transition: "transform 0.3s ease",
                 }}
                 onMouseEnter={e => {
-                  const el = e.currentTarget as HTMLImageElement;
-                  el.style.opacity = "1";
-                  el.style.transform = "scale(1.06)";
+                  (e.currentTarget as HTMLImageElement).style.transform = "scale(1.05)";
                 }}
                 onMouseLeave={e => {
-                  const el = e.currentTarget as HTMLImageElement;
-                  el.style.opacity = "0.8";
-                  el.style.transform = "scale(1)";
+                  (e.currentTarget as HTMLImageElement).style.transform = "scale(1)";
                 }}
                 loading="lazy"
               />
