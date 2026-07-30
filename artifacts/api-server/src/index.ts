@@ -250,6 +250,25 @@ async function ensureAiTables(): Promise<void> {
   }
 }
 
+async function ensureBrandLogosTable(): Promise<void> {
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS "brand_logos" (
+        "id"         serial PRIMARY KEY,
+        "name"       text NOT NULL,
+        "image_url"  text NOT NULL,
+        "website"    text,
+        "sort_order" integer NOT NULL DEFAULT 0,
+        "is_active"  boolean NOT NULL DEFAULT true,
+        "created_at" timestamptz NOT NULL DEFAULT now()
+      )
+    `);
+  } finally {
+    client.release();
+  }
+}
+
 ensureSessionTable()
   .then(() => ensurePushSubscriptionsTable())
   .then(() => ensureRolesTable())
@@ -258,6 +277,7 @@ ensureSessionTable()
   .then(() => ensureStaffRoleIdColumn())
   .then(() => ensureChecklistTables())
   .then(() => ensureAiTables())
+  .then(() => ensureBrandLogosTable())
   .then(() => seedAdmin())
   .then(() => {
     startChecklistScheduler();

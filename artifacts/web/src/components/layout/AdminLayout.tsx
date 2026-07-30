@@ -125,6 +125,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     { href: "/gab-c7x2p/open-day",               fr: "Journée Portes Ouvertes",  ar: t.openDay,          icon: Ticket,          exact: false, show: canManageNotifications },
     { href: "/gab-c7x2p/courses",                fr: "Cours",                    ar: t.courses,          icon: BookOpen,        exact: false, show: canManageNotifications },
     { href: "/gab-c7x2p/gallery",                fr: "Galerie",                  ar: t.gallery,          icon: ImageIcon,       exact: false, show: canManageNotifications },
+    { href: "/gab-c7x2p/brand-logos",           fr: "Marques",                  ar: "العلامات التجارية", icon: ImageIcon,       exact: false, show: canManageNotifications },
     { href: "/gab-c7x2p/staff",                  fr: "Personnel",                ar: t.staff,            icon: ShieldCheck,     exact: false, show: canManageStaff },
     { href: "/gab-c7x2p/staff-activity",         fr: "Activité équipe",          ar: "نشاط الفريق",      icon: RadioTower,       exact: false, show: canManageStaff },
     { href: "/gab-c7x2p/roles",                  fr: "Rôles",                    ar: "الأدوار",          icon: Lock,            exact: false, show: canManageRoles },

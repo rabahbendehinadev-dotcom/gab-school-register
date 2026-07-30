@@ -20,3 +20,4 @@ export * from "./checklist-templates";
 export * from "./checklist-items";
 export * from "./checklist-assignments";
 export * from "./escalation-log";
+export * from "./brand-logos";

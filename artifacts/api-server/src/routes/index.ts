@@ -20,6 +20,7 @@ import sessionsRouter from "./sessions";
 import studentCollabRouter from "./student-collab";
 import checklistsRouter from "./checklists";
 import aiRouter from "./ai";
+import brandLogosRouter from "./brand-logos";
 
 const router: IRouter = Router();
 
@@ -44,5 +45,6 @@ router.use(sessionsRouter);
 router.use(studentCollabRouter);
 router.use(checklistsRouter);
 router.use(aiRouter);
+router.use(brandLogosRouter);
 
 export default router;

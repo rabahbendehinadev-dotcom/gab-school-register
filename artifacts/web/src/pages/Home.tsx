@@ -7,6 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCreateStudent, useListGalleryImages } from "@workspace/api-client-react";
 import CoursesSection from "@/components/CoursesSection";
 import OpenDaySection from "@/components/OpenDaySection";
+import BrandLogosSlider from "@/components/BrandLogosSlider";
 
 const registrationSchema = z.object({
   firstName: z.string().min(2, "الاسم الأول مطلوب"),
@@ -218,6 +219,9 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* ─── BRAND LOGOS ─── */}
+      <BrandLogosSlider />
 
       {/* ─── GALLERY ─── */}
       <section id="gallery" className="py-20 bg-[#f5f5f5]">

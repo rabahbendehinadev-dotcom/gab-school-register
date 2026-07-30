@@ -25,9 +25,13 @@ export function getReceiptsDir(): string {
   return path.join(getUploadsDir(), "receipts");
 }
 
+export function getBrandLogosDir(): string {
+  return path.join(getUploadsDir(), "brand-logos");
+}
+
 /** Ensure all required upload subdirectories exist (idempotent). */
 export function ensureUploadDirs(): void {
-  for (const dir of [getGalleryDir(), getReceiptsDir()]) {
+  for (const dir of [getGalleryDir(), getReceiptsDir(), getBrandLogosDir()]) {
     mkdirSync(dir, { recursive: true });
   }
 }
