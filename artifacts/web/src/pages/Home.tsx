@@ -3,6 +3,6 @@ import { useLocation } from "wouter";
 
 export default function Home() {
   const [, setLocation] = useLocation();
-  useEffect(() => { setLocation("/admin"); }, [setLocation]);
+  useEffect(() => { setLocation("/gab-c7x2p"); }, [setLocation]);
   return null;
 }
