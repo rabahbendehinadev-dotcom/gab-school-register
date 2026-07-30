@@ -138,7 +138,6 @@ export default function Home() {
                       <Field label="💻 نوع الدورة">
                         <select {...form.register("trainingType")} className={selectCls}>
                           <option value="physical">حضورية (في الأكاديمية)</option>
-                          <option value="online">أونلاين (عن بعد)</option>
                         </select>
                       </Field>
                       <Field label="🏠 هل تحتاج إقامة؟">
