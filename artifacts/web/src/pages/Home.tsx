@@ -55,44 +55,10 @@ export default function Home() {
         }} />
 
         <div className="max-w-7xl mx-auto px-5 relative">
-          <div className="grid md:grid-cols-2 gap-10 md:gap-16 items-center">
-
-            {/* Content */}
-            <div className="animate-fadeup text-right order-2 md:order-1">
-              <div className="inline-flex items-center gap-2 bg-[#ffedd5] text-[#ea580c] border border-[#fed7aa] px-5 py-2 rounded-full text-sm font-bold mb-6 animate-pulse-ring">
-                🏆 دورة حضورية + فيديوهات مسجّلة
-              </div>
-
-              <h1 className="text-4xl md:text-5xl font-black leading-snug mb-5 text-[#111]">
-                سجّل في<br />
-                <span className="text-gradient-orange">دورة تفليش الهواتف</span><br />
-                مع GAB SCHOOL
-              </h1>
-
-              <p className="text-[#525252] leading-8 mb-8">
-                املأ الاستمارة وسنتواصل معك لتأكيد التسجيل وإعطائك كل التفاصيل<br />
-                <strong className="text-[#ea580c]">(العرض · المدة · المواد · مكان الأكاديمية)</strong>
-              </p>
-
-              <div className="flex gap-4 flex-wrap justify-end">
-                {[
-                  { num: "+5000", label: "خريج محترف" },
-                  { num: "80%", label: "تدريب عملي" },
-                  { num: "24/7", label: "دعم مدى الحياة" },
-                ].map((s) => (
-                  <div
-                    key={s.label}
-                    className="flex flex-col items-center bg-white border border-[#e5e5e5] rounded-2xl px-5 py-4 shadow-sm hover:border-[#f97316] hover:shadow-lg hover:-translate-y-1 transition-all min-w-[100px]"
-                  >
-                    <span className="text-2xl font-black text-[#f97316] leading-none">{s.num}</span>
-                    <span className="text-xs text-[#525252] font-semibold mt-1 whitespace-nowrap">{s.label}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+          <div className="flex justify-center">
 
             {/* Registration Form */}
-            <div id="register" className="animate-fadeup-delay order-1 md:order-2">
+            <div id="register" className="animate-fadeup-delay w-full max-w-lg">
               <CoursesSection />
               <OpenDaySection />
               <div className="bg-white rounded-3xl p-7 md:p-10 shadow-2xl border border-[#e5e5e5] relative overflow-hidden">
